@@ -1,0 +1,53 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "RAMPART"
+version = "0.1.0"
+description = "A pytest-native safety testing framework for agentic AI applications"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.11"
+dependencies = [
+    "azure-identity>=1.25.3",
+    "azure-kusto-data>=6.0.3",
+    "azure-kusto-ingest>=6.0.3",
+    "jsonschema>=4.26.0",
+    "msgraph-sdk>=1.55.0",
+    "playwright>=1.58.0",
+    "pyrit",
+    "pytest>=9.0.3",
+    "pytest-asyncio>=1.3.0",
+    "pyyaml>=6.0.3",
+]
+
+[project.entry-points.pytest11]
+rampart = "rampart.pytest_plugin.plugin"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+markers = [
+    "harm(*categories): categorize test by harm type",
+    "trial(n=, threshold=): statistical repetition of a test",
+]
+
+[tool.ruff.lint]
+select = ["ALL"]
+
+[tool.ruff.lint.flake8-copyright]
+notice-rgx = "Copyright \\(c\\) Microsoft Corporation\\.\\s*\\n.*Licensed under the MIT license"
+
+[tool.ruff.lint.isort]
+known-first-party = ["rampart"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.uv.sources]
+pyrit = { git = "https://github.com/microsoft/PyRIT.git", rev = "main" }
+
+[dependency-groups]
+dev = [
+    "pre-commit>=4.5.1",
+]
