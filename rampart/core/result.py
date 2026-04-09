@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """Core result types for the RAMPART framework.
 
 Defines the single Result type, SafetyStatus, HarmCategory, InjectionRecord,

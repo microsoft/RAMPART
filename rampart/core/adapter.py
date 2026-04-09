@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """Session and AgentAdapter protocols.
 
 These are the two protocols that product teams implement to connect

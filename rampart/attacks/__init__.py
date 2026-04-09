@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """Attack factories.
 
 Attacks test for BAD things.  When the evaluator detects the attack

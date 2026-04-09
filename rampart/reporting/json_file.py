@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """JSON file report sink.
 
 Writes test run reports to timestamped JSON files under a

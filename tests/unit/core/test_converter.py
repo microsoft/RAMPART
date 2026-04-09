@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """Tests for rampart.core.converter — PayloadConverter protocol."""
 
 from pathlib import Path

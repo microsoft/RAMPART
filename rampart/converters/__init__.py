@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """Payload converters — transform payloads before injection or delivery.
 
 Re-exports concrete ``PayloadConverter`` implementations.

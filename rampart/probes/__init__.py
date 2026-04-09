@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """Probe factories.
 
 Probes test for the presence of desired behavior. When the evaluator

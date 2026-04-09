@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """SideEffectOccurred evaluator — detects observed side effects."""
 
 from __future__ import annotations

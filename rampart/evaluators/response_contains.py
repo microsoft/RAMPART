@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """ResponseContains evaluator — detects patterns in response text."""
 
 from __future__ import annotations

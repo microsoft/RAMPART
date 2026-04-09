@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """Tests for rampart.core.persona — Persona dataclass."""
 
 from rampart.core.persona import Persona

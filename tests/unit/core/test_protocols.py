@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """Tests for runtime-checkable protocol compliance via structural subtyping.
 
 Verifies that plain classes with the right methods satisfy isinstance checks

@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """Tests for the PyRIT LLM bridge.
 
 Validates translation from public LLMConfig to internal PyRIT

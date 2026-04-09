@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """LLM configuration — public model-configuration type.
 
 LLMConfig is the team-facing abstraction for specifying which LLM to

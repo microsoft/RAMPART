@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """Framework exceptions for RAMPART.
 
 The framework defines one exception that surfaces and adapters should raise

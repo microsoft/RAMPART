@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """BaseExecution ABC and execution lifecycle infrastructure.
 
 All execution strategies inherit BaseExecution, which owns the execution

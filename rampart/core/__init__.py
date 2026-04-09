@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """Core types, protocols, and ABCs.
 
 Re-exports all public core types for convenient access via rampart.core.

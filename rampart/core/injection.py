@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """Surface and InjectionHandle protocols.
 
 Two protocols serving two audiences: Surface is what surface authors

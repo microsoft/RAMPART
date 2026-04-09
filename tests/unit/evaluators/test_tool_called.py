@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """Tests for rampart.evaluators.tool_called — ToolCalled evaluator."""
 
 import pytest

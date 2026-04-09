@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """PayloadConverter protocol — transform payloads before injection.
 
 Converters are the single abstraction for payload transformation

@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """LLM-driven text variant generation.
 
 Internal module. Consumers use ``Payloads``, not this class directly.

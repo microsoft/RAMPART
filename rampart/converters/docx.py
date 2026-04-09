@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """DocxConverter — render text payloads into Word documents.
 
 Adapts PyRIT's ``WordDocConverter`` to RAMPART's ``PayloadConverter``

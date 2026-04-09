@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """Driver implementations.
 
 Re-exports StaticDriver and provides the _coerce_driver helper

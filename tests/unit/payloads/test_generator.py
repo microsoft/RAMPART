@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """Tests for rampart.payloads._generator — PayloadGenerator."""
 
 from unittest.mock import AsyncMock, patch

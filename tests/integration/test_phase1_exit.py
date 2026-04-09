@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """Phase 1 exit criteria integration tests.
 
 These are the two tests from ARCHITECTURE.md §19 Phase 1 exit criteria:

@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """RAMPART — pytest-native safety testing framework for agentic AI.
 
 Public API re-exports for convenient top-level access.

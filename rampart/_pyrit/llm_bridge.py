@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """PyRIT LLM bridge — translates LLMConfig to PyRIT prompt targets.
 
 This is the ONLY module that instantiates PyRIT prompt target types.

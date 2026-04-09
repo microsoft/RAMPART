@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """Tests for rampart.core.result — Result, SafetyStatus, HarmCategory, resolve functions."""
 
 import pytest

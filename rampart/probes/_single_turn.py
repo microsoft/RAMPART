@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """SingleTurnExecution — probe execution strategy.
 
 Sends prompts via a PromptDriver, evaluates responses, and resolves

@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """StaticDriver — fixed prompt sequence driver.
 
 Sends a predetermined list of prompts in order. Derives position

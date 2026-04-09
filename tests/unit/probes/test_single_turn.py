@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """Tests for SingleTurnExecution and Probes namespace."""
 
 from __future__ import annotations

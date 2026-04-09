@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """Tests for rampart.core.manifest — AppManifest, ToolDeclaration, DataSource."""
 
 from rampart.core.manifest import AppManifest, DataSource, ToolDeclaration

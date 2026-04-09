@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """AppManifest, ToolDeclaration, and DataSource.
 
 Describes what an agent can do — its tools, data sources, and capabilities.

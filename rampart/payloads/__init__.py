@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """Payload generation, conversion, and persistence.
 
 ``Payloads`` is a static namespace for LLM-driven payload generation.

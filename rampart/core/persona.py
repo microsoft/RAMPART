@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """Persona dataclass — shared by payloads/ and drivers/.
 
 A Persona is a named LLM identity used to shape model behavior for

@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """XPIAExecution — cross-plugin indirect attack execution strategy.
 
 Orchestrates the full XPIA lifecycle: activate injections, wait for

@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """Tests for rampart.core.evaluator — Evaluator protocol, BaseEvaluator, composition."""
 
 import pytest

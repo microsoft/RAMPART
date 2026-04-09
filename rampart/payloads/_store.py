@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """Payload persistence on disk.
 
 Collections are stored as directories under the store root:

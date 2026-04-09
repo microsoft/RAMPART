@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """Core data types for the RAMPART framework.
 
 All types in this module are the shared vocabulary of the entire framework —

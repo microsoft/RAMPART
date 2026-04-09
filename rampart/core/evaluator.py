@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """Evaluator protocol, BaseEvaluator ABC, and composition operators.
 
 The evaluator system is the framework's primary analytical capability.

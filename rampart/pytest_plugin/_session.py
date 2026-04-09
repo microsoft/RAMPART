@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """Session-scoped state for the RAMPART pytest plugin.
 
 Accumulates Result objects, computes trial group aggregates, and

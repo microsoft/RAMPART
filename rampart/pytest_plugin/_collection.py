@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """Result collection infrastructure for the pytest plugin.
 
 Provides the ContextVar-based mechanism for collecting Result objects

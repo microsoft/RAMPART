@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """PromptDriver protocol and PromptDecision.
 
 Drivers generate the prompts sent to the agent during an execution.

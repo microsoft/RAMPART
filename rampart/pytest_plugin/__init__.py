@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """RAMPART pytest plugin.
 
 Plugin registration via the pytest11 entry point in pyproject.toml.

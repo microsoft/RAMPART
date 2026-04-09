@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """ToolCalled evaluator — detects whether a specific tool was invoked."""
 
 from __future__ import annotations

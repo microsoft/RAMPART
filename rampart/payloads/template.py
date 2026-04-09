@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """Payload template definitions for LLM-driven generation.
 
 A PayloadTemplate is the instruction to an adversarial LLM about

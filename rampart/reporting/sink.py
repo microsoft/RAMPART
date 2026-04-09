@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """ReportSink protocol and TestRunReport.
 
 The reporting layer consumes structured Result objects and emits

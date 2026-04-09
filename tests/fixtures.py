@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """Mock fixtures for testing adapters and evaluators.
 
 Provides MockSession and MockAdapter as minimal deterministic test

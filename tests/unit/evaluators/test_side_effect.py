@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """Tests for rampart.evaluators.side_effect — SideEffectOccurred evaluator."""
 
 import pytest
