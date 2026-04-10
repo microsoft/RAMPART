@@ -16,14 +16,18 @@ from __future__ import annotations
 import copy
 import logging
 from collections import Counter
-from collections.abc import Sequence
 from dataclasses import dataclass
-
-import pytest
+from typing import TYPE_CHECKING
 
 from rampart.core.result import Result, SafetyStatus
-from rampart.pytest_plugin._collection import ResultCollector
 from rampart.reporting.sink import ReportSink, TestRunReport
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+
+    import pytest
+
+    from rampart.pytest_plugin._collection import ResultCollector
 
 logger = logging.getLogger(__name__)
 
@@ -66,8 +70,7 @@ class TrialGroupResult:
 
 
 class RampartSession:
-    """
-    Session-scoped state for the RAMPART plugin.
+    """Session-scoped state for the RAMPART plugin.
 
     Accumulates Result objects from all tests, stores trial group
     aggregates, tracks session duration, and builds the final
@@ -92,8 +95,7 @@ class RampartSession:
         return list(self._sinks)
 
     def add_sinks(self, *, sinks: list[ReportSink]) -> None:
-        """
-        Register additional sinks for report emission.
+        """Register additional sinks for report emission.
 
         Called by the fixture-based bootstrap to add team-provided
         sinks.
@@ -106,15 +108,18 @@ class RampartSession:
         """
         for sink in sinks:
             if not isinstance(sink, ReportSink):
-                raise TypeError(
+                msg = (
                     f"Expected ReportSink, got {type(sink).__name__}. "
-                    f"Sinks must implement: async def emit_async(*, report: TestRunReport) -> None"
+                    "Sinks must implement: "
+                    "async def emit_async(*, report: TestRunReport) -> None"
+                )
+                raise TypeError(
+                    msg,
                 )
             self._sinks.append(sink)
 
     def set_duration(self, *, duration_seconds: float) -> None:
-        """
-        Set the total session duration.
+        """Set the total session duration.
 
         Called by the plugin at session finish with the elapsed time
         since pytest_configure.
@@ -125,8 +130,7 @@ class RampartSession:
         self._duration_seconds = duration_seconds
 
     def absorb(self, *, node: pytest.Item, collector: ResultCollector) -> None:
-        """
-        Absorb results from a completed test's collector.
+        """Absorb results from a completed test's collector.
 
         Tags each result with the short test name (extracted from
         the node ID) and the harm category from ``@pytest.mark.harm``
@@ -141,14 +145,16 @@ class RampartSession:
         """
         test_name = node.nodeid.split("::")[-1] if "::" in node.nodeid else node.nodeid
         harm_marker = node.get_closest_marker("harm")
-        harm_category = harm_marker.args[0] if harm_marker and harm_marker.args else None
+        harm_category = (
+            harm_marker.args[0] if harm_marker and harm_marker.args else None
+        )
 
         collected = collector.results
         tagged: list[Result] = []
-        for result in collected:
+        for original_result in collected:
             # Shallow copy is sufficient because we reconstruct all
             # mutable fields we modify (currently metadata and harm_category).
-            result = copy.copy(result)
+            result = copy.copy(original_result)
             result.metadata = {**result.metadata, "test_name": test_name}
             if harm_category is not None and result.harm_category is None:
                 result.harm_category = harm_category
@@ -164,8 +170,7 @@ class RampartSession:
         trial_items: Sequence[pytest.Item],
         threshold: float,
     ) -> None:
-        """
-        Record aggregate statistics for a trial group.
+        """Record aggregate statistics for a trial group.
 
         Semantics:
         - Any UNSAFE result across all trials -> group FAILS
@@ -230,8 +235,7 @@ class RampartSession:
         return dict(self._trial_groups)
 
     def build_report(self) -> TestRunReport:
-        """
-        Build a TestRunReport from all collected results.
+        """Build a TestRunReport from all collected results.
 
         The report is cached and reused on subsequent calls. The
         cache is invalidated when new results are absorbed.

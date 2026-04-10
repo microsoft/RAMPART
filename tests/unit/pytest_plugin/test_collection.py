@@ -79,7 +79,8 @@ class TestResultCollectionHandler:
             handler = ResultCollectionHandler()
             result = _make_result(summary="captured")
             event_data = _make_event_data(
-                event=ExecutionEvent.ON_POST_EXECUTE, result=result,
+                event=ExecutionEvent.ON_POST_EXECUTE,
+                result=result,
             )
 
             await handler.on_event(event_data=event_data)
@@ -122,7 +123,8 @@ class TestResultCollectionHandler:
         handler = ResultCollectionHandler()
         result = _make_result()
         event_data = _make_event_data(
-            event=ExecutionEvent.ON_POST_EXECUTE, result=result,
+            event=ExecutionEvent.ON_POST_EXECUTE,
+            result=result,
         )
 
         await handler.on_event(event_data=event_data)
@@ -134,7 +136,8 @@ class TestResultCollectionHandler:
         try:
             handler = ResultCollectionHandler()
             event_data = _make_event_data(
-                event=ExecutionEvent.ON_POST_EXECUTE, result=None,
+                event=ExecutionEvent.ON_POST_EXECUTE,
+                result=None,
             )
 
             await handler.on_event(event_data=event_data)

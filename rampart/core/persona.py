@@ -13,8 +13,7 @@ from dataclasses import dataclass
 
 @dataclass(kw_only=True)
 class Persona:
-    """
-    A named LLM identity used to shape model behavior.
+    """A named LLM identity used to shape model behavior.
 
     Args:
         name: Stable identifier used in cache keys and reports.

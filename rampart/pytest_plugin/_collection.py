@@ -11,19 +11,25 @@ per test; execution event handlers write into it automatically.
 from __future__ import annotations
 
 from contextvars import ContextVar, Token
+from typing import TYPE_CHECKING
 
-from rampart.core.execution import ExecutionEvent, ExecutionEventData, ExecutionEventHandler
-from rampart.core.result import Result
+from rampart.core.execution import (
+    ExecutionEvent,
+    ExecutionEventData,
+    ExecutionEventHandler,
+)
 
+if TYPE_CHECKING:
+    from rampart.core.result import Result
 
 _active_collector: ContextVar[ResultCollector | None] = ContextVar(
-    "_active_collector", default=None
+    "_active_collector",
+    default=None,
 )
 
 
 def activate_collector(collector: ResultCollector) -> Token[ResultCollector | None]:
-    """
-    Set the given collector as the active per-test collector.
+    """Set the given collector as the active per-test collector.
 
     Returns a token that must be passed to deactivate_collector to
     restore the previous state.
@@ -38,8 +44,7 @@ def activate_collector(collector: ResultCollector) -> Token[ResultCollector | No
 
 
 def deactivate_collector(token: Token[ResultCollector | None]) -> None:
-    """
-    Restore the previous collector state using the token from activate_collector.
+    """Restore the previous collector state using the token from activate_collector.
 
     Args:
         token (Token[ResultCollector | None]): The token returned by activate_collector.
@@ -48,8 +53,7 @@ def deactivate_collector(token: Token[ResultCollector | None]) -> None:
 
 
 class ResultCollector:
-    """
-    Accumulates Result objects produced during a single test.
+    """Accumulates Result objects produced during a single test.
 
     Framework-internal. Never referenced by test authors.
     """
@@ -58,8 +62,7 @@ class ResultCollector:
         self._results: list[Result] = []
 
     def record(self, *, result: Result) -> None:
-        """
-        Record a result.
+        """Record a result.
 
         Args:
             result (Result): The result to record.
@@ -73,8 +76,7 @@ class ResultCollector:
 
 
 class ResultCollectionHandler(ExecutionEventHandler):
-    """
-    Default ExecutionEventHandler installed on every BaseExecution.
+    """Default ExecutionEventHandler installed on every BaseExecution.
 
     Writes the Result into the active per-test collector on
     ON_POST_EXECUTE. No-op for all other events. No-op when no
@@ -82,8 +84,7 @@ class ResultCollectionHandler(ExecutionEventHandler):
     """
 
     async def on_event(self, *, event_data: ExecutionEventData) -> None:
-        """
-        Record result on post-execute. Ignore all other events.
+        """Record result on post-execute. Ignore all other events.
 
         Args:
             event_data (ExecutionEventData): The event data.
@@ -98,8 +99,7 @@ class ResultCollectionHandler(ExecutionEventHandler):
 
 
 def record_result(result: Result) -> None:
-    """
-    Record a Result into the active test's collector.
+    """Record a Result into the active test's collector.
 
     For building-block tests that construct Results manually rather
     than via Attacks.* or Probes.* factories. No-op when called

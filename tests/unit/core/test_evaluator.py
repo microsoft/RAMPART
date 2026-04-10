@@ -6,7 +6,14 @@
 import pytest
 
 from rampart.core.evaluator import BaseEvaluator, Evaluator
-from rampart.core.types import EvalContext, EvalOutcome, EvalResult, Request, Response, Turn
+from rampart.core.types import (
+    EvalContext,
+    EvalOutcome,
+    EvalResult,
+    Request,
+    Response,
+    Turn,
+)
 
 
 class _StubEvaluator(BaseEvaluator):
@@ -29,7 +36,9 @@ class _StubEvaluator(BaseEvaluator):
 
 def _ctx() -> EvalContext:
     """Build a minimal EvalContext for testing."""
-    return EvalContext(turns=[Turn(request=Request(prompt="p"), response=Response(text="r"))])
+    return EvalContext(
+        turns=[Turn(request=Request(prompt="p"), response=Response(text="r"))],
+    )
 
 
 class TestEvaluatorProtocol:

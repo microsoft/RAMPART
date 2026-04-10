@@ -28,7 +28,6 @@ from rampart.core import (
     InjectionRecord,
     ObservabilityLevel,
     PromptDriver,
-    Request,
     Result,
     SafetyStatus,
     Turn,
@@ -39,8 +38,7 @@ logger = logging.getLogger(__name__)
 
 
 class XPIAExecution(BaseExecution):
-    """
-    Executes the full XPIA attack lifecycle.
+    """Executes the full XPIA attack lifecycle.
 
     Inherits BaseExecution.  Implements ``_execute_async`` with XPIA's
     specific phase structure.  The lifecycle skeleton (event dispatch,
@@ -95,8 +93,7 @@ class XPIAExecution(BaseExecution):
         return "xpia"
 
     async def _execute_async(self, *, adapter: AgentAdapter) -> Result:
-        """
-        Orchestrate the XPIA lifecycle and return a safety Result.
+        """Orchestrate the XPIA lifecycle and return a safety Result.
 
         Delegates phase execution to ``_run_phases_async`` and result
         construction to ``_build_attack_result`` or
@@ -116,17 +113,22 @@ class XPIAExecution(BaseExecution):
         )
         if max_turns_hit:
             return self._max_turns_error_result(
-                adapter=adapter, turns=turns, eval_results=eval_results,
+                adapter=adapter,
+                turns=turns,
+                eval_results=eval_results,
             )
         return self._build_attack_result(
-            adapter=adapter, turns=turns, eval_results=eval_results,
+            adapter=adapter,
+            turns=turns,
+            eval_results=eval_results,
         )
 
     async def _run_phases_async(
-        self, *, adapter: AgentAdapter,
+        self,
+        *,
+        adapter: AgentAdapter,
     ) -> tuple[list[Turn], list[EvalResult], bool]:
-        """
-        Run XPIA phases 1-5 inside a cleanup-guaranteed context.
+        """Run XPIA phases 1-5 inside a cleanup-guaranteed context.
 
         Args:
             adapter (AgentAdapter): The agent adapter.
@@ -140,7 +142,7 @@ class XPIAExecution(BaseExecution):
         async with AsyncExitStack() as stack:
             await self._activate_handles_async(stack=stack)
             session = await stack.enter_async_context(
-                await adapter.create_session_async()
+                await adapter.create_session_async(),
             )
 
             for turn_index in range(self._max_turns):
@@ -150,16 +152,19 @@ class XPIAExecution(BaseExecution):
 
                 request = decision.request
                 response = await session.send_async(request)
-                turns.append(Turn(
-                    request=request,
-                    response=response,
-                    turn_number=turn_index,
-                    driver_reasoning=decision.reasoning,
-                ))
+                turns.append(
+                    Turn(
+                        request=request,
+                        response=response,
+                        turn_number=turn_index,
+                        driver_reasoning=decision.reasoning,
+                    ),
+                )
 
                 eval_result = await self._evaluator.evaluate_async(
                     context=EvalContext(
-                        turns=list(turns), manifest=adapter.manifest,
+                        turns=list(turns),
+                        manifest=adapter.manifest,
                     ),
                 )
                 eval_results.append(eval_result)
@@ -172,10 +177,11 @@ class XPIAExecution(BaseExecution):
         return turns, eval_results, False
 
     async def _activate_handles_async(
-        self, *, stack: AsyncExitStack,
+        self,
+        *,
+        stack: AsyncExitStack,
     ) -> None:
-        """
-        Activate all injection handles and wait for indexing.
+        """Activate all injection handles and wait for indexing.
 
         Args:
             stack (AsyncExitStack): The exit stack managing cleanup.
@@ -184,7 +190,8 @@ class XPIAExecution(BaseExecution):
             await stack.enter_async_context(handle)
 
         delay = max(
-            (h.indexing_delay_seconds for h in self._handles), default=0.0,
+            (h.indexing_delay_seconds for h in self._handles),
+            default=0.0,
         )
         if delay > 0:
             await asyncio.sleep(delay)
@@ -196,8 +203,7 @@ class XPIAExecution(BaseExecution):
         turns: list[Turn],
         eval_results: list[EvalResult],
     ) -> Result:
-        """
-        Resolve eval results into a final attack Result.
+        """Resolve eval results into a final attack Result.
 
         Applies observability adjustment when the initial verdict is SAFE.
 
@@ -213,7 +219,10 @@ class XPIAExecution(BaseExecution):
 
         if status == SafetyStatus.SAFE:
             safe, status = self._adjust_for_observability(
-                adapter=adapter, turns=turns, safe=safe, status=status,
+                adapter=adapter,
+                turns=turns,
+                safe=safe,
+                status=status,
             )
 
         return Result(
@@ -235,8 +244,7 @@ class XPIAExecution(BaseExecution):
         turns: list[Turn],
         eval_results: list[EvalResult],
     ) -> Result:
-        """
-        Build an ERROR result when the driver exceeds max_turns.
+        """Build an ERROR result when the driver exceeds max_turns.
 
         Args:
             adapter (AgentAdapter): The adapter under test.
@@ -255,8 +263,7 @@ class XPIAExecution(BaseExecution):
             safe=False,
             status=SafetyStatus.ERROR,
             summary=(
-                f"Max turns ({self._max_turns}) reached"
-                " — driver did not terminate"
+                f"Max turns ({self._max_turns}) reached — driver did not terminate"
             ),
             turns=turns,
             eval_results=eval_results,
@@ -284,8 +291,7 @@ class XPIAExecution(BaseExecution):
         safe: bool,
         status: SafetyStatus,
     ) -> tuple[bool, SafetyStatus]:
-        """
-        Downgrade SAFE to UNDETERMINED when the adapter lacks observability.
+        """Downgrade SAFE to UNDETERMINED when the adapter lacks observability.
 
         If the evaluator returned NOT_DETECTED (and ``resolve_as_attack``
         produced SAFE), but the adapter has RESPONSE_ONLY observability
@@ -323,8 +329,7 @@ def _collect_response_metadata(
     *,
     turns: list[Turn],
 ) -> dict[str, Any]:
-    """
-    Aggregate response metadata from all turns.
+    """Aggregate response metadata from all turns.
 
     Adapters can attach diagnostic data (e.g. conversation_id, session_id)
     to Response.metadata. This function collects it into a single dict
@@ -355,8 +360,7 @@ def _build_summary(
     status: SafetyStatus,
     eval_results: list[EvalResult],
 ) -> str:
-    """
-    Build a human-readable one-line summary for XPIA results.
+    """Build a human-readable one-line summary for XPIA results.
 
     Args:
         status (SafetyStatus): The resolved safety status.
@@ -374,7 +378,9 @@ def _build_summary(
         return f"Attack objective detected: {'; '.join(evidence[:3])}"
     if status == SafetyStatus.UNDETERMINED:
         rationales = [er.rationale for er in eval_results if er.rationale]
-        detail = "; ".join(rationales[:2]) if rationales else "Insufficient observability"
+        detail = (
+            "; ".join(rationales[:2]) if rationales else "Insufficient observability"
+        )
         return f"Evaluation undetermined: {detail}"
     if status == SafetyStatus.ERROR:
         return "Infrastructure error during execution"

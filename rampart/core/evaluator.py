@@ -18,8 +18,7 @@ from rampart.core.types import EvalContext, EvalOutcome, EvalResult
 
 @runtime_checkable
 class Evaluator(Protocol):
-    """
-    Detects a condition in an EvalContext.
+    """Detects a condition in an EvalContext.
 
     Evaluators are polarity-free. They answer "did X happen?" — not
     "is X good or bad?" The Attacks/Probes factories handle the
@@ -33,8 +32,7 @@ class Evaluator(Protocol):
     """
 
     async def evaluate_async(self, *, context: EvalContext) -> EvalResult:
-        """
-        Evaluate the context and return a detection signal.
+        """Evaluate the context and return a detection signal.
 
         Args:
             context (EvalContext): The interaction data to evaluate.
@@ -46,8 +44,7 @@ class Evaluator(Protocol):
 
 
 class BaseEvaluator(ABC):
-    """
-    Base class for evaluator implementations.
+    """Base class for evaluator implementations.
 
     Provides composition operators (|, &, ~) and common behavior.
     Subclass this for concrete evaluators. Implement evaluate_async.
@@ -79,8 +76,7 @@ class _AnyEvaluator(BaseEvaluator):
         self._right = right
 
     async def evaluate_async(self, *, context: EvalContext) -> EvalResult:
-        """
-        Evaluate left first. If DETECTED, skip right entirely.
+        """Evaluate left first. If DETECTED, skip right entirely.
 
         Short-circuiting avoids unnecessary work when the left operand
         is a cheap deterministic evaluator and the right is an expensive
@@ -104,10 +100,7 @@ class _AnyEvaluator(BaseEvaluator):
                 rationale=right_result.rationale,
             )
 
-        if (
-            left_result.outcome == EvalOutcome.UNDETERMINED
-            or right_result.outcome == EvalOutcome.UNDETERMINED
-        ):
+        if EvalOutcome.UNDETERMINED in (left_result.outcome, right_result.outcome):
             return EvalResult(
                 outcome=EvalOutcome.UNDETERMINED,
                 rationale="One or both operands undetermined",
@@ -127,8 +120,7 @@ class _AllEvaluator(BaseEvaluator):
         self._right = right
 
     async def evaluate_async(self, *, context: EvalContext) -> EvalResult:
-        """
-        Evaluate left first. If NOT_DETECTED or UNDETERMINED, skip right.
+        """Evaluate left first. If NOT_DETECTED or UNDETERMINED, skip right.
 
         Short-circuiting avoids unnecessary work when the left operand
         can rule out the conjunction cheaply. Place the cheaper or more
@@ -182,9 +174,7 @@ class _NotEvaluator(BaseEvaluator):
         if result.outcome == EvalOutcome.UNDETERMINED:
             return result
 
-        flipped = (
-            EvalOutcome.NOT_DETECTED if result.detected else EvalOutcome.DETECTED
-        )
+        flipped = EvalOutcome.NOT_DETECTED if result.detected else EvalOutcome.DETECTED
         return EvalResult(
             outcome=flipped,
             confidence=result.confidence,

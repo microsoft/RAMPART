@@ -9,16 +9,18 @@ their agent to the RAMPART framework.
 
 from __future__ import annotations
 
-from typing import Any, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Protocol, Self, runtime_checkable
 
-from rampart.core.manifest import AppManifest
-from rampart.core.types import ObservabilityLevel, Payload, Request, Response
+if TYPE_CHECKING:
+    import types
+
+    from rampart.core.manifest import AppManifest
+    from rampart.core.types import ObservabilityLevel, Request, Response
 
 
 @runtime_checkable
 class Session(Protocol):
-    """
-    A bounded unit of interaction with the agent.
+    """A bounded unit of interaction with the agent.
 
     Sessions are async context managers. Entering returns the session
     ready for use; exiting guarantees cleanup of any resources the
@@ -28,8 +30,7 @@ class Session(Protocol):
     """
 
     async def send_async(self, request: Request) -> Response:
-        """
-        Send a request to the agent and return its response.
+        """Send a request to the agent and return its response.
 
         The adapter is responsible for populating Response.tool_calls
         and Response.side_effects with whatever it can observe. Empty
@@ -44,7 +45,7 @@ class Session(Protocol):
         """
         ...
 
-    async def __aenter__(self) -> Session:
+    async def __aenter__(self) -> Self:
         """Enter the session context. Returns self."""
         ...
 
@@ -52,7 +53,7 @@ class Session(Protocol):
         self,
         exc_type: type[BaseException] | None,
         exc_val: BaseException | None,
-        exc_tb: Any,
+        exc_tb: types.TracebackType | None,
     ) -> None:
         """Clean up session resources. Must be idempotent."""
         ...
@@ -60,8 +61,7 @@ class Session(Protocol):
 
 @runtime_checkable
 class AgentAdapter(Protocol):
-    """
-    Factory for sessions and source of agent metadata.
+    """Factory for sessions and source of agent metadata.
 
     Teams implement this to describe their agent and create
     interaction sessions. The manifest declares what the agent
@@ -69,8 +69,7 @@ class AgentAdapter(Protocol):
     """
 
     async def create_session_async(self) -> Session:
-        """
-        Create a fresh interaction session.
+        """Create a fresh interaction session.
 
         Each session is independent — no shared conversation state.
         Creating a new session is how the framework achieves
@@ -83,8 +82,7 @@ class AgentAdapter(Protocol):
 
     @property
     def manifest(self) -> AppManifest:
-        """
-        The agent's declared capabilities.
+        """The agent's declared capabilities.
 
         Returns:
             AppManifest: The agent's capability declaration.
@@ -93,8 +91,7 @@ class AgentAdapter(Protocol):
 
     @property
     def observability_profile(self) -> ObservabilityLevel:
-        """
-        Declares what this adapter can reliably observe.
+        """Declares what this adapter can reliably observe.
 
         Used by evaluators to distinguish "nothing happened" from
         "I can't see what happened."

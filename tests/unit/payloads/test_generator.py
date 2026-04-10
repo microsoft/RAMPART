@@ -77,7 +77,9 @@ class TestGenerateTextVariants:
             return "single variant"
 
         with patch.object(
-            PayloadGenerator, "_send_to_llm_async", side_effect=capture,
+            PayloadGenerator,
+            "_send_to_llm_async",
+            side_effect=capture,
         ):
             gen = PayloadGenerator(llm=_llm())
             template = PayloadTemplate(
@@ -127,7 +129,9 @@ class TestGenerateTextVariants:
             return "variant"
 
         with patch.object(
-            PayloadGenerator, "_send_to_llm_async", side_effect=capture,
+            PayloadGenerator,
+            "_send_to_llm_async",
+            side_effect=capture,
         ):
             gen = PayloadGenerator(llm=_llm())
             await gen.generate_text_variants_async(

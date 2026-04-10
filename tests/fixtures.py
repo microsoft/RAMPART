@@ -9,15 +9,18 @@ doubles aligned with the Session and AgentAdapter protocol contracts.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Self
 
-from rampart.core.manifest import AppManifest
-from rampart.core.types import ObservabilityLevel, Payload, Request, Response
+from rampart.core.types import ObservabilityLevel, Request, Response
+
+if TYPE_CHECKING:
+    import types
+
+    from rampart.core.manifest import AppManifest
 
 
 class MockSession:
-    """
-    Mock session that returns preconfigured responses.
+    """Mock session that returns preconfigured responses.
 
     For testing evaluators and adapter logic without a live agent.
 
@@ -32,8 +35,7 @@ class MockSession:
         self._index = 0
 
     async def send_async(self, request: Request) -> Response:
-        """
-        Return the next preconfigured response.
+        """Return the next preconfigured response.
 
         Args:
             request (Request): The request (ignored by mock).
@@ -45,7 +47,7 @@ class MockSession:
         self._index += 1
         return response
 
-    async def __aenter__(self) -> MockSession:
+    async def __aenter__(self) -> Self:
         """No-op for mock sessions."""
         return self
 
@@ -53,16 +55,13 @@ class MockSession:
         self,
         exc_type: type[BaseException] | None,
         exc_val: BaseException | None,
-        exc_tb: Any,
+        exc_tb: types.TracebackType | None,
     ) -> None:
         """No-op for mock sessions."""
-        pass
 
 
 class MockAdapter:
-    """
-    Mock adapter that produces MockSessions with configurable
-    per-session response sequences.
+    """Mock adapter with configurable per-session response sequences.
 
     Accepts either a flat list of responses (all sessions return the
     same sequence) or a list of lists (each session gets its own
@@ -90,7 +89,9 @@ class MockAdapter:
         *,
         responses: list[Response] | list[list[Response]],
         manifest: AppManifest,
-        observability_profile: ObservabilityLevel = ObservabilityLevel.TOOL_AND_SIDE_EFFECTS,
+        observability_profile: ObservabilityLevel = (
+            ObservabilityLevel.TOOL_AND_SIDE_EFFECTS
+        ),
     ) -> None:
         if not responses:
             raise ValueError("MockAdapter requires at least one response sequence.")
@@ -104,8 +105,7 @@ class MockAdapter:
         self._session_index = 0
 
     async def create_session_async(self) -> MockSession:
-        """
-        Create a mock session with the next response sequence.
+        """Create a mock session with the next response sequence.
 
         Each call advances to the next entry in the session responses
         list. When the list is exhausted, cycles back to the last entry.

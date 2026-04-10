@@ -9,13 +9,15 @@ detects the expected behavior, the result is SAFE.
 
 from __future__ import annotations
 
-from typing import overload
+from typing import TYPE_CHECKING, overload
 
-from rampart.core.evaluator import Evaluator
-from rampart.core.execution import BaseExecution, ExecutionEventHandler
-from rampart.core.prompt_driver import PromptDriver
 from rampart.drivers import _coerce_driver
 from rampart.probes._single_turn import SingleTurnExecution
+
+if TYPE_CHECKING:
+    from rampart.core.evaluator import Evaluator
+    from rampart.core.execution import BaseExecution, ExecutionEventHandler
+    from rampart.core.prompt_driver import PromptDriver
 
 __all__ = ["Probes", "SingleTurnExecution"]
 
@@ -54,7 +56,7 @@ class Probes:
     ) -> BaseExecution: ...
 
     @staticmethod
-    def behavior(
+    def behavior(  # noqa: PLR0913
         *,
         prompt: str | None = None,
         prompts: list[str] | None = None,
@@ -63,8 +65,7 @@ class Probes:
         max_turns: int = 25,
         event_handlers: list[ExecutionEventHandler] | None = None,
     ) -> BaseExecution:
-        """
-        Probe whether the agent exhibits desired behavior.
+        """Probe whether the agent exhibits desired behavior.
 
         Exactly one of ``prompt``, ``prompts``, or ``driver`` must be
         provided.
@@ -86,19 +87,18 @@ class Probes:
             ValueError: If more than one or none of ``prompt``,
                 ``prompts``, and ``driver`` are provided.
         """
-        given = sum(
-            x is not None for x in (prompt, prompts, driver)
-        )
+        given = sum(x is not None for x in (prompt, prompts, driver))
         if given != 1:
+            msg = "Specify exactly one of 'prompt', 'prompts', or 'driver'."
             raise ValueError(
-                "Specify exactly one of 'prompt', 'prompts', or 'driver'."
+                msg,
             )
         if prompt is not None:
             resolved_driver = _coerce_driver(prompt)
         elif prompts is not None:
             resolved_driver = _coerce_driver(prompts)
         else:
-            assert driver is not None
+            assert driver is not None  # noqa: S101  — type narrowing
             resolved_driver = driver
         return SingleTurnExecution(
             driver=resolved_driver,

@@ -1,12 +1,12 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT license.
 
-from typing import Any
+import types
+from typing import Self
 
 import pytest
 
-from rampart.core import execution as _execution_module
-from rampart.core.adapter import AgentAdapter, Session
+from rampart.core.adapter import AgentAdapter
 from rampart.core.errors import InfrastructureError
 from rampart.core.execution import (
     BaseExecution,
@@ -16,7 +16,7 @@ from rampart.core.execution import (
 )
 from rampart.core.manifest import AppManifest
 from rampart.core.result import Result, SafetyStatus
-from rampart.core.types import ObservabilityLevel, Payload, Request, Response
+from rampart.core.types import ObservabilityLevel, Request, Response
 
 
 class _StubSession:
@@ -26,7 +26,7 @@ class _StubSession:
         """Return a fixed response."""
         return Response(text="ok")
 
-    async def __aenter__(self) -> "_StubSession":
+    async def __aenter__(self) -> Self:
         """Enter context."""
         return self
 
@@ -34,7 +34,7 @@ class _StubSession:
         self,
         exc_type: type[BaseException] | None,
         exc_val: BaseException | None,
-        exc_tb: Any,
+        exc_tb: types.TracebackType | None,
     ) -> None:
         """Exit context."""
 
@@ -219,7 +219,9 @@ class TestGenericErrorPropagation:
         with pytest.raises(RuntimeError):
             await execution.execute_async(adapter=_StubAdapter())
 
-        error_event = [e for e in handler.events if e.event is ExecutionEvent.ON_ERROR][0]
+        error_event = [e for e in handler.events if e.event is ExecutionEvent.ON_ERROR][
+            0
+        ]
         assert isinstance(error_event.error, RuntimeError)
 
 

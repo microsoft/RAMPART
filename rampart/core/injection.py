@@ -9,15 +9,17 @@ implement; InjectionHandle is what execution strategies consume.
 
 from __future__ import annotations
 
-from typing import Any, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Protocol, Self, runtime_checkable
 
-from rampart.core.types import Payload
+if TYPE_CHECKING:
+    import types
+
+    from rampart.core.types import Payload
 
 
 @runtime_checkable
 class InjectionHandle(Protocol):
-    """
-    A prepared injection, ready to activate as an async context manager.
+    """A prepared injection, ready to activate as an async context manager.
 
     Returned by Surface.inject(). Entering activates the injection
     (writes the payload to the data source); exiting removes it
@@ -42,7 +44,7 @@ class InjectionHandle(Protocol):
         """The name of the surface this handle injects into (e.g., 'SharePoint')."""
         ...
 
-    async def __aenter__(self) -> InjectionHandle:
+    async def __aenter__(self) -> Self:
         """Activate the injection (write payload to data source)."""
         ...
 
@@ -50,7 +52,7 @@ class InjectionHandle(Protocol):
         self,
         exc_type: type[BaseException] | None,
         exc_val: BaseException | None,
-        exc_tb: Any,
+        exc_tb: types.TracebackType | None,
     ) -> None:
         """Remove the injection. Must be idempotent. Must not raise."""
         ...
@@ -58,8 +60,7 @@ class InjectionHandle(Protocol):
 
 @runtime_checkable
 class Surface(Protocol):
-    """
-    An injectable data source.
+    """An injectable data source.
 
     Surfaces are fully configured at construction (credentials, target
     location) and expose a universal inject() signature. Teams implement
@@ -71,8 +72,7 @@ class Surface(Protocol):
     """
 
     def inject(self, *, payload: Payload) -> InjectionHandle:
-        """
-        Prepare an injection of the given payload.
+        """Prepare an injection of the given payload.
 
         Does not activate the injection — the caller enters the
         returned handle as an async context manager to activate it.

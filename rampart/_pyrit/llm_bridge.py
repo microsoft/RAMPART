@@ -12,26 +12,29 @@ Internal module — never imported by consumer code.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from pyrit.prompt_target import OpenAIChatTarget, PromptChatTarget
 
-from rampart.core.llm import LLMConfig
+if TYPE_CHECKING:
+    from rampart.core.llm import LLMConfig
 
 # OpenAIChatTarget constructor parameters that can be forwarded
 # from LLMConfig.metadata.  Kept explicit so unrecognised keys
 # are silently ignored rather than causing PyRIT TypeErrors.
-_FORWARDED_MODEL_PARAMS: frozenset[str] = frozenset({
-    "frequency_penalty",
-    "max_completion_tokens",
-    "max_requests_per_minute",
-    "max_tokens",
-    "n",
-    "presence_penalty",
-    "seed",
-    "temperature",
-    "top_p",
-})
+_FORWARDED_MODEL_PARAMS: frozenset[str] = frozenset(
+    {
+        "frequency_penalty",
+        "max_completion_tokens",
+        "max_requests_per_minute",
+        "max_tokens",
+        "n",
+        "presence_penalty",
+        "seed",
+        "temperature",
+        "top_p",
+    },
+)
 
 
 def create_prompt_target(config: LLMConfig) -> PromptChatTarget:
@@ -84,12 +87,14 @@ def create_prompt_target(config: LLMConfig) -> PromptChatTarget:
 def _validate(config: LLMConfig) -> None:
     """Raise early with clear messages for missing required fields."""
     if not config.model:
+        msg = "LLMConfig.model is required (e.g. 'gpt-4o')."
         raise ValueError(
-            "LLMConfig.model is required (e.g. 'gpt-4o')."
+            msg,
         )
     if not config.endpoint:
+        msg = "LLMConfig.endpoint is required (e.g. 'https://api.openai.com/v1')."
         raise ValueError(
-            "LLMConfig.endpoint is required (e.g. 'https://api.openai.com/v1')."
+            msg,
         )
 
 
@@ -123,9 +128,9 @@ async def send_generation_request_async(
     Returns:
         str: The LLM's text response.
     """
-    import uuid
+    import uuid  # noqa: PLC0415  — deferred: pyrit is optional
 
-    from pyrit.models import MessagePiece
+    from pyrit.models import MessagePiece  # noqa: PLC0415
 
     target = create_prompt_target(config)
     conversation_id = str(uuid.uuid4())

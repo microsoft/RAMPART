@@ -5,17 +5,26 @@
 
 import pytest
 
-from rampart.core.types import EvalContext, EvalOutcome, Request, Response, ToolCall, Turn
+from rampart.core.types import (
+    EvalContext,
+    EvalOutcome,
+    Request,
+    Response,
+    ToolCall,
+    Turn,
+)
 from rampart.evaluators import ToolCalled
 
 
 def _ctx_with_tool_calls(*tool_calls: ToolCall) -> EvalContext:
     """Build an EvalContext with a single turn containing the given tool calls."""
     return EvalContext(
-        turns=[Turn(
-            request=Request(prompt="test"),
-            response=Response(text="ok", tool_calls=list(tool_calls)),
-        )],
+        turns=[
+            Turn(
+                request=Request(prompt="test"),
+                response=Response(text="ok", tool_calls=list(tool_calls)),
+            ),
+        ],
     )
 
 
@@ -58,14 +67,18 @@ class TestToolCalledParameterMatching:
     async def test_exact_parameter_match(self) -> None:
         tc = ToolCall(name="send_email", arguments={"to": "evil@evil.com"})
         ctx = _ctx_with_tool_calls(tc)
-        result = await ToolCalled("send_email", to="evil@evil.com").evaluate_async(context=ctx)
+        result = await ToolCalled("send_email", to="evil@evil.com").evaluate_async(
+            context=ctx,
+        )
         assert result.outcome is EvalOutcome.DETECTED
 
     @pytest.mark.asyncio
     async def test_exact_parameter_mismatch(self) -> None:
         tc = ToolCall(name="send_email", arguments={"to": "friend@company.com"})
         ctx = _ctx_with_tool_calls(tc)
-        result = await ToolCalled("send_email", to="evil@evil.com").evaluate_async(context=ctx)
+        result = await ToolCalled("send_email", to="evil@evil.com").evaluate_async(
+            context=ctx,
+        )
         assert result.outcome is EvalOutcome.NOT_DETECTED
 
     @pytest.mark.asyncio
@@ -73,7 +86,8 @@ class TestToolCalledParameterMatching:
         tc = ToolCall(name="send_email", arguments={"to": "evil@evil.com"})
         ctx = _ctx_with_tool_calls(tc)
         result = await ToolCalled(
-            "send_email", to=lambda v: "evil" in str(v),
+            "send_email",
+            to=lambda v: "evil" in str(v),
         ).evaluate_async(context=ctx)
         assert result.outcome is EvalOutcome.DETECTED
 
@@ -82,7 +96,8 @@ class TestToolCalledParameterMatching:
         tc = ToolCall(name="send_email", arguments={"to": "friend@company.com"})
         ctx = _ctx_with_tool_calls(tc)
         result = await ToolCalled(
-            "send_email", to=lambda v: "evil" in str(v),
+            "send_email",
+            to=lambda v: "evil" in str(v),
         ).evaluate_async(context=ctx)
         assert result.outcome is EvalOutcome.NOT_DETECTED
 
@@ -91,7 +106,8 @@ class TestToolCalledParameterMatching:
         tc = ToolCall(name="send_email", arguments={})
         ctx = _ctx_with_tool_calls(tc)
         result = await ToolCalled(
-            "send_email", to=lambda v: v is not None,
+            "send_email",
+            to=lambda v: v is not None,
         ).evaluate_async(context=ctx)
         assert result.outcome is EvalOutcome.NOT_DETECTED
 
@@ -99,19 +115,23 @@ class TestToolCalledParameterMatching:
 class TestToolCalledMultiTurn:
     @pytest.mark.asyncio
     async def test_scans_across_turns(self) -> None:
-        ctx = _multi_turn_ctx([
-            [],
-            [ToolCall(name="send_email", arguments={"to": "evil@evil.com"})],
-        ])
+        ctx = _multi_turn_ctx(
+            [
+                [],
+                [ToolCall(name="send_email", arguments={"to": "evil@evil.com"})],
+            ],
+        )
         result = await ToolCalled("send_email").evaluate_async(context=ctx)
         assert result.outcome is EvalOutcome.DETECTED
 
     @pytest.mark.asyncio
     async def test_not_detected_across_turns(self) -> None:
-        ctx = _multi_turn_ctx([
-            [ToolCall(name="read_file")],
-            [ToolCall(name="query_db")],
-        ])
+        ctx = _multi_turn_ctx(
+            [
+                [ToolCall(name="read_file")],
+                [ToolCall(name="query_db")],
+            ],
+        )
         result = await ToolCalled("send_email").evaluate_async(context=ctx)
         assert result.outcome is EvalOutcome.NOT_DETECTED
 

@@ -8,7 +8,8 @@ for Session, AgentAdapter, Surface, InjectionHandle, and PromptDriver — withou
 inheriting from the protocol.
 """
 
-from typing import Any
+import types
+from typing import Self
 
 from rampart.core.adapter import AgentAdapter, Session
 from rampart.core.injection import InjectionHandle, Surface
@@ -23,14 +24,14 @@ class TestSessionProtocol:
             async def send_async(self, request: Request) -> Response:
                 return Response(text="ok")
 
-            async def __aenter__(self) -> "MySession":
+            async def __aenter__(self) -> Self:
                 return self
 
             async def __aexit__(
                 self,
                 exc_type: type[BaseException] | None,
                 exc_val: BaseException | None,
-                exc_tb: Any,
+                exc_tb: types.TracebackType | None,
             ) -> None:
                 pass
 
@@ -38,18 +39,19 @@ class TestSessionProtocol:
 
     def test_send_async_accepts_request(self) -> None:
         """Verify the protocol requires a Request parameter."""
+
         class MySession:
             async def send_async(self, request: Request) -> Response:
                 return Response(text="ok")
 
-            async def __aenter__(self) -> "MySession":
+            async def __aenter__(self) -> Self:
                 return self
 
             async def __aexit__(
                 self,
                 exc_type: type[BaseException] | None,
                 exc_val: BaseException | None,
-                exc_tb: Any,
+                exc_tb: types.TracebackType | None,
             ) -> None:
                 pass
 
@@ -60,8 +62,7 @@ class TestSessionProtocol:
 class TestAgentAdapterProtocol:
     def test_structural_subtyping(self) -> None:
         class MyAdapter:
-            async def create_session_async(self) -> Session:
-                ...
+            async def create_session_async(self) -> Session: ...
 
             @property
             def manifest(self) -> AppManifest:
@@ -89,14 +90,14 @@ class TestInjectionHandleProtocol:
             def surface_name(self) -> str:
                 return "SharePoint"
 
-            async def __aenter__(self) -> "MyHandle":
+            async def __aenter__(self) -> Self:
                 return self
 
             async def __aexit__(
                 self,
                 exc_type: type[BaseException] | None,
                 exc_val: BaseException | None,
-                exc_tb: Any,
+                exc_tb: types.TracebackType | None,
             ) -> None:
                 pass
 
@@ -118,14 +119,14 @@ class TestSurfaceProtocol:
             def surface_name(self) -> str:
                 return "test"
 
-            async def __aenter__(self) -> "MyHandle":
+            async def __aenter__(self) -> Self:
                 return self
 
             async def __aexit__(
                 self,
                 exc_type: type[BaseException] | None,
                 exc_val: BaseException | None,
-                exc_tb: Any,
+                exc_tb: types.TracebackType | None,
             ) -> None:
                 pass
 
@@ -140,7 +141,9 @@ class TestPromptDriverProtocol:
     def test_structural_subtyping(self) -> None:
         class MyDriver:
             async def next_prompt_async(
-                self, *, history: list[Turn],
+                self,
+                *,
+                history: list[Turn],
             ) -> PromptDecision | None:
                 return None
 
@@ -161,5 +164,6 @@ class TestRequest:
 
     def test_empty_request_raises(self) -> None:
         import pytest
+
         with pytest.raises(ValueError, match="at least"):
             Request()

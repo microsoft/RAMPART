@@ -49,15 +49,18 @@ from __future__ import annotations
 
 import logging
 import uuid
+from typing import TYPE_CHECKING
 
-from rampart.core.converter import PayloadConverter
-from rampart.core.llm import LLMConfig
-from rampart.core.manifest import AppManifest
-from rampart.core.persona import Persona
 from rampart.core.types import Payload, PayloadFormat
 from rampart.payloads._generator import PayloadGenerator
 from rampart.payloads._store import PayloadStore
 from rampart.payloads.template import PayloadTemplate
+
+if TYPE_CHECKING:
+    from rampart.core.converter import PayloadConverter
+    from rampart.core.llm import LLMConfig
+    from rampart.core.manifest import AppManifest
+    from rampart.core.persona import Persona
 
 logger = logging.getLogger(__name__)
 
@@ -89,7 +92,7 @@ class Payloads:
     """
 
     @staticmethod
-    async def generate_async(
+    async def generate_async(  # noqa: PLR0913  — factory method needs all params
         *,
         template: PayloadTemplate,
         llm: LLMConfig,
@@ -144,7 +147,8 @@ class Payloads:
             ValueError: If count < 1.
         """
         if count < 1:
-            raise ValueError(f"count must be >= 1, got {count}")
+            msg = f"count must be >= 1, got {count}"
+            raise ValueError(msg)
 
         generator = PayloadGenerator(llm=llm)
         text_variants = await generator.generate_text_variants_async(

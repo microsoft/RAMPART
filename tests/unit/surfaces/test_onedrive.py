@@ -12,11 +12,11 @@ import pytest
 
 from rampart.core.errors import InfrastructureError
 from rampart.core.injection import InjectionHandle, Surface
-from rampart.core.types import Payload, PayloadFormat
+from rampart.core.types import Payload
 from rampart.surfaces.onedrive import (
+    _MAX_SMALL_UPLOAD_BYTES,
     OneDriveSurface,
     _OneDriveInjection,
-    _MAX_SMALL_UPLOAD_BYTES,
 )
 
 _UNSET = object()
@@ -25,7 +25,7 @@ _UNSET = object()
 def _make_graph_client(
     *,
     upload_item_id: str = "item-abc-123",
-    upload_return: Any = _UNSET,
+    upload_return: Any = _UNSET,  # noqa: ANN401
     upload_error: Exception | None = None,
     delete_error: Exception | None = None,
 ) -> MagicMock:
@@ -63,13 +63,13 @@ def _make_graph_client(
 
     items_mock = MagicMock()
 
-    def _by_drive_item_id_dispatch(item_id: str) -> Any:
+    def _by_drive_item_id_dispatch(item_id: str) -> Any:  # noqa: ANN401
         if item_id.startswith("root:"):
             return upload_item_mock
         return delete_item_mock
 
     items_mock.by_drive_item_id = MagicMock(
-        side_effect=_by_drive_item_id_dispatch
+        side_effect=_by_drive_item_id_dispatch,
     )
 
     by_drive_id_mock = MagicMock()
@@ -293,7 +293,9 @@ class TestOneDriveInjectionLifecycle:
             assert h is handle
 
     @pytest.mark.asyncio
-    async def test_upload_exceeding_size_limit_raises_infrastructure_error(self) -> None:
+    async def test_upload_exceeding_size_limit_raises_infrastructure_error(
+        self,
+    ) -> None:
         client = _make_graph_client()
         surface = OneDriveSurface(
             graph_client=client,

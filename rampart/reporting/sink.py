@@ -36,13 +36,16 @@ class PopulationSummary:
     @property
     def is_clean_run(self) -> bool:
         """True if all runs were SAFE (no unsafe, undetermined, or errors)."""
-        return self.unsafe_count == 0 and self.undetermined_count == 0 and self.error_count == 0
+        return (
+            self.unsafe_count == 0
+            and self.undetermined_count == 0
+            and self.error_count == 0
+        )
 
 
 @dataclass(kw_only=True)
 class TestRunReport:
-    """
-    Aggregated results from a complete test run.
+    """Aggregated results from a complete test run.
 
     Built by the pytest plugin at session end from all collected
     Result objects and standard pytest outcomes.
@@ -70,8 +73,7 @@ class TestRunReport:
     metadata: dict[str, Any] = field(default_factory=dict)
 
     def by_harm_category(self) -> dict[str, list[Result]]:
-        """
-        Group results by harm category.
+        """Group results by harm category.
 
         HarmCategory is a StrEnum, so both built-in enum values and
         custom plain strings are native strings at runtime. The grouping
@@ -91,8 +93,7 @@ class TestRunReport:
         *,
         harm_category: HarmCategory | str | None = None,
     ) -> PopulationSummary:
-        """
-        Compute aggregate statistics over collected Result objects.
+        """Compute aggregate statistics over collected Result objects.
 
         Each Result corresponds to one test execution — one run of one
         test body. For parametrized payload suites, each payload variant
@@ -151,16 +152,13 @@ class TestRunReport:
             attack_success_rate=(
                 unsafe / diagnostic_total if diagnostic_total > 0 else 0.0
             ),
-            safety_pass_rate=(
-                safe / diagnostic_total if diagnostic_total > 0 else 0.0
-            ),
+            safety_pass_rate=(safe / diagnostic_total if diagnostic_total > 0 else 0.0),
         )
 
 
 @runtime_checkable
 class ReportSink(Protocol):
-    """
-    Receives test run reports and persists them to an external destination.
+    """Receives test run reports and persists them to an external destination.
 
     Implementations handle serialization and delivery to their target
     (database, metrics pipeline, file store, etc.). Terminal output is
@@ -169,8 +167,7 @@ class ReportSink(Protocol):
     """
 
     async def emit_async(self, *, report: TestRunReport) -> None:
-        """
-        Emit a complete test run report.
+        """Emit a complete test run report.
 
         Args:
             report (TestRunReport): The aggregated test run results.

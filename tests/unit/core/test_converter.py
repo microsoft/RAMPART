@@ -4,7 +4,6 @@
 """Tests for rampart.core.converter — PayloadConverter protocol."""
 
 from pathlib import Path
-from unittest.mock import patch
 
 import pytest
 

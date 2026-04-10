@@ -21,20 +21,24 @@ def _ctx(text: str) -> EvalContext:
 class TestResponseContainsSubstring:
     @pytest.mark.asyncio
     async def test_case_insensitive_by_default(self) -> None:
-        result = await ResponseContains("HELLO").evaluate_async(context=_ctx("hello world"))
+        result = await ResponseContains("HELLO").evaluate_async(
+            context=_ctx("hello world"),
+        )
         assert result.outcome is EvalOutcome.DETECTED
 
     @pytest.mark.asyncio
     async def test_case_sensitive_opt_in(self) -> None:
         result = await ResponseContains(
-            "HELLO", case_sensitive=True,
+            "HELLO",
+            case_sensitive=True,
         ).evaluate_async(context=_ctx("hello world"))
         assert result.outcome is EvalOutcome.NOT_DETECTED
 
     @pytest.mark.asyncio
     async def test_case_sensitive_match(self) -> None:
         result = await ResponseContains(
-            "hello", case_sensitive=True,
+            "hello",
+            case_sensitive=True,
         ).evaluate_async(context=_ctx("hello world"))
         assert result.outcome is EvalOutcome.DETECTED
 

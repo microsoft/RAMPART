@@ -9,20 +9,23 @@ objective, the result is UNSAFE (safe=False).
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from rampart.attacks._xpia import XPIAExecution
-from rampart.core.evaluator import Evaluator
-from rampart.core.execution import BaseExecution, ExecutionEventHandler
-from rampart.core.injection import InjectionHandle
-from rampart.core.prompt_driver import PromptDriver
-from rampart.core.types import Request
 from rampart.drivers import _coerce_driver
+
+if TYPE_CHECKING:
+    from rampart.core.evaluator import Evaluator
+    from rampart.core.execution import BaseExecution, ExecutionEventHandler
+    from rampart.core.injection import InjectionHandle
+    from rampart.core.prompt_driver import PromptDriver
+    from rampart.core.types import Request
 
 __all__ = ["Attacks", "XPIAExecution"]
 
 
 class Attacks:
-    """
-    Factory methods for attack test executions.
+    """Factory methods for attack test executions.
 
     Each method returns a BaseExecution.  The test calls
     ``execute_async`` and asserts the result.
@@ -47,8 +50,7 @@ class Attacks:
         max_turns: int = 25,
         event_handlers: list[ExecutionEventHandler] | None = None,
     ) -> BaseExecution:
-        """
-        Create an XPIA attack execution.
+        """Create an XPIA attack execution.
 
         Orchestrates the full XPIA flow: inject payloads into surfaces,
         wait for indexing, create a session, drive the trigger

@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import pytest
 
-from rampart.core.prompt_driver import PromptDecision, PromptDriver
+from rampart.core.prompt_driver import PromptDecision
 from rampart.core.types import Request, Response, Turn
 from rampart.drivers import _coerce_driver
 from rampart.drivers.static import StaticDriver
@@ -25,7 +25,9 @@ class TestCoerceString:
         assert d0.request.prompt == "hello"
 
         d1 = await driver.next_prompt_async(
-            history=[Turn(request=Request(prompt="hello"), response=Response(text="ok"))],
+            history=[
+                Turn(request=Request(prompt="hello"), response=Response(text="ok")),
+            ],
         )
         assert d1 is None
 
@@ -55,7 +57,9 @@ class TestCoercePassthrough:
     async def test_custom_driver_passthrough_async(self) -> None:
         class Custom:
             async def next_prompt_async(
-                self, *, history: list[Turn],
+                self,
+                *,
+                history: list[Turn],
             ) -> PromptDecision | None:
                 return PromptDecision(request=Request(prompt="custom"))
 

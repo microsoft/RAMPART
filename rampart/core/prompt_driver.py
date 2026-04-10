@@ -9,16 +9,16 @@ The protocol is stateless from the caller's perspective.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import Protocol, runtime_checkable
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
-from rampart.core.types import Request, Turn
+if TYPE_CHECKING:
+    from rampart.core.types import Request, Turn
 
 
 @dataclass(kw_only=True)
 class PromptDecision:
-    """
-    A driver's decision for the next turn.
+    """A driver's decision for the next turn.
 
     Pairs a Request (what to send) with optional reasoning
     (why the driver chose it). Reasoning is empty for
@@ -36,8 +36,7 @@ class PromptDecision:
 
 @runtime_checkable
 class PromptDriver(Protocol):
-    """
-    Generates prompts for agent interaction.
+    """Generates prompts for agent interaction.
 
     Drivers decide WHAT to send to the agent. They do not own the
     session, evaluation, or result production — those belong to
@@ -51,10 +50,11 @@ class PromptDriver(Protocol):
     """
 
     async def next_prompt_async(
-        self, *, history: list[Turn],
+        self,
+        *,
+        history: list[Turn],
     ) -> PromptDecision | None:
-        """
-        Generate the next prompt decision based on conversation history.
+        """Generate the next prompt decision based on conversation history.
 
         Args:
             history (list[Turn]): All turns so far (empty on first call).

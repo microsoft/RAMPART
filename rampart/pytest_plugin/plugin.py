@@ -28,8 +28,7 @@ import asyncio
 import logging
 import re
 import time
-from collections.abc import Generator
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
 import pytest
 
@@ -45,6 +44,9 @@ from rampart.pytest_plugin._collection import (
     deactivate_collector,
 )
 from rampart.pytest_plugin._session import RampartSession
+
+if TYPE_CHECKING:
+    from collections.abc import Generator
 
 logger = logging.getLogger(__name__)
 
@@ -72,8 +74,7 @@ _STATUS_LABELS: dict[SafetyStatus, str] = {
 
 
 def _sanitize_for_terminal(text: str) -> str:
-    """
-    Strip ANSI escape sequences from text before terminal output.
+    """Strip ANSI escape sequences from text before terminal output.
 
     Prevents terminal injection from attacker-controlled payload text
     that may appear in result summaries.
@@ -88,8 +89,7 @@ def _sanitize_for_terminal(text: str) -> str:
 
 
 def _resolve_trial_n(marker: pytest.Mark) -> int:
-    """
-    Extract the trial count from a trial marker.
+    """Extract the trial count from a trial marker.
 
     Supports both positional and keyword argument forms:
     ``@pytest.mark.trial(5)`` and ``@pytest.mark.trial(n=5)``.
@@ -113,23 +113,24 @@ def _resolve_trial_n(marker: pytest.Mark) -> int:
         return 1
 
     if not isinstance(raw, int) or isinstance(raw, bool):
+        msg = f"trial(n=) must be an integer, got {type(raw).__name__}: {raw!r}"
         raise pytest.UsageError(
-            f"trial(n=) must be an integer, got {type(raw).__name__}: {raw!r}"
+            msg,
         )
     if raw < 1:
+        msg = f"trial(n=) must be >= 1, got {raw}"
         raise pytest.UsageError(
-            f"trial(n=) must be >= 1, got {raw}"
+            msg,
         )
     return raw
 
 
 def pytest_configure(config: pytest.Config) -> None:
-    """
-    Register RAMPART markers, install default handler factory, and
-    initialize session.
+    """Register RAMPART markers and install default handler factory.
 
-    Sinks are provided by teams via the ``rampart_sinks`` fixture
-    in their conftest.py, not through configuration.
+    Initializes session. Sinks are provided by teams via the
+    ``rampart_sinks`` fixture in their conftest.py, not through
+    configuration.
 
     Args:
         config (pytest.Config): The pytest configuration object.
@@ -144,8 +145,7 @@ def pytest_configure(config: pytest.Config) -> None:
 
 
 def pytest_unconfigure(config: pytest.Config) -> None:
-    """
-    Clean up the handler factory on plugin teardown.
+    """Clean up the handler factory on plugin teardown.
 
     Args:
         config (pytest.Config): The pytest configuration object.
@@ -158,8 +158,7 @@ def pytest_unconfigure(config: pytest.Config) -> None:
 
 
 def _copy_markers_to_clone(*, source: pytest.Item, clone: pytest.Item) -> None:
-    """
-    Copy all markers from the original item to its trial clone.
+    """Copy all markers from the original item to its trial clone.
 
     Markers applied at the class level, module level, or via conftest
     pytestmark are NOT transferred by ``from_parent``. This function
@@ -175,7 +174,7 @@ def _copy_markers_to_clone(*, source: pytest.Item, clone: pytest.Item) -> None:
         if marker.name == "trial":
             continue
         clone.add_marker(
-            pytest.mark.__getattr__(marker.name)(*marker.args, **marker.kwargs)
+            pytest.mark.__getattr__(marker.name)(*marker.args, **marker.kwargs),
         )
 
 
@@ -185,8 +184,7 @@ def _create_trial_clones(
     trial_marker: pytest.Mark,
     count: int,
 ) -> list[pytest.Item]:
-    """
-    Create trial clone items from an original test item.
+    """Create trial clone items from an original test item.
 
     Each clone gets a unique ``[trial-N]`` suffix, all markers from
     the original item (including class-level and module-level markers),
@@ -206,8 +204,9 @@ def _create_trial_clones(
     callspec = getattr(item, "callspec", None)
     fixtureinfo = getattr(item, "_fixtureinfo", None)
     if parent is None:
+        msg = f"Cannot clone trial item with no parent: {item.nodeid}"
         raise pytest.UsageError(
-            f"Cannot clone trial item with no parent: {item.nodeid}"
+            msg,
         )
     clones: list[pytest.Item] = []
 
@@ -224,12 +223,12 @@ def _create_trial_clones(
             from_parent_kwargs["fixtureinfo"] = fixtureinfo
 
         clone = type(item).from_parent(**from_parent_kwargs)  # type: ignore[arg-type]
-        clone._rampart_trial_index = i  # type: ignore[attr-defined]
-        clone._rampart_trial_base = item.nodeid  # type: ignore[attr-defined]
+        clone._rampart_trial_index = i  # type: ignore[attr-defined]  # noqa: SLF001
+        clone._rampart_trial_base = item.nodeid  # type: ignore[attr-defined]  # noqa: SLF001
 
         _copy_markers_to_clone(source=item, clone=clone)
         clone.add_marker(
-            pytest.mark.trial(*trial_marker.args, **trial_marker.kwargs)
+            pytest.mark.trial(*trial_marker.args, **trial_marker.kwargs),
         )
         # Group all trials for the same base test on one xdist worker
         # so that trial aggregation works correctly across workers.
@@ -241,11 +240,10 @@ def _create_trial_clones(
 
 @pytest.hookimpl(trylast=True)
 def pytest_collection_modifyitems(
-    config: pytest.Config,
+    config: pytest.Config,  # noqa: ARG001  — pytest hook signature
     items: list[pytest.Item],
 ) -> None:
-    """
-    Clone trial-marked items and validate marker usage.
+    """Clone trial-marked items and validate marker usage.
 
     Uses ``trylast=True`` so clones are created after pytest-asyncio
     has wrapped async items — ``item.obj`` on the original already
@@ -275,7 +273,7 @@ def pytest_collection_modifyitems(
         n = _resolve_trial_n(trial_marker)
 
         expanded.extend(
-            _create_trial_clones(item=item, trial_marker=trial_marker, count=n)
+            _create_trial_clones(item=item, trial_marker=trial_marker, count=n),
         )
 
     items[:] = expanded
@@ -287,8 +285,7 @@ def _absorb_results(
     node: pytest.Item,
     collector: ResultCollector,
 ) -> None:
-    """
-    Safely absorb collected results into the session.
+    """Safely absorb collected results into the session.
 
     Catches and logs any unexpected errors to prevent the plugin from
     breaking the test run.
@@ -300,7 +297,7 @@ def _absorb_results(
     """
     try:
         rampart_session.absorb(node=node, collector=collector)
-    except Exception:
+    except Exception:  # noqa: BLE001  — plugin must not break test runs
         logger.warning(
             "Failed to absorb results for %s — results may be incomplete.",
             node.nodeid,
@@ -312,8 +309,7 @@ def _absorb_results(
 def _rampart_collect(  # type: ignore[reportUnusedFunction]  # pytest discovers this via autouse=True
     request: pytest.FixtureRequest,
 ) -> Generator[None, None, None]:
-    """
-    Installed automatically on every test. Invisible to test authors.
+    """Installed automatically on every test. Invisible to test authors.
 
     Scopes a ResultCollector to the current test via ContextVar.
     The ResultCollectionHandler (installed on every BaseExecution via
@@ -328,7 +324,7 @@ def _rampart_collect(  # type: ignore[reportUnusedFunction]  # pytest discovers 
     No test author ever imports or references this fixture.
     """
     collector = ResultCollector()
-    node = cast(pytest.Item, request.node)
+    node = cast("pytest.Item", request.node)
     rampart_session = request.config.stash.get(_rampart_key, None)
     token = activate_collector(collector)
     yield
@@ -353,8 +349,7 @@ def _rampart_collect(  # type: ignore[reportUnusedFunction]  # pytest discovers 
 def _rampart_sink_bootstrap(  # type: ignore[reportUnusedFunction]  # pytest discovers this via autouse=True
     request: pytest.FixtureRequest,
 ) -> None:
-    """
-    Merge team-provided sinks into the RAMPART session.
+    """Merge team-provided sinks into the RAMPART session.
 
     If the consuming project defines a ``rampart_sinks`` fixture
     (session-scoped, returning ``list[ReportSink]``), this fixture
@@ -380,15 +375,15 @@ def _rampart_sink_bootstrap(  # type: ignore[reportUnusedFunction]  # pytest dis
 
     if not isinstance(user_sinks, list):
         logger.warning(
-            "rampart_sinks fixture must return list[ReportSink], "
-            "got %s. Ignoring.",
+            "rampart_sinks fixture must return list[ReportSink], got %s. Ignoring.",
             type(user_sinks).__name__,
         )
         return
 
     rampart_session.add_sinks(sinks=user_sinks)
     logger.info(
-        "Loaded %d sink(s) from rampart_sinks fixture.", len(user_sinks),
+        "Loaded %d sink(s) from rampart_sinks fixture.",
+        len(user_sinks),
     )
 
 
@@ -397,8 +392,7 @@ def _aggregate_trial_results(
     session: pytest.Session,
     rampart_session: RampartSession,
 ) -> None:
-    """
-    Group trial item reports by base node ID and compute per-group rates.
+    """Group trial item reports by base node ID and compute per-group rates.
 
     A trial group is identified by ``_rampart_trial_base`` on the item.
     The aggregate is stored on RampartSession for terminal summary output.
@@ -427,8 +421,7 @@ def _evaluate_gates(
     *,
     rampart_session: RampartSession,
 ) -> None:
-    """
-    Log trial group gate results.
+    """Log trial group gate results.
 
     Reports whether each trial group passed or failed based on:
     - Any UNSAFE -> FAIL (unconditional)
@@ -465,10 +458,9 @@ def _evaluate_gates(
 
 def pytest_sessionfinish(
     session: pytest.Session,
-    exitstatus: int,
+    exitstatus: int,  # noqa: ARG001  — pytest hook signature
 ) -> None:
-    """
-    Aggregate trial results, evaluate gates, and emit sinks.
+    """Aggregate trial results, evaluate gates, and emit sinks.
 
     Args:
         session (pytest.Session): The pytest session.
@@ -488,8 +480,7 @@ def pytest_sessionfinish(
 
 
 async def _emit_sinks_async(*, rampart_session: RampartSession) -> None:
-    """
-    Emit the test run report to all configured sinks.
+    """Emit the test run report to all configured sinks.
 
     Each sink receives the complete TestRunReport. Sink errors are
     logged and swallowed — a failing sink must not break the test
@@ -505,7 +496,7 @@ async def _emit_sinks_async(*, rampart_session: RampartSession) -> None:
     for sink in rampart_session.sinks:
         try:
             await sink.emit_async(report=report)
-        except Exception:
+        except Exception:  # noqa: BLE001  — sink errors must not break teardown
             logger.warning(
                 "Sink %s.emit_async failed — report may not be persisted.",
                 type(sink).__name__,
@@ -514,8 +505,7 @@ async def _emit_sinks_async(*, rampart_session: RampartSession) -> None:
 
 
 def _emit_sinks(*, rampart_session: RampartSession) -> None:
-    """
-    Synchronous wrapper for sink emission.
+    """Synchronous wrapper for sink emission.
 
     Used by ``pytest_sessionfinish`` when no event loop is running.
     When an event loop is already running (e.g. pytest-asyncio),
@@ -533,17 +523,16 @@ def _emit_sinks(*, rampart_session: RampartSession) -> None:
     except RuntimeError:
         # Inside an already-running event loop (e.g. pytest-asyncio).
         loop = asyncio.get_running_loop()
-        loop.create_task(coro)
+        _background_task = loop.create_task(coro)  # noqa: RUF006
 
 
 def _write_result_line(
     *,
-    terminalreporter: Any,
+    terminalreporter: Any,  # noqa: ANN401
     result: Result,
     test_name: str = "",
 ) -> None:
-    """
-    Write a single result line to the terminal.
+    """Write a single result line to the terminal.
 
     Format matches the architecture's example output:
     ``PASS  test_name — summary (observability_level)``
@@ -560,21 +549,20 @@ def _write_result_line(
 
     if test_name:
         terminalreporter.write_line(
-            f"  {label}  {test_name} -- {sanitized_summary} ({obs_level})"
+            f"  {label}  {test_name} -- {sanitized_summary} ({obs_level})",
         )
     else:
         terminalreporter.write_line(
-            f"  {label}  {sanitized_summary} ({obs_level})"
+            f"  {label}  {sanitized_summary} ({obs_level})",
         )
 
 
 def _write_trial_group_lines(
     *,
-    terminalreporter: Any,
+    terminalreporter: Any,  # noqa: ANN401
     rampart_session: RampartSession,
 ) -> None:
-    """
-    Write trial group aggregate lines to the terminal.
+    """Write trial group aggregate lines to the terminal.
 
     Format: ``PASS  test_name [8/10 safe, 80% defense rate, threshold: 70%] — PASSED``
 
@@ -587,17 +575,16 @@ def _write_trial_group_lines(
         terminalreporter.write_line(
             f"  {group.terminal_label}  {test_name} "
             f"[{group.detail}, {group.pass_rate:.0%} pass rate, "
-            f"threshold: {group.threshold:.0%}] -- {group.verdict}"
+            f"threshold: {group.threshold:.0%}] -- {group.verdict}",
         )
 
 
 def pytest_terminal_summary(
-    terminalreporter: Any,
-    exitstatus: int,
+    terminalreporter: Any,  # noqa: ANN401
+    exitstatus: int,  # noqa: ARG001  — pytest hook signature
     config: pytest.Config,
 ) -> None:
-    """
-    Append RAMPART harm-category summary after pytest's standard output.
+    """Append RAMPART harm-category summary after pytest's standard output.
 
     Fires after all tests complete. Writes harm-grouped result lines,
     trial group aggregates, and population statistics. No-op if no
@@ -629,7 +616,9 @@ def pytest_terminal_summary(
 
     for category, results in report.by_harm_category().items():
         sorted_results = sorted(results, key=lambda r: status_order.get(r.status, 99))
-        terminalreporter.write_line(f"\n{category.upper()} ({len(sorted_results)} tests)")
+        terminalreporter.write_line(
+            f"\n{category.upper()} ({len(sorted_results)} tests)",
+        )
         for result in sorted_results:
             test_name = result.metadata.get("test_name", "")
             _write_result_line(
@@ -639,7 +628,8 @@ def pytest_terminal_summary(
             )
 
     _write_trial_group_lines(
-        terminalreporter=terminalreporter, rampart_session=rampart_session,
+        terminalreporter=terminalreporter,
+        rampart_session=rampart_session,
     )
 
     stats = report.population_summary()
@@ -649,5 +639,5 @@ def pytest_terminal_summary(
             f"{stats.unsafe_count} unsafe "
             f"({stats.attack_success_rate:.1%} attack success rate), "
             f"{stats.undetermined_count} undetermined, "
-            f"{stats.error_count} errors"
+            f"{stats.error_count} errors",
         )

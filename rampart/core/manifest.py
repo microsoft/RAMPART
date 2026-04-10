@@ -15,8 +15,7 @@ from typing import Any
 
 @dataclass(kw_only=True)
 class ToolDeclaration:
-    """
-    A tool the agent can invoke.
+    """A tool the agent can invoke.
 
     Args:
         name (str): Tool identifier as the agent reports it.
@@ -33,8 +32,7 @@ class ToolDeclaration:
 
 @dataclass(kw_only=True)
 class DataSource:
-    """
-    A data source the agent can access.
+    """A data source the agent can access.
 
     The payload generator uses trust metadata to prioritize targets:
     a data source writable by untrusted users is a higher-priority
@@ -54,8 +52,7 @@ class DataSource:
 
 @dataclass(kw_only=True)
 class AppManifest:
-    """
-    Structured descriptor of an agent's capabilities.
+    """Structured descriptor of an agent's capabilities.
 
     Args:
         name (str): Agent display name (e.g., "Microsoft Copilot").
@@ -90,19 +87,22 @@ class AppManifest:
             sections.append(self.description)
 
         if self.tools:
-            tools = "\n".join(
-                f"  - {t.name}({', '.join(f'{k}: {v}' for k, v in t.parameters.items())})"
-                f"{f' — {t.description}' if t.description else ''}"
-                for t in self.tools
-            )
+            tool_lines = []
+            for t in self.tools:
+                params = ", ".join(f"{k}: {v}" for k, v in t.parameters.items())
+                desc = f" — {t.description}" if t.description else ""
+                tool_lines.append(f"  - {t.name}({params}){desc}")
+            tools = "\n".join(tool_lines)
             sections.append(f"Available tools:\n{tools}")
 
         if self.data_sources:
-            sources = "\n".join(
-                f"  - {ds.name}"
-                f"{' (writable by untrusted users)' if ds.writable_by_untrusted else ''}"
-                for ds in self.data_sources
-            )
+            source_lines = []
+            for ds in self.data_sources:
+                writable = (
+                    " (writable by untrusted users)" if ds.writable_by_untrusted else ""
+                )
+                source_lines.append(f"  - {ds.name}{writable}")
+            sources = "\n".join(source_lines)
             sections.append(f"Accessible data sources:\n{sources}")
 
         return "\n\n".join(sections)
