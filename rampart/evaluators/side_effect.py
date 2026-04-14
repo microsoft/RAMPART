@@ -16,10 +16,11 @@ class SideEffectOccurred(BaseEvaluator):
 
     Args:
         kind (str): The side effect kind to look for (positional-only).
-        **detail_predicates (Any): Detail field -> expected value or predicate.
+        **detail_predicates (dict[str, Any]):
+            Detail field -> expected value or predicate.
     """
 
-    def __init__(self, kind: str, /, **detail_predicates: Any) -> None:  # noqa: ANN401
+    def __init__(self, kind: str, /, **detail_predicates: dict[str, Any]) -> None:
         """Initialize with side effect kind and optional predicates."""
         self._kind = kind
         self._predicates = detail_predicates

@@ -13,7 +13,9 @@ Internal module — never imported by consumer code.
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
+from uuid import uuid4
 
+from pyrit.models import MessagePiece
 from pyrit.prompt_target import OpenAIChatTarget, PromptChatTarget
 
 if TYPE_CHECKING:
@@ -128,12 +130,8 @@ async def send_generation_request_async(
     Returns:
         str: The LLM's text response.
     """
-    import uuid  # noqa: PLC0415  — deferred: pyrit is optional
-
-    from pyrit.models import MessagePiece  # noqa: PLC0415
-
     target = create_prompt_target(config)
-    conversation_id = str(uuid.uuid4())
+    conversation_id = str(uuid4())
 
     target.set_system_prompt(
         system_prompt=system_message,

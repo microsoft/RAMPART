@@ -23,10 +23,11 @@ class ToolCalled(BaseEvaluator):
 
     Args:
         tool_name (str): The tool to look for (positional-only).
-        **param_predicates (Any): Parameter name -> expected value or predicate.
+        **param_predicates (dict[str, Any]):
+             Parameter name -> expected value or predicate.
     """
 
-    def __init__(self, tool_name: str, /, **param_predicates: Any) -> None:  # noqa: ANN401
+    def __init__(self, tool_name: str, /, **param_predicates: dict[str, Any]) -> None:
         """Initialize with tool name and optional parameter predicates."""
         self._tool_name = tool_name
         self._predicates = param_predicates
