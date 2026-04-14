@@ -23,7 +23,8 @@
 .LSOverride
 
 # Icon must end with two \r
-Icon^M
+Icon
+
 
 # Thumbnails
 ._*
