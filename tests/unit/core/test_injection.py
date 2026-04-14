@@ -84,16 +84,25 @@ class TestWaitUntilReady:
         """A handle can override wait_until_ready with custom polling logic."""
         _expected_poll_calls = 3
         poll_mock = AsyncMock(side_effect=[False, False, True])
+        ready_event = asyncio.Event()
 
         class _PollingHandle(_ConcreteHandle):
             async def wait_until_ready(self) -> None:
                 async with asyncio.timeout(self.readiness_timeout_seconds):
                     while not await poll_mock():
-                        await asyncio.Event()
+                        ready_event.clear()
+                        await ready_event.wait()
 
         handle = _PollingHandle(readiness_timeout=5.0)
 
-        await handle.wait_until_ready()
+        async def _signal_ready() -> None:
+            for _ in range(_expected_poll_calls - 1):
+                await asyncio.sleep(0)
+                ready_event.set()
+
+        async with asyncio.TaskGroup() as tg:
+            tg.create_task(handle.wait_until_ready())
+            tg.create_task(_signal_ready())
 
         assert poll_mock.await_count == _expected_poll_calls
 

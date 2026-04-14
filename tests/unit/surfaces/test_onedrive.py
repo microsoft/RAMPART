@@ -5,18 +5,17 @@
 
 from __future__ import annotations
 
-from typing import Any
 from unittest.mock import AsyncMock, MagicMock, call
 
 import pytest
 
 from rampart.core.errors import InfrastructureError
 from rampart.core.injection import InjectionHandle, Surface
-from rampart.core.types import Payload, PayloadFormat
+from rampart.core.types import Payload
 from rampart.surfaces.onedrive import (
+    _MAX_SMALL_UPLOAD_BYTES,
     OneDriveSurface,
     _OneDriveInjection,
-    _MAX_SMALL_UPLOAD_BYTES,
 )
 
 _UNSET = object()
@@ -25,7 +24,7 @@ _UNSET = object()
 def _make_graph_client(
     *,
     upload_item_id: str = "item-abc-123",
-    upload_return: Any = _UNSET,
+    upload_return: object = _UNSET,
     upload_error: Exception | None = None,
     delete_error: Exception | None = None,
 ) -> MagicMock:
@@ -63,13 +62,13 @@ def _make_graph_client(
 
     items_mock = MagicMock()
 
-    def _by_drive_item_id_dispatch(item_id: str) -> Any:
+    def _by_drive_item_id_dispatch(item_id: str) -> object:
         if item_id.startswith("root:"):
             return upload_item_mock
         return delete_item_mock
 
     items_mock.by_drive_item_id = MagicMock(
-        side_effect=_by_drive_item_id_dispatch
+        side_effect=_by_drive_item_id_dispatch,
     )
 
     by_drive_id_mock = MagicMock()
@@ -93,9 +92,10 @@ class TestOneDriveSurfaceInit:
             drive_id="drive-1",
             folder_path="Documents/payloads",
         )
-        assert surface._drive_id == "drive-1"
-        assert surface._folder_path == "Documents/payloads"
-        assert surface._indexing_delay == OneDriveSurface.DEFAULT_INDEXING_DELAY
+        assert surface.drive_id == "drive-1"
+        assert surface.folder_path == "Documents/payloads"
+        assert surface.indexing_delay == OneDriveSurface.DEFAULT_INDEXING_DELAY
+        assert surface.readiness_timeout == OneDriveSurface.DEFAULT_READINESS_TIMEOUT
 
     def test_custom_indexing_delay(self) -> None:
         surface = OneDriveSurface(
@@ -104,7 +104,7 @@ class TestOneDriveSurfaceInit:
             folder_path="test",
             indexing_delay=42.0,
         )
-        assert surface._indexing_delay == 42.0
+        assert surface.indexing_delay == 42.0
 
     def test_strips_leading_trailing_slashes_from_folder_path(self) -> None:
         surface = OneDriveSurface(
@@ -112,7 +112,7 @@ class TestOneDriveSurfaceInit:
             drive_id="d",
             folder_path="/foo/bar/",
         )
-        assert surface._folder_path == "foo/bar"
+        assert surface.folder_path == "foo/bar"
 
 
 class TestOneDriveSurfaceProtocolConformance:
@@ -304,7 +304,9 @@ class TestOneDriveInjectionLifecycle:
             assert h is handle
 
     @pytest.mark.asyncio
-    async def test_upload_exceeding_size_limit_raises_infrastructure_error(self) -> None:
+    async def test_upload_exceeding_size_limit_raises_infrastructure_error(
+        self,
+    ) -> None:
         client = _make_graph_client()
         surface = OneDriveSurface(
             graph_client=client,

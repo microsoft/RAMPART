@@ -8,7 +8,8 @@ for Session, AgentAdapter, Surface, InjectionHandle, and PromptDriver — withou
 inheriting from the protocol.
 """
 
-from typing import Any
+import types
+from typing import Self
 
 from rampart.core.adapter import AgentAdapter, Session
 from rampart.core.injection import InjectionHandle, Surface
@@ -23,14 +24,14 @@ class TestSessionProtocol:
             async def send_async(self, request: Request) -> Response:
                 return Response(text="ok")
 
-            async def __aenter__(self) -> "MySession":
+            async def __aenter__(self) -> Self:
                 return self
 
             async def __aexit__(
                 self,
                 exc_type: type[BaseException] | None,
                 exc_val: BaseException | None,
-                exc_tb: Any,
+                exc_tb: types.TracebackType | None,
             ) -> None:
                 pass
 
@@ -43,14 +44,14 @@ class TestSessionProtocol:
             async def send_async(self, request: Request) -> Response:
                 return Response(text="ok")
 
-            async def __aenter__(self) -> "MySession":
+            async def __aenter__(self) -> Self:
                 return self
 
             async def __aexit__(
                 self,
                 exc_type: type[BaseException] | None,
                 exc_val: BaseException | None,
-                exc_tb: Any,
+                exc_tb: types.TracebackType | None,
             ) -> None:
                 pass
 
@@ -96,14 +97,14 @@ class TestInjectionHandleProtocol:
             async def wait_until_ready(self) -> None:
                 pass
 
-            async def __aenter__(self) -> "MyHandle":
+            async def __aenter__(self) -> Self:
                 return self
 
             async def __aexit__(
                 self,
                 exc_type: type[BaseException] | None,
                 exc_val: BaseException | None,
-                exc_tb: Any,
+                exc_tb: types.TracebackType | None,
             ) -> None:
                 pass
 
@@ -132,14 +133,14 @@ class TestSurfaceProtocol:
             async def wait_until_ready(self) -> None:
                 pass
 
-            async def __aenter__(self) -> "MyHandle":
+            async def __aenter__(self) -> Self:
                 return self
 
             async def __aexit__(
                 self,
                 exc_type: type[BaseException] | None,
                 exc_val: BaseException | None,
-                exc_tb: Any,
+                exc_tb: types.TracebackType | None,
             ) -> None:
                 pass
 
