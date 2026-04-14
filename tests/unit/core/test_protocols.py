@@ -38,6 +38,7 @@ class TestSessionProtocol:
 
     def test_send_async_accepts_request(self) -> None:
         """Verify the protocol requires a Request parameter."""
+
         class MySession:
             async def send_async(self, request: Request) -> Response:
                 return Response(text="ok")
@@ -60,8 +61,7 @@ class TestSessionProtocol:
 class TestAgentAdapterProtocol:
     def test_structural_subtyping(self) -> None:
         class MyAdapter:
-            async def create_session_async(self) -> Session:
-                ...
+            async def create_session_async(self) -> Session: ...
 
             @property
             def manifest(self) -> AppManifest:
@@ -154,7 +154,9 @@ class TestPromptDriverProtocol:
     def test_structural_subtyping(self) -> None:
         class MyDriver:
             async def next_prompt_async(
-                self, *, history: list[Turn],
+                self,
+                *,
+                history: list[Turn],
             ) -> PromptDecision | None:
                 return None
 
@@ -175,5 +177,6 @@ class TestRequest:
 
     def test_empty_request_raises(self) -> None:
         import pytest
+
         with pytest.raises(ValueError, match="at least"):
             Request()

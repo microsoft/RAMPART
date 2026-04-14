@@ -35,6 +35,24 @@ markers = [
 [tool.ruff.lint]
 select = ["ALL"]
 
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = [
+    "S101",                                    # assert is pytest's API
+    "D100", "D101", "D102", "D104", "D107",    # no docstrings needed
+    "ANN001", "ANN201", "ANN202",              # no type annotations needed
+    "PLR2004",                                 # magic values in assertions are fine
+    "ARG001", "ARG002",                        # unused args (fixtures, stubs)
+    "PLC0415",                                 # imports inside functions for isolation
+    "SLF001",                                  # testing private members is valid
+    "TRY003", "EM101", "EM102",                # exception message style
+    "BLE001",                                  # catching Exception in tests
+    "TRY301",                                  # raise in try blocks
+    "S108",                                    # /tmp usage
+    "PT017", "PT018",                          # assertion style
+    "ASYNC240",                                # pathlib in async tests
+    "PERF401", "RUF015", "PTH123",             # micro-optimizations / style
+]
+
 [tool.ruff.lint.flake8-copyright]
 notice-rgx = "Copyright \\(c\\) Microsoft Corporation\\.\\s*\\n.*Licensed under the MIT license"
 

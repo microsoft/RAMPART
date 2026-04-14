@@ -10,14 +10,17 @@ Uses ``msgraph-sdk`` for async file upload and deletion.
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Self
 
 from rampart.core.errors import InfrastructureError
 from rampart.core.injection import InjectionHandle
-from rampart.core.types import Payload
 
 if TYPE_CHECKING:
+    import types
+
     from msgraph.graph_service_client import GraphServiceClient
+
+    from rampart.core.types import Payload
 
 logger = logging.getLogger(__name__)
 
@@ -28,8 +31,7 @@ _MAX_SMALL_UPLOAD_BYTES: int = 4 * 1024 * 1024  # 4 MiB
 
 
 class OneDriveSurface:
-    """
-    Injects payloads into a specific OneDrive location.
+    """Injects payloads into a specific OneDrive location.
 
     The surface is fully configured at construction — drive ID,
     credentials, and target folder path. The ``inject()`` method takes
@@ -63,15 +65,15 @@ class OneDriveSurface:
         indexing_delay: float = DEFAULT_INDEXING_DELAY,
         readiness_timeout: float = DEFAULT_READINESS_TIMEOUT,
     ) -> None:
+        """Initialize with Graph client and OneDrive location."""
         self._graph_client = graph_client
-        self._drive_id = drive_id
-        self._folder_path = folder_path.strip("/")
-        self._indexing_delay = indexing_delay
-        self._readiness_timeout = readiness_timeout
+        self.drive_id = drive_id
+        self.folder_path = folder_path.strip("/")
+        self.indexing_delay = indexing_delay
+        self.readiness_timeout = readiness_timeout
 
     def inject(self, *, payload: Payload) -> _OneDriveInjection:
-        """
-        Prepare an injection into the configured OneDrive folder.
+        """Prepare an injection into the configured OneDrive folder.
 
         Returns an InjectionHandle — enter it as an async context manager
         to activate the injection, exit to clean up.
@@ -84,7 +86,7 @@ class OneDriveSurface:
         """
         return _OneDriveInjection(surface=self, payload=payload)
 
-    async def _upload_async(self, *, payload: Payload) -> str:
+    async def upload_async(self, *, payload: Payload) -> str:
         """Upload payload content to OneDrive. Returns the item ID.
 
         Uses the small-file upload endpoint
@@ -97,60 +99,69 @@ class OneDriveSurface:
             InfrastructureError: If Graph returns no ``DriveItem``.
         """
         filename = f"{payload.id}{payload.format.extension}"
-        upload_path = f"{self._folder_path}/{filename}"
+        upload_path = f"{self.folder_path}/{filename}"
 
         if payload.format.is_binary:
             if payload.artifact is None:
-                raise ValueError(
+                msg = (
                     f"Binary payload format {payload.format.value} "
-                    f"requires an artifact path."
+                    f"requires an artifact path.",
+                )
+                raise ValueError(
+                    msg,
                 )
             content = payload.artifact.read_bytes()
         else:
             content = payload.content.encode("utf-8")
 
         if len(content) > _MAX_SMALL_UPLOAD_BYTES:
-            raise ValueError(
+            msg = (
                 f"Payload {payload.id} is {len(content)} bytes, which "
                 f"exceeds the 4 MiB small-upload limit. Upload sessions "
-                f"are not yet implemented."
+                f"are not yet implemented.",
+            )
+            raise ValueError(
+                msg,
             )
 
         # Graph path-based addressing: root:/{relative-path}:
         # The trailing colon is required by the API.
         drive_item = (
-            await self._graph_client.drives.by_drive_id(self._drive_id)
+            await self._graph_client.drives.by_drive_id(self.drive_id)
             .items.by_drive_item_id(f"root:/{upload_path}:")
             .content.put(content)
         )
 
         if drive_item is None or drive_item.id is None:
-            raise InfrastructureError(
+            msg = (
                 f"Graph API returned no DriveItem after upload to "
-                f"drive={self._drive_id} path={upload_path}"
+                f"drive={self.drive_id} path={upload_path}",
+            )
+            raise InfrastructureError(
+                msg,
             )
 
         item_id = drive_item.id
         logger.info(
             "Uploaded payload %s to OneDrive drive=%s path=%s (item=%s)",
             payload.id,
-            self._drive_id,
+            self.drive_id,
             upload_path,
             item_id,
         )
         return item_id
 
-    async def _delete_async(self, *, item_id: str) -> None:
+    async def delete_async(self, *, item_id: str) -> None:
         """Delete a file from OneDrive by item ID."""
         await (
-            self._graph_client.drives.by_drive_id(self._drive_id)
+            self._graph_client.drives.by_drive_id(self.drive_id)
             .items.by_drive_item_id(item_id)
             .delete()
         )
         logger.info(
             "Deleted OneDrive item %s from drive=%s",
             item_id,
-            self._drive_id,
+            self.drive_id,
         )
 
 
@@ -165,12 +176,12 @@ class _OneDriveInjection:
     @property
     def indexing_delay_seconds(self) -> float:
         """How long to wait after upload for content to be discoverable."""
-        return self._surface._indexing_delay
+        return self._surface.indexing_delay
 
     @property
     def readiness_timeout_seconds(self) -> float:
         """Maximum time `wait_until_ready` may block."""
-        return self._surface._readiness_timeout
+        return self._surface.readiness_timeout
 
     @property
     def payload_id(self) -> str | None:
@@ -186,18 +197,21 @@ class _OneDriveInjection:
         """Wait for OneDrive indexing using the default sleep-based strategy."""
         await InjectionHandle.wait_until_ready(self)
 
-    async def __aenter__(self) -> _OneDriveInjection:
+    async def __aenter__(self) -> Self:
         """Upload payload to OneDrive. Raises InfrastructureError on failure."""
         try:
-            self._item_id = await self._surface._upload_async(
-                payload=self._payload
+            self._item_id = await self._surface.upload_async(
+                payload=self._payload,
             )
         except InfrastructureError:
             raise
         except Exception as exc:
+            msg = (
+                f"OneDrive upload failed for drive={self._surface.drive_id} "
+                f"path={self._surface.folder_path}: {exc}",
+            )
             raise InfrastructureError(
-                f"OneDrive upload failed for drive={self._surface._drive_id} "
-                f"path={self._surface._folder_path}: {exc}",
+                msg,
             ) from exc
         return self
 
@@ -205,16 +219,18 @@ class _OneDriveInjection:
         self,
         exc_type: type[BaseException] | None,
         exc_val: BaseException | None,
-        exc_tb: Any,
+        exc_tb: types.TracebackType | None,
     ) -> None:
         """Delete uploaded content. Logs warnings on failure but never raises."""
         if self._item_id is not None:
             try:
-                await self._surface._delete_async(item_id=self._item_id)
-            except Exception:
+                await self._surface.delete_async(item_id=self._item_id)
+            except Exception:  # noqa: BLE001  — cleanup must not raise
+                msg = (
+                    f"OneDrive cleanup failed for item {self._item_id} "
+                    f"in drive={self._surface.drive_id}"
+                )
                 logger.warning(
-                    "OneDrive cleanup failed for item %s in drive=%s",
-                    self._item_id,
-                    self._surface._drive_id,
+                    msg,
                     exc_info=True,
                 )

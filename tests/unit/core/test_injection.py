@@ -1,15 +1,20 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT license.
 
+"""Tests for rampart.core.injection."""
+
 from __future__ import annotations
 
 import asyncio
-from typing import Any
+from typing import TYPE_CHECKING, Self
 from unittest.mock import AsyncMock
 
 import pytest
 
 from rampart.core.injection import InjectionHandle
+
+if TYPE_CHECKING:
+    import types
 
 
 class _ConcreteHandle(InjectionHandle):
@@ -40,14 +45,14 @@ class _ConcreteHandle(InjectionHandle):
     def surface_name(self) -> str:
         return "TestSurface"
 
-    async def __aenter__(self) -> _ConcreteHandle:
+    async def __aenter__(self) -> Self:
         return self
 
     async def __aexit__(
         self,
         exc_type: type[BaseException] | None,
         exc_val: BaseException | None,
-        exc_tb: Any,
+        exc_tb: types.TracebackType | None,
     ) -> None:
         pass
 
@@ -65,7 +70,9 @@ class TestWaitUntilReady:
         ids=["zero-delay", "short-delay-within-timeout"],
     )
     async def test_default_completes_when_delay_within_timeout(
-        self, delay: float, readiness_timeout: float
+        self,
+        delay: float,
+        readiness_timeout: float,
     ) -> None:
         """Default sleep-based wait completes when delay is within the timeout."""
         handle = _ConcreteHandle(delay=delay, readiness_timeout=readiness_timeout)
@@ -75,19 +82,20 @@ class TestWaitUntilReady:
     @pytest.mark.asyncio
     async def test_custom_polling_implementation(self) -> None:
         """A handle can override wait_until_ready with custom polling logic."""
+        _expected_poll_calls = 3
         poll_mock = AsyncMock(side_effect=[False, False, True])
 
         class _PollingHandle(_ConcreteHandle):
             async def wait_until_ready(self) -> None:
                 async with asyncio.timeout(self.readiness_timeout_seconds):
                     while not await poll_mock():
-                        await asyncio.sleep(0)
+                        await asyncio.Event()
 
         handle = _PollingHandle(readiness_timeout=5.0)
 
         await handle.wait_until_ready()
 
-        assert poll_mock.await_count == 3
+        assert poll_mock.await_count == _expected_poll_calls
 
     @pytest.mark.asyncio
     async def test_timeout_raises_when_delay_exceeds_limit(self) -> None:
