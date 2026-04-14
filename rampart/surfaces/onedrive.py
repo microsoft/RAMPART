@@ -97,7 +97,7 @@ class OneDriveSurface:
         """
         return _OneDriveInjection(surface=self, payload=payload)
 
-    async def _upload_async(self, *, payload: Payload) -> str:
+    async def upload_async(self, *, payload: Payload) -> str:
         """Upload payload content to OneDrive. Returns the item ID.
 
         Uses the small-file upload endpoint
@@ -162,7 +162,7 @@ class OneDriveSurface:
         )
         return item_id
 
-    async def _delete_async(self, *, item_id: str) -> None:
+    async def delete_async(self, *, item_id: str) -> None:
         """Delete a file from OneDrive by item ID."""
         await (
             self._graph_client.drives.by_drive_id(self._drive_id)
@@ -202,7 +202,7 @@ class _OneDriveInjection:
     async def __aenter__(self) -> Self:
         """Upload payload to OneDrive. Raises InfrastructureError on failure."""
         try:
-            self._item_id = await self._surface._upload_async(  # noqa: SLF001
+            self._item_id = await self._surface.upload_async(
                 payload=self._payload,
             )
         except InfrastructureError:
@@ -226,7 +226,7 @@ class _OneDriveInjection:
         """Delete uploaded content. Logs warnings on failure but never raises."""
         if self._item_id is not None:
             try:
-                await self._surface._delete_async(item_id=self._item_id)  # noqa: SLF001
+                await self._surface.delete_async(item_id=self._item_id)
             except Exception:  # noqa: BLE001  — cleanup must not raise
                 logger.warning(
                     "OneDrive cleanup failed for item %s in drive=%s",
