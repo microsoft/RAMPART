@@ -82,12 +82,19 @@ class TestInjectionHandleProtocol:
                 return 5.0
 
             @property
+            def readiness_timeout_seconds(self) -> float:
+                return 30.0
+
+            @property
             def payload_id(self) -> str | None:
                 return "abc"
 
             @property
             def surface_name(self) -> str:
                 return "SharePoint"
+
+            async def wait_until_ready(self) -> None:
+                pass
 
             async def __aenter__(self) -> "MyHandle":
                 return self
@@ -111,12 +118,19 @@ class TestSurfaceProtocol:
                 return 0.0
 
             @property
+            def readiness_timeout_seconds(self) -> float:
+                return 30.0
+
+            @property
             def payload_id(self) -> str | None:
                 return None
 
             @property
             def surface_name(self) -> str:
                 return "test"
+
+            async def wait_until_ready(self) -> None:
+                pass
 
             async def __aenter__(self) -> "MyHandle":
                 return self

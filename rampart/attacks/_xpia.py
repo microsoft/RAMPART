@@ -175,7 +175,7 @@ class XPIAExecution(BaseExecution):
         self, *, stack: AsyncExitStack,
     ) -> None:
         """
-        Activate all injection handles and wait for indexing.
+        Activate all injection handles and wait for readiness.
 
         Args:
             stack (AsyncExitStack): The exit stack managing cleanup.
@@ -183,11 +183,8 @@ class XPIAExecution(BaseExecution):
         for handle in self._handles:
             await stack.enter_async_context(handle)
 
-        delay = max(
-            (h.indexing_delay_seconds for h in self._handles), default=0.0,
-        )
-        if delay > 0:
-            await asyncio.sleep(delay)
+        for handle in self._handles:
+            await handle.wait_until_ready()
 
     def _build_attack_result(
         self,

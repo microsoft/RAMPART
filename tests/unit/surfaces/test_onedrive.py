@@ -171,6 +171,17 @@ class TestOneDriveInjectionProperties:
         handle = surface.inject(payload=payload)
         assert handle.indexing_delay_seconds == 99.0
 
+    def test_readiness_timeout_from_surface(self) -> None:
+        surface = OneDriveSurface(
+            graph_client=MagicMock(),
+            drive_id="d",
+            folder_path="f",
+            readiness_timeout=60.0,
+        )
+        payload = Payload(content="test")
+        handle = surface.inject(payload=payload)
+        assert handle.readiness_timeout_seconds == 60.0
+
 
 class TestOneDriveInjectionLifecycle:
     """Test the async context manager lifecycle (upload + delete)."""

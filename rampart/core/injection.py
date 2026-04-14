@@ -9,6 +9,7 @@ implement; InjectionHandle is what execution strategies consume.
 
 from __future__ import annotations
 
+import asyncio
 from typing import Any, Protocol, runtime_checkable
 
 from rampart.core.types import Payload
@@ -33,6 +34,11 @@ class InjectionHandle(Protocol):
         ...
 
     @property
+    def readiness_timeout_seconds(self) -> float:
+        """Maximum time `wait_until_ready` may block before raising `TimeoutError`."""
+        ...
+
+    @property
     def payload_id(self) -> str | None:
         """The injected payload's identifier, for reporting."""
         ...
@@ -41,6 +47,25 @@ class InjectionHandle(Protocol):
     def surface_name(self) -> str:
         """The name of the surface this handle injects into (e.g., 'SharePoint')."""
         ...
+
+    async def wait_until_ready(self) -> None:
+        """Block until the injected content is visible to the agent.
+
+        Implementations must complete within `readiness_timeout_seconds`
+        or raise `TimeoutError`.
+
+        Default implementation sleeps for `indexing_delay_seconds`, with
+        an upper bound of `readiness_timeout_seconds` to prevent indefinite
+        blocking — which is a common strategy for many surfaces. Surfaces with
+        more complex readiness logic can override this method with a custom
+        implementation.
+
+        Raises:
+            TimeoutError: If `indexing_delay_seconds` exceeds
+                `readiness_timeout_seconds`.
+        """
+        async with asyncio.timeout(self.readiness_timeout_seconds):
+            await asyncio.sleep(self.indexing_delay_seconds)
 
     async def __aenter__(self) -> InjectionHandle:
         """Activate the injection (write payload to data source)."""

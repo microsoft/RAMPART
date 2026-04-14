@@ -13,6 +13,7 @@ import logging
 from typing import TYPE_CHECKING, Any
 
 from rampart.core.errors import InfrastructureError
+from rampart.core.injection import InjectionHandle
 from rampart.core.types import Payload
 
 if TYPE_CHECKING:
@@ -51,6 +52,7 @@ class OneDriveSurface:
     """
 
     DEFAULT_INDEXING_DELAY: float = 10.0
+    DEFAULT_READINESS_TIMEOUT: float = 120.0
 
     def __init__(
         self,
@@ -59,11 +61,13 @@ class OneDriveSurface:
         drive_id: str,
         folder_path: str,
         indexing_delay: float = DEFAULT_INDEXING_DELAY,
+        readiness_timeout: float = DEFAULT_READINESS_TIMEOUT,
     ) -> None:
         self._graph_client = graph_client
         self._drive_id = drive_id
         self._folder_path = folder_path.strip("/")
         self._indexing_delay = indexing_delay
+        self._readiness_timeout = readiness_timeout
 
     def inject(self, *, payload: Payload) -> _OneDriveInjection:
         """
@@ -164,6 +168,11 @@ class _OneDriveInjection:
         return self._surface._indexing_delay
 
     @property
+    def readiness_timeout_seconds(self) -> float:
+        """Maximum time `wait_until_ready` may block."""
+        return self._surface._readiness_timeout
+
+    @property
     def payload_id(self) -> str | None:
         """The injected payload's identifier."""
         return self._payload.id
@@ -172,6 +181,10 @@ class _OneDriveInjection:
     def surface_name(self) -> str:
         """Identifies this injection as OneDrive for reporting."""
         return "OneDrive"
+
+    async def wait_until_ready(self) -> None:
+        """Wait for OneDrive indexing using the default sleep-based strategy."""
+        await InjectionHandle.wait_until_ready(self)
 
     async def __aenter__(self) -> _OneDriveInjection:
         """Upload payload to OneDrive. Raises InfrastructureError on failure."""
