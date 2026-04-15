@@ -25,7 +25,7 @@ _UNSET = object()
 def _make_graph_client(
     *,
     upload_item_id: str = "item-abc-123",
-    upload_return: Any = _UNSET,  # noqa: ANN401
+    upload_return: Any = _UNSET,
     upload_error: Exception | None = None,
     delete_error: Exception | None = None,
 ) -> MagicMock:
@@ -63,7 +63,7 @@ def _make_graph_client(
 
     items_mock = MagicMock()
 
-    def _by_drive_item_id_dispatch(item_id: str) -> Any:  # noqa: ANN401
+    def _by_drive_item_id_dispatch(item_id: str) -> Any:
         if item_id.startswith("root:"):
             return upload_item_mock
         return delete_item_mock

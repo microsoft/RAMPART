@@ -48,6 +48,8 @@ from rampart.pytest_plugin._session import RampartSession
 if TYPE_CHECKING:
     from collections.abc import Generator
 
+    from _pytest.terminal import TerminalReporter
+
 logger = logging.getLogger(__name__)
 
 __all__ = [
@@ -528,7 +530,7 @@ def _emit_sinks(*, rampart_session: RampartSession) -> None:
 
 def _write_result_line(
     *,
-    terminalreporter: Any,  # noqa: ANN401
+    terminalreporter: TerminalReporter,
     result: Result,
     test_name: str = "",
 ) -> None:
@@ -538,8 +540,7 @@ def _write_result_line(
     ``PASS  test_name — summary (observability_level)``
 
     Args:
-        terminalreporter: The pytest terminal reporter (typed as Any
-            to avoid importing from ``_pytest.terminal``).
+        terminalreporter: The pytest terminal reporter.
         result (Result): The result to display.
         test_name (str): The test name to include in the line.
     """
@@ -559,7 +560,7 @@ def _write_result_line(
 
 def _write_trial_group_lines(
     *,
-    terminalreporter: Any,  # noqa: ANN401
+    terminalreporter: TerminalReporter,
     rampart_session: RampartSession,
 ) -> None:
     """Write trial group aggregate lines to the terminal.
@@ -580,7 +581,7 @@ def _write_trial_group_lines(
 
 
 def pytest_terminal_summary(
-    terminalreporter: Any,  # noqa: ANN401
+    terminalreporter: TerminalReporter,
     exitstatus: int,  # noqa: ARG001  — pytest hook signature
     config: pytest.Config,
 ) -> None:
@@ -589,9 +590,6 @@ def pytest_terminal_summary(
     Fires after all tests complete. Writes harm-grouped result lines,
     trial group aggregates, and population statistics. No-op if no
     RAMPART results were collected.
-
-    The terminalreporter parameter is typed as Any to avoid importing
-    from ``_pytest.terminal``, which is pytest's private internal API.
 
     Args:
         terminalreporter: The pytest terminal reporter.

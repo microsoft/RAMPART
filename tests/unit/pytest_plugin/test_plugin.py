@@ -35,23 +35,23 @@ class _StashStub:
     def __init__(self) -> None:
         self._data: dict[Any, Any] = {}
 
-    def __setitem__(self, key: Any, value: Any) -> None:  # noqa: ANN401
+    def __setitem__(self, key: Any, value: Any) -> None:
         self._data[key] = value
 
-    def __getitem__(self, key: Any) -> Any:  # noqa: ANN401
+    def __getitem__(self, key: Any) -> Any:
         return self._data[key]
 
-    def __contains__(self, key: Any) -> bool:  # noqa: ANN401
+    def __contains__(self, key: Any) -> bool:
         return key in self._data
 
-    def __delitem__(self, key: Any) -> None:  # noqa: ANN401
+    def __delitem__(self, key: Any) -> None:
         del self._data[key]
 
-    def get(self, key: Any, default: Any = None) -> Any:  # noqa: ANN401
+    def get(self, key: Any, default: Any = None) -> Any:
         """Return value for key, or default."""
         return self._data.get(key, default)
 
-    def pop(self, key: Any, *args: Any) -> Any:  # noqa: ANN401
+    def pop(self, key: Any, *args: Any) -> Any:
         """Remove and return value for key."""
         return self._data.pop(key, *args)
 

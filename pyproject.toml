@@ -39,7 +39,7 @@ select = ["ALL"]
 "tests/**" = [
     "S101",                                    # assert is pytest's API
     "D100", "D101", "D102", "D104", "D107",    # no docstrings needed
-    "ANN001", "ANN201", "ANN202",              # no type annotations needed
+    "ANN001", "ANN201", "ANN202", "ANN401",    # no type annotations needed
     "PLR2004",                                 # magic values in assertions are fine
     "ARG001", "ARG002",                        # unused args (fixtures, stubs)
     "PLC0415",                                 # imports inside functions for isolation
