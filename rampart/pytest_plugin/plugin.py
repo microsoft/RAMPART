@@ -506,6 +506,9 @@ async def _emit_sinks_async(*, rampart_session: RampartSession) -> None:
             )
 
 
+_background_tasks: set[asyncio.Task[Any]] = set()
+
+
 def _emit_sinks(*, rampart_session: RampartSession) -> None:
     """Synchronous wrapper for sink emission.
 
@@ -521,11 +524,15 @@ def _emit_sinks(*, rampart_session: RampartSession) -> None:
 
     coro = _emit_sinks_async(rampart_session=rampart_session)
     try:
-        asyncio.run(coro)
-    except RuntimeError:
-        # Inside an already-running event loop (e.g. pytest-asyncio).
         loop = asyncio.get_running_loop()
-        _background_task = loop.create_task(coro)  # noqa: RUF006
+    except RuntimeError:
+        # No event loop running — start one.
+        asyncio.run(coro)
+    else:
+        # Event loop is already running — schedule the coroutine.
+        task = loop.create_task(coro)
+        _background_tasks.add(task)
+        task.add_done_callback(_background_tasks.discard)
 
 
 def _write_result_line(
