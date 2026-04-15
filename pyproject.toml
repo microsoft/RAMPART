@@ -32,9 +32,7 @@ dependencies = [
     "jsonschema>=4.26.0",
     "msgraph-sdk>=1.55.0",
     "playwright>=1.58.0",
-    # NOTE: pyrit is unpinned; uv users get PyRIT main via [tool.uv.sources],
-    # pip users get whatever is published on PyPI. Pin to a release before distributing.
-    "pyrit",
+    "pyrit==0.12.1",
     "pytest>=9.0.3",
     "pytest-asyncio>=1.3.0",
     "pytest-xdist[psutil]>=3.8.0",
@@ -112,4 +110,4 @@ known-first-party = ["rampart"]
 convention = "google"
 
 [tool.uv.sources]
-pyrit = { git = "https://github.com/microsoft/PyRIT.git", rev = "main" }
+pyrit = { git = "https://github.com/microsoft/PyRIT", rev = "3873c7762c42febcf844c468e1eb4adee6cf2e30" } # v0.12.1
