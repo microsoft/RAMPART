@@ -15,7 +15,7 @@ from rampart.core.execution import (
     ExecutionEventData,
     ExecutionEventHandler,
 )
-from rampart.core.injection import InjectionHandle, Surface
+from rampart.core.injection import InjectionHandle, InjectionHandleMixin, Surface
 from rampart.core.manifest import AppManifest, DataSource, ToolDeclaration
 from rampart.core.persona import Persona
 from rampart.core.prompt_driver import PromptDecision, PromptDriver
@@ -61,6 +61,7 @@ __all__ = [
     "HarmCategory",
     "InfrastructureError",
     "InjectionHandle",
+    "InjectionHandleMixin",
     "InjectionRecord",
     "ObservabilityLevel",
     "Payload",

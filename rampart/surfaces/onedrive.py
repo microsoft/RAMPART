@@ -13,7 +13,7 @@ import logging
 from typing import TYPE_CHECKING, Self
 
 from rampart.core.errors import InfrastructureError
-from rampart.core.injection import InjectionHandle
+from rampart.core.injection import InjectionHandleMixin
 
 if TYPE_CHECKING:
     import types
@@ -105,7 +105,7 @@ class OneDriveSurface:
             if payload.artifact is None:
                 msg = (
                     f"Binary payload format {payload.format.value} "
-                    f"requires an artifact path.",
+                    "requires an artifact path."
                 )
                 raise ValueError(
                     msg,
@@ -117,8 +117,8 @@ class OneDriveSurface:
         if len(content) > _MAX_SMALL_UPLOAD_BYTES:
             msg = (
                 f"Payload {payload.id} is {len(content)} bytes, which "
-                f"exceeds the 4 MiB small-upload limit. Upload sessions "
-                f"are not yet implemented.",
+                "exceeds the 4 MiB small-upload limit. Upload sessions "
+                "are not yet implemented."
             )
             raise ValueError(
                 msg,
@@ -134,8 +134,8 @@ class OneDriveSurface:
 
         if drive_item is None or drive_item.id is None:
             msg = (
-                f"Graph API returned no DriveItem after upload to "
-                f"drive={self.drive_id} path={upload_path}",
+                "Graph API returned no DriveItem after upload to "
+                f"drive={self.drive_id} path={upload_path}"
             )
             raise InfrastructureError(
                 msg,
@@ -165,7 +165,7 @@ class OneDriveSurface:
         )
 
 
-class _OneDriveInjection:
+class _OneDriveInjection(InjectionHandleMixin):
     """InjectionHandle for OneDrive. Manages upload and cleanup lifecycle."""
 
     def __init__(self, *, surface: OneDriveSurface, payload: Payload) -> None:
@@ -193,10 +193,6 @@ class _OneDriveInjection:
         """Identifies this injection as OneDrive for reporting."""
         return "OneDrive"
 
-    async def wait_until_ready(self) -> None:
-        """Wait for OneDrive indexing using the default sleep-based strategy."""
-        await InjectionHandle.wait_until_ready(self)
-
     async def __aenter__(self) -> Self:
         """Upload payload to OneDrive. Raises InfrastructureError on failure."""
         try:
@@ -208,7 +204,7 @@ class _OneDriveInjection:
         except Exception as exc:
             msg = (
                 f"OneDrive upload failed for drive={self._surface.drive_id} "
-                f"path={self._surface.folder_path}: {exc}",
+                f"path={self._surface.folder_path}: {exc}"
             )
             raise InfrastructureError(
                 msg,

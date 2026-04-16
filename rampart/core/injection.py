@@ -5,6 +5,9 @@
 
 Two protocols serving two audiences: Surface is what surface authors
 implement; InjectionHandle is what execution strategies consume.
+
+``InjectionHandleMixin`` provides a default sleep-based
+``wait_until_ready`` for surfaces that only need a simple delay.
 """
 
 from __future__ import annotations
@@ -55,19 +58,8 @@ class InjectionHandle(Protocol):
 
         Implementations must complete within `readiness_timeout_seconds`
         or raise `TimeoutError`.
-
-        Default implementation sleeps for `indexing_delay_seconds`, with
-        an upper bound of `readiness_timeout_seconds` to prevent indefinite
-        blocking — which is a common strategy for many surfaces. Surfaces with
-        more complex readiness logic can override this method with a custom
-        implementation.
-
-        Raises:
-            TimeoutError: If `indexing_delay_seconds` exceeds
-                `readiness_timeout_seconds`.
         """
-        async with asyncio.timeout(self.readiness_timeout_seconds):
-            await asyncio.sleep(self.indexing_delay_seconds)
+        ...
 
     async def __aenter__(self) -> Self:
         """Activate the injection (write payload to data source)."""
@@ -81,6 +73,33 @@ class InjectionHandle(Protocol):
     ) -> None:
         """Remove the injection. Must be idempotent. Must not raise."""
         ...
+
+
+class InjectionHandleMixin:
+    """Mixin providing a default sleep-based ``wait_until_ready``.
+
+    Surfaces whose readiness strategy is a simple timed delay can
+    inherit from this mixin instead of implementing
+    ``wait_until_ready`` from scratch.  The mixin sleeps for
+    ``indexing_delay_seconds`` with an upper bound of
+    ``readiness_timeout_seconds`` to prevent indefinite blocking.
+
+    Surfaces with more complex readiness logic (e.g. polling an
+    API) should implement ``wait_until_ready`` directly.
+    """
+
+    indexing_delay_seconds: float
+    readiness_timeout_seconds: float
+
+    async def wait_until_ready(self) -> None:
+        """Sleep for ``indexing_delay_seconds``, bounded by timeout.
+
+        Raises:
+            TimeoutError: If ``indexing_delay_seconds`` exceeds
+                ``readiness_timeout_seconds``.
+        """
+        async with asyncio.timeout(self.readiness_timeout_seconds):
+            await asyncio.sleep(self.indexing_delay_seconds)
 
 
 @runtime_checkable

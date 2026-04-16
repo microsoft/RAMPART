@@ -11,13 +11,13 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from rampart.core.injection import InjectionHandle
+from rampart.core.injection import InjectionHandleMixin
 
 if TYPE_CHECKING:
     import types
 
 
-class _ConcreteHandle(InjectionHandle):
+class _ConcreteHandle(InjectionHandleMixin):
     """Minimal concrete handle that inherits the default wait_until_ready."""
 
     def __init__(
@@ -58,7 +58,7 @@ class _ConcreteHandle(InjectionHandle):
 
 
 class TestWaitUntilReady:
-    """Tests for InjectionHandle.wait_until_ready default and custom behaviour."""
+    """Tests for InjectionHandleMixin.wait_until_ready default and custom behaviour."""
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize(
