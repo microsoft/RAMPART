@@ -12,6 +12,7 @@ infrastructure error handling.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from contextlib import AsyncExitStack
 from typing import Any
@@ -188,8 +189,10 @@ class XPIAExecution(BaseExecution):
         for handle in self._handles:
             await stack.enter_async_context(handle)
 
-        for handle in self._handles:
-            await handle.wait_until_ready()
+        # Concurrent: total = max of all wait times
+        async with asyncio.TaskGroup() as tg:
+            for handle in self._handles:
+                tg.create_task(handle.wait_until_ready())
 
     def _build_attack_result(
         self,
