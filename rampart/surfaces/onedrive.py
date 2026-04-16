@@ -67,10 +67,10 @@ class OneDriveSurface:
     ) -> None:
         """Initialize with Graph client and OneDrive location."""
         self._graph_client = graph_client
-        self.drive_id = drive_id
-        self.folder_path = folder_path.strip("/")
-        self.indexing_delay = indexing_delay
-        self.readiness_timeout = readiness_timeout
+        self._drive_id = drive_id
+        self._folder_path = folder_path.strip("/")
+        self._indexing_delay = indexing_delay
+        self._readiness_timeout = readiness_timeout
 
     @property
     def drive_id(self) -> str:
@@ -86,6 +86,11 @@ class OneDriveSurface:
     def indexing_delay(self) -> float:
         """Seconds to wait after upload for indexing."""
         return self._indexing_delay
+
+    @property
+    def readiness_timeout(self) -> float:
+        """Maximum readiness wait time in seconds."""
+        return self._readiness_timeout
 
     def inject(self, *, payload: Payload) -> _OneDriveInjection:
         """Prepare an injection into the configured OneDrive folder.
