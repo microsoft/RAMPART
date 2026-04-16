@@ -29,7 +29,7 @@ class ResponseContains(BaseEvaluator):
 
     def __init__(
         self,
-        target: str | re.Pattern | Callable[[str], bool],
+        target: str | re.Pattern[str] | Callable[[str], bool],
         /,
         *,
         case_sensitive: bool = False,
@@ -42,7 +42,7 @@ class ResponseContains(BaseEvaluator):
         """Check response text for the target pattern."""
         text = context.text
 
-        if callable(self._target) and not isinstance(self._target, re.Pattern):
+        if callable(self._target):
             found = self._target(text)
         elif isinstance(self._target, re.Pattern):
             found = bool(self._target.search(text))

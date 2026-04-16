@@ -12,7 +12,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from rampart.attacks._xpia import XPIAExecution
-from rampart.drivers import _coerce_driver
+from rampart.drivers._utils import coerce_driver
 
 if TYPE_CHECKING:
     from rampart.core.evaluator import Evaluator
@@ -94,7 +94,7 @@ class Attacks:
             handles = inject
         else:
             handles = [inject]
-        driver = _coerce_driver(trigger)
+        driver = coerce_driver(trigger)
 
         return XPIAExecution(
             handles=handles,

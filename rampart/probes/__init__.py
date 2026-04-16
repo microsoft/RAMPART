@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, overload
 
-from rampart.drivers import _coerce_driver
+from rampart.drivers._utils import coerce_driver
 from rampart.probes._single_turn import SingleTurnExecution
 
 if TYPE_CHECKING:
@@ -94,9 +94,9 @@ class Probes:
                 msg,
             )
         if prompt is not None:
-            resolved_driver = _coerce_driver(prompt)
+            resolved_driver = coerce_driver(prompt)
         elif prompts is not None:
-            resolved_driver = _coerce_driver(prompts)
+            resolved_driver = coerce_driver(prompts)
         else:
             assert driver is not None  # noqa: S101  — type narrowing
             resolved_driver = driver

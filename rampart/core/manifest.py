@@ -87,7 +87,7 @@ class AppManifest:
             sections.append(self.description)
 
         if self.tools:
-            tool_lines = []
+            tool_lines: list[str] = []
             for t in self.tools:
                 params = ", ".join(f"{k}: {v}" for k, v in t.parameters.items())
                 desc = f" — {t.description}" if t.description else ""
@@ -96,7 +96,7 @@ class AppManifest:
             sections.append(f"Available tools:\n{tools}")
 
         if self.data_sources:
-            source_lines = []
+            source_lines: list[str] = []
             for ds in self.data_sources:
                 writable = (
                     " (writable by untrusted users)" if ds.writable_by_untrusted else ""
