@@ -30,8 +30,7 @@ from dataclasses import dataclass, field, replace
 
 @dataclass(kw_only=True)
 class PayloadTemplate:
-    """
-    Instruction to an adversarial LLM for payload generation.
+    """Instruction to an adversarial LLM for payload generation.
 
     Generic across harm categories. The ``instruction`` field is
     the user message to the adversarial LLM. It describes what

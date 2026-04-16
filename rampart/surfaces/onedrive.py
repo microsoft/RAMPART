@@ -72,6 +72,21 @@ class OneDriveSurface:
         self.indexing_delay = indexing_delay
         self.readiness_timeout = readiness_timeout
 
+    @property
+    def drive_id(self) -> str:
+        """The OneDrive drive ID."""
+        return self._drive_id
+
+    @property
+    def folder_path(self) -> str:
+        """The target folder path."""
+        return self._folder_path
+
+    @property
+    def indexing_delay(self) -> float:
+        """Seconds to wait after upload for indexing."""
+        return self._indexing_delay
+
     def inject(self, *, payload: Payload) -> _OneDriveInjection:
         """Prepare an injection into the configured OneDrive folder.
 
@@ -110,6 +125,7 @@ class OneDriveSurface:
                 raise ValueError(
                     msg,
                 )
+
             content = payload.artifact.read_bytes()
         else:
             content = payload.content.encode("utf-8")
@@ -222,11 +238,9 @@ class _OneDriveInjection(InjectionHandleMixin):
             try:
                 await self._surface.delete_async(item_id=self._item_id)
             except Exception:  # noqa: BLE001  — cleanup must not raise
-                msg = (
-                    f"OneDrive cleanup failed for item {self._item_id} "
-                    f"in drive={self._surface.drive_id}"
-                )
                 logger.warning(
-                    msg,
+                    "OneDrive cleanup failed for item %s in drive=%s",
+                    self._item_id,
+                    self._surface.drive_id,
                     exc_info=True,
                 )

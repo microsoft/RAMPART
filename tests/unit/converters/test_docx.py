@@ -83,7 +83,8 @@ class TestDocxConverterConversion:
             )
 
         mock_instance.convert_async.assert_called_once_with(
-            prompt="adversarial text", input_type="text",
+            prompt="adversarial text",
+            input_type="text",
         )
 
     @pytest.mark.asyncio

@@ -15,8 +15,7 @@ from rampart.core.types import Request, Turn
 
 
 class StaticDriver:
-    """
-    Sends a fixed sequence of prompts.
+    """Sends a fixed sequence of prompts.
 
     Derives its position from the history length — no mutable state.
     Safe to reuse across tests.
@@ -27,16 +26,17 @@ class StaticDriver:
     """
 
     def __init__(self, *, prompts: list[str] | list[Request]) -> None:
+        """Initialize with a list of prompts or Request objects."""
         self._requests: list[Request] = [
-            Request(prompt=p) if isinstance(p, str) else p
-            for p in prompts
+            Request(prompt=p) if isinstance(p, str) else p for p in prompts
         ]
 
     async def next_prompt_async(
-        self, *, history: list[Turn],
+        self,
+        *,
+        history: list[Turn],
     ) -> PromptDecision | None:
-        """
-        Return the next prompt in sequence, or None when exhausted.
+        """Return the next prompt in sequence, or None when exhausted.
 
         Args:
             history (list[Turn]): All turns so far (empty on first call).

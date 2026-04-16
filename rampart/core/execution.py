@@ -15,18 +15,19 @@ import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
-from typing import Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
-from rampart.core.adapter import AgentAdapter
 from rampart.core.errors import InfrastructureError
 from rampart.core.result import Result, SafetyStatus
+
+if TYPE_CHECKING:
+    from rampart.core.adapter import AgentAdapter
 
 logger = logging.getLogger(__name__)
 
 
 class ExecutionEvent(Enum):
-    """
-    Lifecycle events fired during a BaseExecution run.
+    """Lifecycle events fired during a BaseExecution run.
 
     ON_PRE_EXECUTE:  Fired before _execute_async is called.
     ON_POST_EXECUTE: Fired after _execute_async returns a Result.
@@ -41,8 +42,7 @@ class ExecutionEvent(Enum):
 
 @dataclass(kw_only=True)
 class ExecutionEventData:
-    """
-    Data passed to event handlers at each lifecycle point.
+    """Data passed to event handlers at each lifecycle point.
 
     Args:
         event (ExecutionEvent): Which lifecycle point fired.
@@ -60,8 +60,7 @@ class ExecutionEventData:
 
 
 class ExecutionEventHandler(ABC):
-    """
-    Receives lifecycle events from BaseExecution.
+    """Receives lifecycle events from BaseExecution.
 
     The pytest plugin installs a ResultCollectionHandler on every
     execution via the _default_handler_factory hook. Teams can
@@ -71,8 +70,7 @@ class ExecutionEventHandler(ABC):
 
     @abstractmethod
     async def on_event(self, *, event_data: ExecutionEventData) -> None:
-        """
-        Handle an execution lifecycle event.
+        """Handle an execution lifecycle event.
 
         Args:
             event_data (ExecutionEventData): The event data.
@@ -82,8 +80,7 @@ class ExecutionEventHandler(ABC):
 
 @runtime_checkable
 class ExecutionHandlerFactory(Protocol):
-    """
-    Factory that creates the default ExecutionEventHandlers injected into every BaseExecution.
+    """Factory that creates default ExecutionEventHandlers for every BaseExecution.
 
     When a BaseExecution is instantiated it needs a set of framework-level
     handlers (e.g. the ResultCollectionHandler that funnels results into
@@ -111,8 +108,7 @@ class ExecutionHandlerFactory(Protocol):
 
 
 class _DefaultHandlerRegistry:
-    """
-    Mutable registry for the default handler factory.
+    """Mutable registry for the default handler factory.
 
     Wrapping the reference in a registry instance avoids ``global``
     statements — register/clear simply mutate the ``.factory``
@@ -137,8 +133,7 @@ _default_handler_factory = _DefaultHandlerRegistry()
 def register_default_handler_factory(
     factory: ExecutionHandlerFactory,
 ) -> None:
-    """
-    Install a factory that provides default handlers for every BaseExecution.
+    """Install a factory that provides default handlers for every BaseExecution.
 
     Called by the pytest plugin at configure time. The factory is invoked
     once per BaseExecution.__init__ to supply framework-level handlers
@@ -153,16 +148,18 @@ def register_default_handler_factory(
         TypeError: If factory does not satisfy ExecutionHandlerFactory.
     """
     if not callable(factory):
-        raise TypeError(
+        msg = (
             "factory must satisfy ExecutionHandlerFactory (callable returning "
             "list[ExecutionEventHandler])"
+        )
+        raise TypeError(
+            msg,
         )
     _default_handler_factory.factory = factory
 
 
 def clear_default_handler_factory() -> None:
-    """
-    Remove the installed default handler factory.
+    """Remove the installed default handler factory.
 
     Called by the pytest plugin at unconfigure time to restore the
     module to its clean, no-plugin state.
@@ -171,8 +168,7 @@ def clear_default_handler_factory() -> None:
 
 
 class BaseExecution(ABC):
-    """
-    ABC for all execution strategies.
+    """ABC for all execution strategies.
 
     Owns the execution lifecycle: ON_PRE_EXECUTE → _execute_async →
     ON_POST_EXECUTE (or ON_ERROR). Subclasses implement only
@@ -196,14 +192,14 @@ class BaseExecution(ABC):
         *,
         event_handlers: list[ExecutionEventHandler] | None = None,
     ) -> None:
+        """Initialize with optional extra event handlers."""
         defaults = _default_handler_factory()
         self._handlers: list[ExecutionEventHandler] = defaults + (event_handlers or [])
 
     @property
     @abstractmethod
     def strategy_name(self) -> str:
-        """
-        Short identifier for this execution strategy.
+        """Short identifier for this execution strategy.
 
         Used in Result.strategy for reporting and dashboard grouping.
         Examples: "xpia", "probe", "crescendo", "pair".
@@ -211,9 +207,10 @@ class BaseExecution(ABC):
         ...
 
     async def execute_async(self, *, adapter: AgentAdapter) -> Result:
-        """
-        Execute the safety test. Fires lifecycle events and delegates
-        to _execute_async for strategy-specific logic.
+        """Execute the safety test.
+
+        Fires lifecycle events and delegates to _execute_async for
+        strategy-specific logic.
 
         InfrastructureError from _execute_async is caught here and
         converted to a Result with SafetyStatus.ERROR.
@@ -232,7 +229,9 @@ class BaseExecution(ABC):
         """
         start = time.monotonic()
         await self._fire(
-            ExecutionEvent.ON_PRE_EXECUTE, adapter=adapter, elapsed=0.0,
+            ExecutionEvent.ON_PRE_EXECUTE,
+            adapter=adapter,
+            elapsed=0.0,
         )
 
         try:
@@ -240,7 +239,8 @@ class BaseExecution(ABC):
         except InfrastructureError as exc:
             logger.warning(
                 "Infrastructure error during %s execution: %s",
-                self.strategy_name, exc,
+                self.strategy_name,
+                exc,
                 exc_info=True,
             )
             result = Result(
@@ -273,8 +273,7 @@ class BaseExecution(ABC):
 
     @abstractmethod
     async def _execute_async(self, *, adapter: AgentAdapter) -> Result:
-        """
-        Core execution logic implemented by each strategy.
+        """Core execution logic implemented by each strategy.
 
         Args:
             adapter (AgentAdapter): The agent to test.
@@ -293,8 +292,7 @@ class BaseExecution(ABC):
         result: Result | None = None,
         error: Exception | None = None,
     ) -> None:
-        """
-        Dispatch an event to all registered handlers.
+        """Dispatch an event to all registered handlers.
 
         Handler exceptions are logged and swallowed — a failing
         handler must not abort the test or suppress its result.
@@ -316,7 +314,7 @@ class BaseExecution(ABC):
         for handler in self._handlers:
             try:
                 await handler.on_event(event_data=event_data)
-            except Exception:
+            except Exception:  # noqa: BLE001  — handler errors must not break execution
                 logger.warning(
                     "ExecutionEventHandler %s raised on %s — ignored.",
                     handler.__class__.__name__,

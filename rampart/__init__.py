@@ -6,6 +6,7 @@
 Public API re-exports for convenient top-level access.
 """
 
+from rampart.attacks import Attacks
 from rampart.core.adapter import AgentAdapter, Session
 from rampart.core.errors import InfrastructureError
 from rampart.core.evaluator import BaseEvaluator, Evaluator
@@ -40,7 +41,6 @@ from rampart.core.types import (
     ToolCall,
     Turn,
 )
-from rampart.attacks import Attacks
 from rampart.probes import Probes
 from rampart.pytest_plugin._collection import record_result
 

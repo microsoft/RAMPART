@@ -11,18 +11,18 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime
 from enum import Enum
-from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
+    from datetime import datetime
+    from pathlib import Path
+
     from rampart.core.manifest import AppManifest
 
 
 class ObservabilityLevel(Enum):
-    """
-    What the adapter can reliably observe during agent execution.
+    """What the adapter can reliably observe during agent execution.
 
     Declared by the adapter to inform evaluators and reporting. When
     the adapter declares RESPONSE_ONLY, evaluators that require tool
@@ -35,8 +35,7 @@ class ObservabilityLevel(Enum):
 
 
 class PayloadFormat(Enum):
-    """
-    Delivery format for a payload.
+    """Delivery format for a payload.
 
     Text formats deliver ``content`` directly. Binary formats
     deliver via ``artifact`` (a file on disk). Surfaces inspect
@@ -46,19 +45,19 @@ class PayloadFormat(Enum):
     surfaces, and the store handle the two categories uniformly
     without listing every enum member.
     """
- 
+
     # Text formats (content: str)
     TEXT = "text"
     HTML = "html"
     MARKDOWN = "markdown"
- 
+
     # Binary formats (content: bytes | Path)
     IMAGE = "image"
     PDF = "pdf"
     DOCX = "docx"
     XLSX = "xlsx"
     AUDIO = "audio"
- 
+
     @property
     def is_text(self) -> bool:
         """True if this format carries content as str."""
@@ -67,7 +66,7 @@ class PayloadFormat(Enum):
             PayloadFormat.HTML,
             PayloadFormat.MARKDOWN,
         )
- 
+
     @property
     def is_binary(self) -> bool:
         """True if this format carries content as bytes or Path."""
@@ -90,8 +89,7 @@ class PayloadFormat(Enum):
 
 @dataclass(kw_only=True)
 class Payload:
-    """
-    Content to inject into a surface or send alongside a prompt.
+    """Content to inject into a surface or send alongside a prompt.
 
     ``content`` is always the semantic text — the attack instruction,
     the adversarial prompt, or a description of the payload's purpose.
@@ -122,32 +120,39 @@ class Payload:
     def __post_init__(self) -> None:
         """Validate content-format-artifact consistency."""
         if self.format.is_binary and self.artifact is None:
-            raise TypeError(
+            msg = (
                 f"Binary format {self.format.value} requires an "
                 f"artifact path. Provide artifact=Path(...) or "
                 f"use a converter to render the payload."
             )
-        if self.format.is_text and self.artifact is not None:
             raise TypeError(
+                msg,
+            )
+        if self.format.is_text and self.artifact is not None:
+            msg = (
                 f"Text format {self.format.value} delivers content "
                 f"directly — artifact must be None."
             )
+            raise TypeError(
+                msg,
+            )
         if self.artifact is not None and not self.artifact.exists():
+            msg = f"Artifact file does not exist: {self.artifact}"
             raise FileNotFoundError(
-                f"Artifact file does not exist: {self.artifact}"
+                msg,
             )
 
     def __str__(self) -> str:
         """Human-readable preview of the payload."""
-        truncated = self.content[:200]
-        suffix = "..." if len(self.content) > 200 else ""
+        _preview_max_length = 200
+        truncated = self.content[:_preview_max_length]
+        suffix = "..." if len(self.content) > _preview_max_length else ""
         return truncated + suffix
 
 
 @dataclass(kw_only=True)
 class ToolCall:
-    """
-    A tool invocation observed during agent execution.
+    """A tool invocation observed during agent execution.
 
     Adapters populate this from whatever observability they have — API
     response fields, telemetry streams, log parsing.
@@ -167,8 +172,7 @@ class ToolCall:
 
 @dataclass(kw_only=True)
 class SideEffect:
-    """
-    An observable side effect beyond tool invocations.
+    """An observable side effect beyond tool invocations.
 
     Covers effects like HTTP requests, file system changes, or
     database writes that the adapter can observe but that are not
@@ -185,8 +189,7 @@ class SideEffect:
 
 @dataclass(kw_only=True)
 class Response:
-    """
-    What the agent returned for a single prompt.
+    """What the agent returned for a single prompt.
 
     The adapter populates every field it can observe.
 
@@ -205,8 +208,7 @@ class Response:
 
 @dataclass(kw_only=True)
 class Request:
-    """
-    What is sent to the agent in a single turn.
+    """What is sent to the agent in a single turn.
 
     Combines prompt text and inline payloads into a single object.
     At least one of ``prompt`` or ``attachments`` must be provided.
@@ -224,15 +226,15 @@ class Request:
     def __post_init__(self) -> None:
         """Validate that the request carries some content."""
         if self.prompt is None and not self.attachments:
+            msg = "Request must include at least a prompt or attachments."
             raise ValueError(
-                "Request must include at least a prompt or attachments."
+                msg,
             )
 
 
 @dataclass(kw_only=True)
 class Turn:
-    """
-    One prompt-response exchange.
+    """One prompt-response exchange.
 
     Args:
         request: What was sent to the agent.
@@ -250,8 +252,7 @@ class Turn:
 
 
 class EvalOutcome(Enum):
-    """
-    What the evaluator determined.
+    """What the evaluator determined.
 
     DETECTED: The condition was found.
     NOT_DETECTED: The condition was not found.
@@ -265,8 +266,7 @@ class EvalOutcome(Enum):
 
 @dataclass(kw_only=True)
 class EvalResult:
-    """
-    What an evaluator returns — a raw condition detection signal.
+    """What an evaluator returns — a raw condition detection signal.
 
     This is NOT a safety judgment. Whether DETECTED means "safe" or
     "unsafe" depends on context.
@@ -291,8 +291,7 @@ class EvalResult:
 
 @dataclass(kw_only=True)
 class EvalContext:
-    """
-    Everything an evaluator needs to make a determination.
+    """Everything an evaluator needs to make a determination.
 
     Holds the full conversation as a flat list of turns. Provides
     convenience properties for common access patterns.
@@ -311,7 +310,8 @@ class EvalContext:
     def current_turn(self) -> Turn:
         """The most recent turn. Raises ValueError if no turns exist."""
         if not self.turns:
-            raise ValueError("No turns in context.")
+            msg = "No turns in context."
+            raise ValueError(msg)
         return self.turns[-1]
 
     @property
@@ -337,8 +337,7 @@ class EvalContext:
         prompt: str = "",
         manifest: AppManifest | None = None,
     ) -> EvalContext:
-        """
-        Build a context from a single response.
+        """Build a context from a single response.
 
         Convenience for evaluating outside the factory flow.
 

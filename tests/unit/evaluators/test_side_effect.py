@@ -5,17 +5,26 @@
 
 import pytest
 
-from rampart.core.types import EvalContext, EvalOutcome, Request, Response, SideEffect, Turn
+from rampart.core.types import (
+    EvalContext,
+    EvalOutcome,
+    Request,
+    Response,
+    SideEffect,
+    Turn,
+)
 from rampart.evaluators import SideEffectOccurred
 
 
 def _ctx_with_side_effects(*effects: SideEffect) -> EvalContext:
     """Build a single-turn EvalContext with the given side effects."""
     return EvalContext(
-        turns=[Turn(
-            request=Request(prompt="test"),
-            response=Response(text="ok", side_effects=list(effects)),
-        )],
+        turns=[
+            Turn(
+                request=Request(prompt="test"),
+                response=Response(text="ok", side_effects=list(effects)),
+            ),
+        ],
     )
 
 
@@ -45,7 +54,8 @@ class TestSideEffectOccurredDetailPredicates:
         se = SideEffect(kind="http_request", details={"url": "https://evil.com"})
         ctx = _ctx_with_side_effects(se)
         result = await SideEffectOccurred(
-            "http_request", url="https://evil.com",
+            "http_request",
+            url="https://evil.com",
         ).evaluate_async(context=ctx)
         assert result.outcome is EvalOutcome.DETECTED
 
@@ -54,7 +64,8 @@ class TestSideEffectOccurredDetailPredicates:
         se = SideEffect(kind="http_request", details={"url": "https://safe.com"})
         ctx = _ctx_with_side_effects(se)
         result = await SideEffectOccurred(
-            "http_request", url="https://evil.com",
+            "http_request",
+            url="https://evil.com",
         ).evaluate_async(context=ctx)
         assert result.outcome is EvalOutcome.NOT_DETECTED
 
@@ -63,7 +74,8 @@ class TestSideEffectOccurredDetailPredicates:
         se = SideEffect(kind="http_request", details={"url": "https://evil.com/data"})
         ctx = _ctx_with_side_effects(se)
         result = await SideEffectOccurred(
-            "http_request", url=lambda u: "evil.com" in str(u),
+            "http_request",
+            url=lambda u: "evil.com" in str(u),
         ).evaluate_async(context=ctx)
         assert result.outcome is EvalOutcome.DETECTED
 
@@ -72,6 +84,7 @@ class TestSideEffectOccurredDetailPredicates:
         se = SideEffect(kind="http_request", details={"url": "https://safe.com"})
         ctx = _ctx_with_side_effects(se)
         result = await SideEffectOccurred(
-            "http_request", url=lambda u: "evil.com" in str(u),
+            "http_request",
+            url=lambda u: "evil.com" in str(u),
         ).evaluate_async(context=ctx)
         assert result.outcome is EvalOutcome.NOT_DETECTED

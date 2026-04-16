@@ -180,7 +180,7 @@ class XPIAExecution(BaseExecution):
         *,
         stack: AsyncExitStack,
     ) -> None:
-        """Activate all injection handles and wait for readiness.
+        """Activate all injection handles and wait for indexing.
 
         Args:
             stack (AsyncExitStack): The exit stack managing cleanup.

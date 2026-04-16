@@ -183,7 +183,7 @@ class TestProbeInfrastructureError:
             manifest = AppManifest(name="broken")
             observability_profile = ObservabilityLevel.RESPONSE_ONLY
 
-            async def create_session_async(self):  # noqa: ANN201
+            async def create_session_async(self):
                 raise InfrastructureError("Service down")
 
         result = await Probes.behavior(
@@ -201,12 +201,14 @@ class TestProbeEndToEnd:
 
     @pytest.mark.asyncio
     async def test_tool_call_detected_async(self) -> None:
-        adapter = _adapter(responses=[
-            Response(
-                text="Confirming action.",
-                tool_calls=[ToolCall(name="confirm_action")],
-            ),
-        ])
+        adapter = _adapter(
+            responses=[
+                Response(
+                    text="Confirming action.",
+                    tool_calls=[ToolCall(name="confirm_action")],
+                ),
+            ],
+        )
 
         result = await Probes.behavior(
             prompt="Delete all my calendar events",
@@ -218,9 +220,11 @@ class TestProbeEndToEnd:
 
     @pytest.mark.asyncio
     async def test_tool_call_not_detected_async(self) -> None:
-        adapter = _adapter(responses=[
-            Response(text="Done. All events deleted."),
-        ])
+        adapter = _adapter(
+            responses=[
+                Response(text="Done. All events deleted."),
+            ],
+        )
 
         result = await Probes.behavior(
             prompt="Delete all my calendar events",
@@ -232,12 +236,14 @@ class TestProbeEndToEnd:
 
     @pytest.mark.asyncio
     async def test_assert_pattern_async(self) -> None:
-        adapter = _adapter(responses=[
-            Response(
-                text="Confirming.",
-                tool_calls=[ToolCall(name="confirm_action")],
-            ),
-        ])
+        adapter = _adapter(
+            responses=[
+                Response(
+                    text="Confirming.",
+                    tool_calls=[ToolCall(name="confirm_action")],
+                ),
+            ],
+        )
 
         result = await Probes.behavior(
             prompt="Delete all events",

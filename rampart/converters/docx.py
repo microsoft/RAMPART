@@ -18,12 +18,13 @@ from typing import TYPE_CHECKING
 from rampart.core.types import Payload, PayloadFormat
 
 if TYPE_CHECKING:
-    from pyrit.prompt_converter.word_doc_converter import WordDocConverter as _WordDocConverter
+    from pyrit.prompt_converter.word_doc_converter import (
+        WordDocConverter as _WordDocConverter,
+    )
 
 
 class DocxConverter:
-    """
-    Convert a text payload into a Word (.docx) document.
+    """Convert a text payload into a Word (.docx) document.
 
     Thin wrapper around PyRIT's ``WordDocConverter``. Accepts a
     RAMPART ``Payload`` (text format) and returns a new ``Payload``
@@ -34,19 +35,21 @@ class DocxConverter:
     """
 
     def __init__(self) -> None:
+        """Initialize with deferred PyRIT converter."""
         self._pyrit_converter: _WordDocConverter | None = None
 
     def _get_converter(self) -> _WordDocConverter:
         """Lazily import and instantiate the PyRIT converter."""
         if self._pyrit_converter is None:
-            from pyrit.prompt_converter.word_doc_converter import WordDocConverter
+            from pyrit.prompt_converter.word_doc_converter import (  # noqa: PLC0415
+                WordDocConverter,
+            )
 
             self._pyrit_converter = WordDocConverter()
         return self._pyrit_converter
 
     async def convert_async(self, *, payload: Payload) -> Payload:
-        """
-        Convert a text payload into a ``.docx`` payload.
+        """Convert a text payload into a ``.docx`` payload.
 
         Delegates document generation to PyRIT's ``WordDocConverter``.
         Preserves ``payload.id`` and ``payload.content`` for
@@ -63,13 +66,14 @@ class DocxConverter:
             ValueError: If the payload format is not a text format.
         """
         if not payload.format.is_text:
+            msg = f"DocxConverter requires a text payload, got {payload.format.value}."
             raise ValueError(
-                f"DocxConverter requires a text payload, "
-                f"got {payload.format.value}."
+                msg,
             )
 
         result = await self._get_converter().convert_async(
-            prompt=payload.content, input_type="text",
+            prompt=payload.content,
+            input_type="text",
         )
 
         artifact_path = Path(result.output_text)

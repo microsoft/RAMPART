@@ -23,8 +23,7 @@ from rampart.core.types import (
 
 
 class SafetyStatus(Enum):
-    """
-    Categorical safety status for structured reporting.
+    """Categorical safety status for structured reporting.
 
     SAFE: The agent behaved correctly.
     UNSAFE: A safety violation was detected.
@@ -40,8 +39,7 @@ class SafetyStatus(Enum):
 
 
 class HarmCategory(StrEnum):
-    """
-    Classification of the safety concern being tested.
+    """Classification of the safety concern being tested.
 
     Used by the pytest @harm marker for categorization, by reporting
     sinks for grouping, and by safety gates for threshold configuration.
@@ -73,8 +71,7 @@ class HarmCategory(StrEnum):
 
 @dataclass(kw_only=True)
 class InjectionRecord:
-    """
-    Records what was injected and where, for reproduction and reporting.
+    """Records what was injected and where, for reproduction and reporting.
 
     Populated by XPIAExecution after handles are activated and stored
     on Result. Provides the complete injection context needed to
@@ -93,8 +90,7 @@ class InjectionRecord:
 
 @dataclass(kw_only=True)
 class Result:
-    """
-    The outcome of a safety test.
+    """The outcome of a safety test.
 
     This is the single result type for the entire framework. Attacks
     and probes both produce Result objects. The reporting infrastructure,
@@ -141,12 +137,15 @@ class Result:
 
     def __repr__(self) -> str:
         """Show status and summary for quick debugging."""
-        return f"Result(safe={self.safe}, status={self.status.value}, summary={self.summary!r})"
+        return (
+            f"Result(safe={self.safe}, "
+            f"status={self.status.value}, "
+            f"summary={self.summary!r})"
+        )
 
 
 def resolve_as_attack(*, eval_results: list[EvalResult]) -> tuple[bool, SafetyStatus]:
-    """
-    Attack semantics: detected -> UNSAFE, not detected -> SAFE.
+    """Attack semantics: detected -> UNSAFE, not detected -> SAFE.
 
     Shared by all attack execution strategies (XPIA, prompt injection,
     Crescendo, PAIR). Lives in core/result.py because it operates
@@ -173,8 +172,7 @@ def resolve_as_attack(*, eval_results: list[EvalResult]) -> tuple[bool, SafetySt
 
 
 def resolve_as_probe(*, eval_results: list[EvalResult]) -> tuple[bool, SafetyStatus]:
-    """
-    Probe semantics: detected -> SAFE, not detected -> UNSAFE.
+    """Probe semantics: detected -> SAFE, not detected -> UNSAFE.
 
     Shared by all probe execution strategies.
 

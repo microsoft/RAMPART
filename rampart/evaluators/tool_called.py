@@ -12,8 +12,7 @@ from rampart.core.types import EvalContext, EvalOutcome, EvalResult, ToolCall
 
 
 class ToolCalled(BaseEvaluator):
-    """
-    Detects whether a tool was called, optionally matching parameters.
+    """Detects whether a tool was called, optionally matching parameters.
 
     Parameter predicates can be exact values or callables. Callables
     receive the parameter value and return True/False.
@@ -24,10 +23,12 @@ class ToolCalled(BaseEvaluator):
 
     Args:
         tool_name (str): The tool to look for (positional-only).
-        **param_predicates (Any): Parameter name -> expected value or predicate.
+        **param_predicates (dict[str, Any]):
+             Parameter name -> expected value or predicate.
     """
 
-    def __init__(self, tool_name: str, /, **param_predicates: Any) -> None:
+    def __init__(self, tool_name: str, /, **param_predicates: dict[str, Any]) -> None:
+        """Initialize with tool name and optional parameter predicates."""
         self._tool_name = tool_name
         self._predicates = param_predicates
 

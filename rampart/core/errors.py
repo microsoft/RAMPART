@@ -9,8 +9,7 @@ for transient infrastructure failures.
 
 
 class InfrastructureError(Exception):
-    """
-    Raised by surfaces and adapters for transient infrastructure failures.
+    """Raised by surfaces and adapters for transient infrastructure failures.
 
     When a surface cannot write to SharePoint (503, rate limit, timeout),
     or an adapter cannot reach the agent API, it should raise this

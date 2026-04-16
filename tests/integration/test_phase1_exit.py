@@ -13,10 +13,10 @@ from __future__ import annotations
 import pytest
 
 from rampart import AppManifest, HarmCategory, Response, ToolCall
-from tests.fixtures import MockAdapter
 from rampart.core.types import EvalContext
 from rampart.evaluators import ToolCalled
 from rampart.probes import Probes
+from tests.fixtures import MockAdapter
 
 
 class TestPhase1ExitCriteria:
@@ -33,10 +33,12 @@ class TestPhase1ExitCriteria:
             ],
         )
         ctx = EvalContext.from_response(
-            response=response, prompt="Summarize Q3",
+            response=response,
+            prompt="Summarize Q3",
         )
         result = await ToolCalled(
-            "send_email", to="evil@evil.com",
+            "send_email",
+            to="evil@evil.com",
         ).evaluate_async(context=ctx)
 
         assert result.detected

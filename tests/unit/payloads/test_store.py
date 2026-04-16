@@ -4,7 +4,6 @@
 """Tests for rampart.payloads._store — PayloadStore persistence."""
 
 import json
-from pathlib import Path
 
 import pytest
 
@@ -12,7 +11,7 @@ from rampart.core.types import Payload, PayloadFormat
 from rampart.payloads._store import PayloadStore
 
 
-@pytest.fixture()
+@pytest.fixture
 def store(tmp_path):
     """PayloadStore rooted in a temporary directory."""
     return PayloadStore(root=tmp_path)

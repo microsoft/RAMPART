@@ -15,22 +15,26 @@ from unittest.mock import patch
 
 import pytest
 
-from rampart.core.llm import LLMConfig
 from rampart._pyrit.llm_bridge import create_prompt_target
-
+from rampart.core.llm import LLMConfig
 
 # ---------------------------------------------------------------------------
 # Translation tests
 # ---------------------------------------------------------------------------
+
 
 class TestModelNameResolution:
     """LLMConfig.model and .deployment map to PyRIT's model_name / underlying_model."""
 
     @patch("rampart._pyrit.llm_bridge.OpenAIChatTarget")
     def test_model_becomes_model_name_without_deployment(self, mock_cls):
-        create_prompt_target(LLMConfig(
-            model="gpt-4o", endpoint="https://api.openai.com/v1", api_key="sk-test",
-        ))
+        create_prompt_target(
+            LLMConfig(
+                model="gpt-4o",
+                endpoint="https://api.openai.com/v1",
+                api_key="sk-test",
+            ),
+        )
 
         kwargs = mock_cls.call_args.kwargs
         assert kwargs["model_name"] == "gpt-4o"
@@ -38,12 +42,14 @@ class TestModelNameResolution:
 
     @patch("rampart._pyrit.llm_bridge.OpenAIChatTarget")
     def test_deployment_becomes_model_name_with_model_as_underlying(self, mock_cls):
-        create_prompt_target(LLMConfig(
-            model="gpt-4o",
-            endpoint="https://myresource.openai.azure.com/openai/v1",
-            api_key="key",
-            deployment="my-gpt4o-deployment",
-        ))
+        create_prompt_target(
+            LLMConfig(
+                model="gpt-4o",
+                endpoint="https://myresource.openai.azure.com/openai/v1",
+                api_key="key",
+                deployment="my-gpt4o-deployment",
+            ),
+        )
 
         kwargs = mock_cls.call_args.kwargs
         assert kwargs["model_name"] == "my-gpt4o-deployment"
@@ -55,26 +61,37 @@ class TestEndpointAndAuth:
 
     @patch("rampart._pyrit.llm_bridge.OpenAIChatTarget")
     def test_endpoint_forwarded(self, mock_cls):
-        create_prompt_target(LLMConfig(
-            model="gpt-4o", endpoint="https://custom.endpoint.com/v1", api_key="k",
-        ))
+        create_prompt_target(
+            LLMConfig(
+                model="gpt-4o",
+                endpoint="https://custom.endpoint.com/v1",
+                api_key="k",
+            ),
+        )
 
         assert mock_cls.call_args.kwargs["endpoint"] == "https://custom.endpoint.com/v1"
 
     @patch("rampart._pyrit.llm_bridge.OpenAIChatTarget")
     def test_api_key_forwarded(self, mock_cls):
-        create_prompt_target(LLMConfig(
-            model="gpt-4o", endpoint="https://api.openai.com/v1", api_key="sk-secret",
-        ))
+        create_prompt_target(
+            LLMConfig(
+                model="gpt-4o",
+                endpoint="https://api.openai.com/v1",
+                api_key="sk-secret",
+            ),
+        )
 
         assert mock_cls.call_args.kwargs["api_key"] == "sk-secret"
 
     @patch("rampart._pyrit.llm_bridge.OpenAIChatTarget")
     def test_none_api_key_forwarded_for_entra_auth(self, mock_cls):
         """None api_key lets PyRIT use Entra ID auth for Azure endpoints."""
-        create_prompt_target(LLMConfig(
-            model="gpt-4o", endpoint="https://myresource.openai.azure.com/v1",
-        ))
+        create_prompt_target(
+            LLMConfig(
+                model="gpt-4o",
+                endpoint="https://myresource.openai.azure.com/v1",
+            ),
+        )
 
         assert mock_cls.call_args.kwargs["api_key"] is None
 
@@ -84,10 +101,14 @@ class TestMetadataForwarding:
 
     @patch("rampart._pyrit.llm_bridge.OpenAIChatTarget")
     def test_temperature_and_top_p_forwarded(self, mock_cls):
-        create_prompt_target(LLMConfig(
-            model="gpt-4o", endpoint="https://api.openai.com/v1", api_key="k",
-            metadata={"temperature": 0.7, "top_p": 0.9},
-        ))
+        create_prompt_target(
+            LLMConfig(
+                model="gpt-4o",
+                endpoint="https://api.openai.com/v1",
+                api_key="k",
+                metadata={"temperature": 0.7, "top_p": 0.9},
+            ),
+        )
 
         kwargs = mock_cls.call_args.kwargs
         assert kwargs["temperature"] == 0.7
@@ -106,10 +127,14 @@ class TestMetadataForwarding:
             "max_tokens": 500,
             "max_requests_per_minute": 60,
         }
-        create_prompt_target(LLMConfig(
-            model="gpt-4o", endpoint="https://api.openai.com/v1", api_key="k",
-            metadata=meta,
-        ))
+        create_prompt_target(
+            LLMConfig(
+                model="gpt-4o",
+                endpoint="https://api.openai.com/v1",
+                api_key="k",
+                metadata=meta,
+            ),
+        )
 
         kwargs = mock_cls.call_args.kwargs
         for key, value in meta.items():
@@ -117,10 +142,14 @@ class TestMetadataForwarding:
 
     @patch("rampart._pyrit.llm_bridge.OpenAIChatTarget")
     def test_unknown_metadata_keys_not_forwarded(self, mock_cls):
-        create_prompt_target(LLMConfig(
-            model="gpt-4o", endpoint="https://api.openai.com/v1", api_key="k",
-            metadata={"custom_key": "custom_value", "temperature": 0.5},
-        ))
+        create_prompt_target(
+            LLMConfig(
+                model="gpt-4o",
+                endpoint="https://api.openai.com/v1",
+                api_key="k",
+                metadata={"custom_key": "custom_value", "temperature": 0.5},
+            ),
+        )
 
         kwargs = mock_cls.call_args.kwargs
         assert "custom_key" not in kwargs
@@ -128,14 +157,21 @@ class TestMetadataForwarding:
 
     @patch("rampart._pyrit.llm_bridge.OpenAIChatTarget")
     def test_empty_metadata_adds_no_extra_kwargs(self, mock_cls):
-        create_prompt_target(LLMConfig(
-            model="gpt-4o", endpoint="https://api.openai.com/v1", api_key="k",
-        ))
+        create_prompt_target(
+            LLMConfig(
+                model="gpt-4o",
+                endpoint="https://api.openai.com/v1",
+                api_key="k",
+            ),
+        )
 
         kwargs = mock_cls.call_args.kwargs
         # Only the four core params should be present.
         assert set(kwargs.keys()) == {
-            "model_name", "endpoint", "api_key", "underlying_model",
+            "model_name",
+            "endpoint",
+            "api_key",
+            "underlying_model",
         }
 
 
@@ -144,9 +180,13 @@ class TestReturnValue:
 
     @patch("rampart._pyrit.llm_bridge.OpenAIChatTarget")
     def test_returns_constructed_target(self, mock_cls):
-        result = create_prompt_target(LLMConfig(
-            model="gpt-4o", endpoint="https://api.openai.com/v1", api_key="k",
-        ))
+        result = create_prompt_target(
+            LLMConfig(
+                model="gpt-4o",
+                endpoint="https://api.openai.com/v1",
+                api_key="k",
+            ),
+        )
 
         assert result is mock_cls.return_value
 
@@ -155,20 +195,27 @@ class TestReturnValue:
 # Validation tests
 # ---------------------------------------------------------------------------
 
+
 class TestValidation:
     """Input validation before PyRIT construction."""
 
     def test_empty_model_raises_value_error(self):
         with pytest.raises(ValueError, match="model"):
-            create_prompt_target(LLMConfig(
-                model="", endpoint="https://api.openai.com/v1",
-            ))
+            create_prompt_target(
+                LLMConfig(
+                    model="",
+                    endpoint="https://api.openai.com/v1",
+                ),
+            )
 
     def test_empty_endpoint_raises_value_error(self):
         with pytest.raises(ValueError, match="endpoint"):
-            create_prompt_target(LLMConfig(
-                model="gpt-4o", endpoint="",
-            ))
+            create_prompt_target(
+                LLMConfig(
+                    model="gpt-4o",
+                    endpoint="",
+                ),
+            )
 
     def test_none_model_raises_value_error(self):
         config = LLMConfig(  # type: ignore[arg-type]
@@ -190,6 +237,7 @@ class TestValidation:
 # ---------------------------------------------------------------------------
 # Boundary guarantee tests
 # ---------------------------------------------------------------------------
+
 
 def _module_imports_pyrit(module_name: str) -> list[str]:
     """Return any ``pyrit`` import statements found in *module_name*'s source."""
@@ -215,12 +263,15 @@ def _module_imports_pyrit(module_name: str) -> list[str]:
 class TestBoundaryGuarantees:
     """Public RAMPART modules must never import from PyRIT directly."""
 
-    @pytest.mark.parametrize("module", [
-        "rampart",
-        "rampart.core",
-        "rampart.core.llm",
-        "rampart.attacks",
-    ])
+    @pytest.mark.parametrize(
+        "module",
+        [
+            "rampart",
+            "rampart.core",
+            "rampart.core.llm",
+            "rampart.attacks",
+        ],
+    )
     def test_public_module_has_no_pyrit_imports(self, module: str):
         violations = _module_imports_pyrit(module)
         assert not violations, (

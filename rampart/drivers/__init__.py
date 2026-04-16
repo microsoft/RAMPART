@@ -19,8 +19,7 @@ __all__ = ["StaticDriver", "_coerce_driver"]
 def _coerce_driver(
     value: str | list[str] | Request | list[Request] | PromptDriver,
 ) -> PromptDriver:
-    """
-    Coerce a string, Request, or list into a PromptDriver.
+    """Coerce a string, Request, or list into a PromptDriver.
 
     Args:
         value: A single prompt string, a list of prompt strings,
@@ -38,7 +37,10 @@ def _coerce_driver(
         return StaticDriver(prompts=value)
     if isinstance(value, PromptDriver):
         return value
-    raise TypeError(
+    msg = (
         f"Cannot coerce {type(value).__name__} to PromptDriver. "
         f"Expected str, list[str], Request, list[Request], or PromptDriver."
+    )
+    raise TypeError(
+        msg,
     )

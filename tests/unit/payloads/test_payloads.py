@@ -133,7 +133,9 @@ class TestGeneration:
         from rampart.payloads._generator import PayloadGenerator
 
         with patch.object(
-            PayloadGenerator, "_send_to_llm_async", side_effect=capture,
+            PayloadGenerator,
+            "_send_to_llm_async",
+            side_effect=capture,
         ):
             await Payloads.generate_async(
                 template=_template(),
@@ -158,7 +160,9 @@ class TestGeneration:
         from rampart.payloads._generator import PayloadGenerator
 
         with patch.object(
-            PayloadGenerator, "_send_to_llm_async", side_effect=capture,
+            PayloadGenerator,
+            "_send_to_llm_async",
+            side_effect=capture,
         ):
             await Payloads.generate_async(
                 template=_template(),

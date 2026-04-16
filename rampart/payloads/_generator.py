@@ -16,12 +16,15 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from typing import TYPE_CHECKING
 
 from rampart._pyrit.llm_bridge import send_generation_request_async
-from rampart.core.llm import LLMConfig
-from rampart.core.manifest import AppManifest
-from rampart.core.persona import Persona
-from rampart.payloads.template import PayloadTemplate
+
+if TYPE_CHECKING:
+    from rampart.core.llm import LLMConfig
+    from rampart.core.manifest import AppManifest
+    from rampart.core.persona import Persona
+    from rampart.payloads.template import PayloadTemplate
 
 logger = logging.getLogger(__name__)
 
@@ -108,8 +111,7 @@ class PayloadGenerator:
                 sections.append(manifest_str)
 
         sections.append(
-            "Output ONLY the generated content. "
-            "No preamble, commentary, or labels."
+            "Output ONLY the generated content. No preamble, commentary, or labels.",
         )
         return "\n\n".join(sections)
 

@@ -1,7 +1,10 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT license.
 
-"""Tests for rampart.core.result — Result, SafetyStatus, HarmCategory, resolve functions."""
+"""Tests for rampart.core.result.
+
+Result, SafetyStatus, HarmCategory, resolve functions.
+"""
 
 import pytest
 
@@ -29,7 +32,6 @@ class TestSafetyStatus:
         assert SafetyStatus.ERROR.value == "error"
 
 
-
 class TestHarmCategory:
     def test_is_strenum(self) -> None:
         assert isinstance(HarmCategory.PROMPT_INJECTION, str)
@@ -49,13 +51,12 @@ class TestHarmCategory:
 
     def test_interchangeable_with_plain_string(self) -> None:
         assert HarmCategory.PROMPT_INJECTION == "prompt_injection"
-        assert "prompt_injection" == HarmCategory.PROMPT_INJECTION
+        assert HarmCategory.PROMPT_INJECTION == "prompt_injection"
 
     def test_usable_as_dict_key(self) -> None:
         d: dict[str, int] = {HarmCategory.DATA_EXFILTRATION: 1, "custom_risk": 2}
         assert d["data_exfiltration"] == 1
         assert d[HarmCategory.DATA_EXFILTRATION] == 1
-
 
 
 class TestInjectionRecord:
@@ -67,7 +68,6 @@ class TestInjectionRecord:
     def test_none_payload_id(self) -> None:
         rec = InjectionRecord(payload_id=None, surface_name="Exchange")
         assert rec.payload_id is None
-
 
 
 class TestResult:
@@ -83,7 +83,11 @@ class TestResult:
         safe_result = Result(safe=True, status=SafetyStatus.SAFE, summary="ok")
         assert safe_result, safe_result.summary
 
-        unsafe_result = Result(safe=False, status=SafetyStatus.UNSAFE, summary="attack detected")
+        unsafe_result = Result(
+            safe=False,
+            status=SafetyStatus.UNSAFE,
+            summary="attack detected",
+        )
         with pytest.raises(AssertionError):
             assert unsafe_result, unsafe_result.summary
 
@@ -122,7 +126,6 @@ class TestResult:
             harm_category="custom_product_risk",
         )
         assert r.harm_category == "custom_product_risk"
-
 
 
 class TestResolveAsAttack:
@@ -181,7 +184,6 @@ class TestResolveAsAttack:
         )
         assert safe is True
         assert status is SafetyStatus.SAFE
-
 
 
 class TestResolveAsProbe:

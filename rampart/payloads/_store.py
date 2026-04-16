@@ -82,15 +82,18 @@ class PayloadStore:
             ValueError: If payloads is empty.
         """
         if not payloads:
-            raise ValueError("Cannot save an empty payload collection")
+            msg = "Cannot save an empty payload collection"
+            raise ValueError(msg)
 
         self._root.mkdir(parents=True, exist_ok=True)
         collection_dir = self._root / name
 
-        tmp_dir = Path(tempfile.mkdtemp(
-            prefix=f".{name}_",
-            dir=self._root,
-        ))
+        tmp_dir = Path(
+            tempfile.mkdtemp(
+                prefix=f".{name}_",
+                dir=self._root,
+            ),
+        )
 
         try:
             self._write_payloads(tmp_dir, payloads=payloads)
@@ -133,16 +136,19 @@ class PayloadStore:
         """
         payloads_path = self._collection_path(name)
         if not payloads_path.exists():
-            raise FileNotFoundError(
+            msg = (
                 f"Payload collection '{name}' not found "
                 f"at {payloads_path.parent}/. Run payload generation "
                 f"first (conftest.py fixture or CLI)."
             )
+            raise FileNotFoundError(
+                msg,
+            )
 
         payloads: list[Payload] = []
         with payloads_path.open("r", encoding="utf-8") as f:
-            for line in f:
-                line = line.strip()
+            for raw_line in f:
+                line = raw_line.strip()
                 if not line:
                     continue
                 payload = self._deserialize(
@@ -189,8 +195,9 @@ class PayloadStore:
         """
         path = self._root / name / "manifest.json"
         if not path.exists():
+            msg = f"No manifest for collection '{name}'"
             raise FileNotFoundError(
-                f"No manifest for collection '{name}'"
+                msg,
             )
         with path.open("r", encoding="utf-8") as f:
             return json.load(f)
@@ -199,9 +206,9 @@ class PayloadStore:
     def _validate_collection_name(name: str) -> None:
         """Reject names that would escape the store root."""
         if not name or "/" in name or "\\" in name or name in (".", ".."):
+            msg = f"Invalid collection name: {name!r}. Must be a simple directory name."
             raise ValueError(
-                f"Invalid collection name: {name!r}. "
-                f"Must be a simple directory name."
+                msg,
             )
 
     def _collection_path(self, name: str) -> Path:
@@ -209,7 +216,10 @@ class PayloadStore:
         return self._root / name / "payloads.jsonl"
 
     def _write_payloads(
-        self, directory: Path, *, payloads: list[Payload],
+        self,
+        directory: Path,
+        *,
+        payloads: list[Payload],
     ) -> None:
         """Write payloads to a JSONL file in the given directory."""
         artifacts_dir = directory / "artifacts"
@@ -217,7 +227,8 @@ class PayloadStore:
         with payloads_path.open("w", encoding="utf-8") as f:
             for payload in payloads:
                 record = self._serialize(
-                    payload=payload, artifacts_dir=artifacts_dir,
+                    payload=payload,
+                    artifacts_dir=artifacts_dir,
                 )
                 f.write(json.dumps(record) + "\n")
 
@@ -345,7 +356,8 @@ class PayloadStore:
         if "artifact" in data:
             artifact_path = collection_dir / data["artifact"]
             if not artifact_path.exists():
-                raise FileNotFoundError(f"Missing artifact: {artifact_path}")
+                msg = f"Missing artifact: {artifact_path}"
+                raise FileNotFoundError(msg)
             artifact = artifact_path
 
         return Payload(

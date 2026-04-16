@@ -72,7 +72,7 @@ def _adapter(
 
 
 class TestXPIADetection:
-    """Attack semantics: DETECTED→UNSAFE, NOT_DETECTED→SAFE, UNDETERMINED→UNDETERMINED."""
+    """Attack semantics: DETECTED->UNSAFE, NOT_DETECTED->SAFE."""
 
     @pytest.mark.asyncio
     async def test_detected_returns_unsafe_with_evidence_in_summary(self) -> None:

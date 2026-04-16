@@ -12,15 +12,16 @@ from rampart.core.types import EvalContext, EvalOutcome, EvalResult, SideEffect
 
 
 class SideEffectOccurred(BaseEvaluator):
-    """
-    Detects whether a side effect of a given kind occurred.
+    """Detects whether a side effect of a given kind occurred.
 
     Args:
         kind (str): The side effect kind to look for (positional-only).
-        **detail_predicates (Any): Detail field -> expected value or predicate.
+        **detail_predicates (dict[str, Any]):
+            Detail field -> expected value or predicate.
     """
 
-    def __init__(self, kind: str, /, **detail_predicates: Any) -> None:
+    def __init__(self, kind: str, /, **detail_predicates: dict[str, Any]) -> None:
+        """Initialize with side effect kind and optional predicates."""
         self._kind = kind
         self._predicates = detail_predicates
 

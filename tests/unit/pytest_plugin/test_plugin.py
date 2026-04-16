@@ -6,7 +6,7 @@
 from __future__ import annotations
 
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -15,9 +15,8 @@ from rampart.core.types import ObservabilityLevel
 from rampart.pytest_plugin._collection import ResultCollectionHandler, ResultCollector
 from rampart.pytest_plugin._session import RampartSession
 from rampart.pytest_plugin.plugin import (
-    _ANSI_ESCAPE_RE,
-    _evaluate_gates,
     _emit_sinks,
+    _evaluate_gates,
     _resolve_trial_n,
     _sanitize_for_terminal,
     _write_result_line,
@@ -77,6 +76,7 @@ class TestDefaultHandlerFactory:
         pytest_configure(config)
         try:
             from rampart.core.execution import _default_handler_factory
+
             handlers = _default_handler_factory()
             assert len(handlers) == 1
             assert isinstance(handlers[0], ResultCollectionHandler)
@@ -89,6 +89,7 @@ class TestDefaultHandlerFactory:
         pytest_unconfigure(config)
 
         from rampart.core.execution import _default_handler_factory
+
         assert _default_handler_factory() == []
 
     def test_configure_creates_session_in_stash(self) -> None:
@@ -96,6 +97,7 @@ class TestDefaultHandlerFactory:
         pytest_configure(config)
         try:
             from rampart.pytest_plugin.plugin import _rampart_key
+
             assert isinstance(config.stash.get(_rampart_key), RampartSession)
         finally:
             pytest_unconfigure(config)
@@ -106,6 +108,7 @@ class TestDefaultHandlerFactory:
         pytest_unconfigure(config)
 
         from rampart.pytest_plugin.plugin import _rampart_key
+
         assert config.stash.get(_rampart_key) is None
 
 
@@ -115,7 +118,9 @@ class TestRampartSession:
     def test_absorb_accumulates_results(self) -> None:
         session = RampartSession()
         collector = ResultCollector()
-        collector.record(result=Result(safe=True, status=SafetyStatus.SAFE, summary="ok"))
+        collector.record(
+            result=Result(safe=True, status=SafetyStatus.SAFE, summary="ok"),
+        )
         node = MagicMock()
         node.nodeid = "test_file.py::test_absorb"
 
@@ -134,9 +139,15 @@ class TestRampartSession:
         session = RampartSession()
 
         collector = ResultCollector()
-        collector.record(result=Result(safe=True, status=SafetyStatus.SAFE, summary="s"))
-        collector.record(result=Result(safe=False, status=SafetyStatus.UNSAFE, summary="u"))
-        collector.record(result=Result(safe=False, status=SafetyStatus.ERROR, summary="e"))
+        collector.record(
+            result=Result(safe=True, status=SafetyStatus.SAFE, summary="s"),
+        )
+        collector.record(
+            result=Result(safe=False, status=SafetyStatus.UNSAFE, summary="u"),
+        )
+        collector.record(
+            result=Result(safe=False, status=SafetyStatus.ERROR, summary="e"),
+        )
         node = MagicMock()
         node.nodeid = "test_file.py::test_counts"
 
@@ -167,7 +178,7 @@ class TestRampartSession:
                     safe=statuses[idx] == SafetyStatus.SAFE,
                     status=statuses[idx],
                     summary=f"trial-{idx}",
-                )
+                ),
             )
             session.absorb(node=item, collector=collector)
 
@@ -196,7 +207,11 @@ class TestRampartSession:
             item.nodeid = f"test_file.py::test_err[trial-{idx}]"
             collector = ResultCollector()
             collector.record(
-                result=Result(safe=False, status=SafetyStatus.ERROR, summary=f"err-{idx}")
+                result=Result(
+                    safe=False,
+                    status=SafetyStatus.ERROR,
+                    summary=f"err-{idx}",
+                ),
             )
             session.absorb(node=item, collector=collector)
 
@@ -257,7 +272,10 @@ def _make_plain_item(
 class TestTrialCloning:
     """Trial cloning produces n items with distinct [trial-N] node ids."""
 
-    def test_trial_cloning_produces_n_items(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_trial_cloning_produces_n_items(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
         item = _make_trial_item(n=3)
         clone_instances = [MagicMock() for _ in range(3)]
         for clone in clone_instances:
@@ -385,7 +403,9 @@ class TestWriteResultLine:
     def test_safe_result_includes_observability(self) -> None:
         reporter = MagicMock()
         result = Result(
-            safe=True, status=SafetyStatus.SAFE, summary="ok",
+            safe=True,
+            status=SafetyStatus.SAFE,
+            summary="ok",
             observability_level=ObservabilityLevel.RESPONSE_ONLY,
         )
         _write_result_line(terminalreporter=reporter, result=result)
@@ -394,31 +414,38 @@ class TestWriteResultLine:
     def test_unsafe_result_includes_observability(self) -> None:
         reporter = MagicMock()
         result = Result(
-            safe=False, status=SafetyStatus.UNSAFE, summary="bad",
+            safe=False,
+            status=SafetyStatus.UNSAFE,
+            summary="bad",
             observability_level=ObservabilityLevel.TOOL_AND_SIDE_EFFECTS,
         )
         _write_result_line(terminalreporter=reporter, result=result)
         reporter.write_line.assert_called_once_with(
-            "  FAIL  bad (tool_and_side_effects)"
+            "  FAIL  bad (tool_and_side_effects)",
         )
 
     def test_with_test_name(self) -> None:
         reporter = MagicMock()
         result = Result(
-            safe=True, status=SafetyStatus.SAFE, summary="SAFE",
+            safe=True,
+            status=SafetyStatus.SAFE,
+            summary="SAFE",
             observability_level=ObservabilityLevel.TOOL_ONLY,
         )
         _write_result_line(
-            terminalreporter=reporter, result=result, test_name="test_exfil",
+            terminalreporter=reporter,
+            result=result,
+            test_name="test_exfil",
         )
         reporter.write_line.assert_called_once_with(
-            "  PASS  test_exfil -- SAFE (tool_only)"
+            "  PASS  test_exfil -- SAFE (tool_only)",
         )
 
     def test_ansi_stripped_from_summary(self) -> None:
         reporter = MagicMock()
         result = Result(
-            safe=True, status=SafetyStatus.SAFE,
+            safe=True,
+            status=SafetyStatus.SAFE,
             summary="\x1b[31mevil\x1b[0m",
         )
         _write_result_line(terminalreporter=reporter, result=result)
@@ -434,14 +461,22 @@ class TestTerminalSummary:
         """Build a RampartSession with two results in different categories."""
         session = RampartSession()
         collector = ResultCollector()
-        collector.record(result=Result(
-            safe=True, status=SafetyStatus.SAFE,
-            summary="safe-one", harm_category="data_exfiltration",
-        ))
-        collector.record(result=Result(
-            safe=False, status=SafetyStatus.UNSAFE,
-            summary="unsafe-one", harm_category="jailbreak",
-        ))
+        collector.record(
+            result=Result(
+                safe=True,
+                status=SafetyStatus.SAFE,
+                summary="safe-one",
+                harm_category="data_exfiltration",
+            ),
+        )
+        collector.record(
+            result=Result(
+                safe=False,
+                status=SafetyStatus.UNSAFE,
+                summary="unsafe-one",
+                harm_category="jailbreak",
+            ),
+        )
         node = MagicMock()
         node.nodeid = "test_file.py::test_summary"
         session.absorb(node=node, collector=collector)
@@ -459,6 +494,7 @@ class TestTerminalSummary:
         config = MagicMock()
         config.stash = _StashStub()
         from rampart.pytest_plugin.plugin import _rampart_key
+
         config.stash[_rampart_key] = RampartSession()
         pytest_terminal_summary(terminalreporter=reporter, exitstatus=0, config=config)
         reporter.write_sep.assert_not_called()
@@ -468,6 +504,7 @@ class TestTerminalSummary:
         config = MagicMock()
         config.stash = _StashStub()
         from rampart.pytest_plugin.plugin import _rampart_key
+
         config.stash[_rampart_key] = self._make_session_with_results()
         pytest_terminal_summary(terminalreporter=reporter, exitstatus=0, config=config)
         reporter.write_sep.assert_called_once_with("=", "RAMPART Safety Summary")
@@ -477,12 +514,12 @@ class TestTerminalSummary:
         config = MagicMock()
         config.stash = _StashStub()
         from rampart.pytest_plugin.plugin import _rampart_key
+
         config.stash[_rampart_key] = self._make_session_with_results()
         pytest_terminal_summary(terminalreporter=reporter, exitstatus=0, config=config)
         # Check that the Population line was written
         population_calls = [
-            c for c in reporter.write_line.call_args_list
-            if "Population:" in str(c)
+            c for c in reporter.write_line.call_args_list if "Population:" in str(c)
         ]
         assert len(population_calls) == 1
 
@@ -555,7 +592,9 @@ class TestRampartSessionDuration:
     def test_default_duration_zero(self) -> None:
         session = RampartSession()
         collector = ResultCollector()
-        collector.record(result=Result(safe=True, status=SafetyStatus.SAFE, summary="ok"))
+        collector.record(
+            result=Result(safe=True, status=SafetyStatus.SAFE, summary="ok"),
+        )
         node = MagicMock()
         node.nodeid = "test.py::test_dur"
         session.absorb(node=node, collector=collector)
@@ -565,7 +604,9 @@ class TestRampartSessionDuration:
     def test_set_duration_reflected_in_report(self) -> None:
         session = RampartSession()
         collector = ResultCollector()
-        collector.record(result=Result(safe=True, status=SafetyStatus.SAFE, summary="ok"))
+        collector.record(
+            result=Result(safe=True, status=SafetyStatus.SAFE, summary="ok"),
+        )
         node = MagicMock()
         node.nodeid = "test.py::test_dur"
         session.absorb(node=node, collector=collector)
@@ -585,7 +626,11 @@ class TestTrialGroupRendering:
             collector = ResultCollector()
             status = SafetyStatus.UNSAFE if idx < 2 else SafetyStatus.SAFE
             collector.record(
-                result=Result(safe=status == SafetyStatus.SAFE, status=status, summary=f"t-{idx}")
+                result=Result(
+                    safe=status == SafetyStatus.SAFE,
+                    status=status,
+                    summary=f"t-{idx}",
+                ),
             )
             session.absorb(node=item, collector=collector)
 
@@ -622,7 +667,11 @@ class TestEvaluateGates:
             collector = ResultCollector()
             status = SafetyStatus.UNSAFE if idx < 2 else SafetyStatus.SAFE
             collector.record(
-                result=Result(safe=status == SafetyStatus.SAFE, status=status, summary=f"t-{idx}")
+                result=Result(
+                    safe=status == SafetyStatus.SAFE,
+                    status=status,
+                    summary=f"t-{idx}",
+                ),
             )
             session.absorb(node=item, collector=collector)
 
@@ -648,7 +697,9 @@ class TestEmitSinks:
         mock_sink.emit_async = AsyncMock(side_effect=RuntimeError("Kusto down"))
         session = RampartSession(sinks=[mock_sink])
         collector = ResultCollector()
-        collector.record(result=Result(safe=True, status=SafetyStatus.SAFE, summary="ok"))
+        collector.record(
+            result=Result(safe=True, status=SafetyStatus.SAFE, summary="ok"),
+        )
         node = MagicMock()
         node.nodeid = "test.py::test_sink"
         session.absorb(node=node, collector=collector)
