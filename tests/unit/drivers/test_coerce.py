@@ -1,7 +1,7 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT license.
 
-"""Tests for _coerce_driver."""
+"""Tests for coerce_driver."""
 
 from __future__ import annotations
 
@@ -9,16 +9,16 @@ import pytest
 
 from rampart.core.prompt_driver import PromptDecision
 from rampart.core.types import Request, Response, Turn
-from rampart.drivers import _coerce_driver
+from rampart.drivers._utils import coerce_driver
 from rampart.drivers.static import StaticDriver
 
 
 class TestCoerceString:
-    """_coerce_driver accepts a str as a single-prompt driver."""
+    """coerce_driver accepts a str as a single-prompt driver."""
 
     @pytest.mark.asyncio
     async def test_str_produces_single_prompt_driver_async(self) -> None:
-        driver = _coerce_driver("hello")
+        driver = coerce_driver("hello")
 
         d0 = await driver.next_prompt_async(history=[])
         assert d0 is not None
@@ -33,11 +33,11 @@ class TestCoerceString:
 
 
 class TestCoerceList:
-    """_coerce_driver accepts list[str] as a multi-prompt driver."""
+    """coerce_driver accepts list[str] as a multi-prompt driver."""
 
     @pytest.mark.asyncio
     async def test_list_produces_multi_prompt_driver_async(self) -> None:
-        driver = _coerce_driver(["a", "b"])
+        driver = coerce_driver(["a", "b"])
 
         d0 = await driver.next_prompt_async(history=[])
         assert d0 is not None
@@ -45,12 +45,12 @@ class TestCoerceList:
 
 
 class TestCoercePassthrough:
-    """_coerce_driver passes through an existing PromptDriver unchanged."""
+    """coerce_driver passes through an existing PromptDriver unchanged."""
 
     @pytest.mark.asyncio
     async def test_prompt_driver_passthrough_async(self) -> None:
         original = StaticDriver(prompts=["x"])
-        result = _coerce_driver(original)
+        result = coerce_driver(original)
         assert result is original
 
     @pytest.mark.asyncio
@@ -64,5 +64,5 @@ class TestCoercePassthrough:
                 return PromptDecision(request=Request(prompt="custom"))
 
         custom = Custom()
-        result = _coerce_driver(custom)  # type: ignore[arg-type]
+        result = coerce_driver(custom)
         assert result is custom

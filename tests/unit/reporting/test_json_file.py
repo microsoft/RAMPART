@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -18,8 +19,8 @@ from rampart.reporting.sink import TestRunReport
 
 def _result_with_turns(
     *,
-    response_metadata: dict | None = None,
-    result_metadata: dict | None = None,
+    response_metadata: dict[str, Any] | None = None,
+    result_metadata: dict[str, Any] | None = None,
 ) -> Result:
     """Build a Result carrying turns with optional response metadata."""
     response = Response(

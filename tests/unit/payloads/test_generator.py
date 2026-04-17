@@ -70,9 +70,9 @@ class TestGenerateTextVariants:
 
     @pytest.mark.asyncio
     async def test_resolves_template_variables(self) -> None:
-        captured_args: dict = {}
+        captured_args: dict[str, str] = {}
 
-        async def capture(*, system_message, user_message):
+        async def capture(*, system_message: str, user_message: str):
             captured_args["user_message"] = user_message
             return "single variant"
 
@@ -122,9 +122,9 @@ class TestGenerateTextVariants:
 
     @pytest.mark.asyncio
     async def test_includes_objective_in_prompt(self) -> None:
-        captured_args: dict = {}
+        captured_args: dict[str, str] = {}
 
-        async def capture(*, system_message, user_message):
+        async def capture(*, system_message: str, user_message: str) -> str:
             captured_args["user_message"] = user_message
             return "variant"
 

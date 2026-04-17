@@ -15,12 +15,12 @@ from rampart.core.types import ObservabilityLevel
 from rampart.pytest_plugin._collection import ResultCollectionHandler, ResultCollector
 from rampart.pytest_plugin._session import RampartSession
 from rampart.pytest_plugin.plugin import (
-    _emit_sinks,
-    _evaluate_gates,
-    _resolve_trial_n,
-    _sanitize_for_terminal,
-    _write_result_line,
-    _write_trial_group_lines,
+    _emit_sinks,  # pyright: ignore[reportPrivateUsage]
+    _evaluate_gates,  # pyright: ignore[reportPrivateUsage]
+    _resolve_trial_n,  # pyright: ignore[reportPrivateUsage]
+    _sanitize_for_terminal,  # pyright: ignore[reportPrivateUsage]
+    _write_result_line,  # pyright: ignore[reportPrivateUsage]
+    _write_trial_group_lines,  # pyright: ignore[reportPrivateUsage]
     pytest_collection_modifyitems,
     pytest_configure,
     pytest_sessionfinish,
@@ -75,7 +75,9 @@ class TestDefaultHandlerFactory:
         config: Any = _ConfigStub()
         pytest_configure(config)
         try:
-            from rampart.core.execution import _default_handler_factory
+            from rampart.core.execution import (
+                _default_handler_factory,  # pyright: ignore[reportPrivateUsage]
+            )
 
             handlers = _default_handler_factory()
             assert len(handlers) == 1
@@ -88,7 +90,9 @@ class TestDefaultHandlerFactory:
         pytest_configure(config)
         pytest_unconfigure(config)
 
-        from rampart.core.execution import _default_handler_factory
+        from rampart.core.execution import (
+            _default_handler_factory,  # pyright: ignore[reportPrivateUsage]
+        )
 
         assert _default_handler_factory() == []
 
@@ -96,7 +100,9 @@ class TestDefaultHandlerFactory:
         config: Any = _ConfigStub()
         pytest_configure(config)
         try:
-            from rampart.pytest_plugin.plugin import _rampart_key
+            from rampart.pytest_plugin.plugin import (
+                _rampart_key,  # pyright: ignore[reportPrivateUsage]
+            )
 
             assert isinstance(config.stash.get(_rampart_key), RampartSession)
         finally:
@@ -107,7 +113,9 @@ class TestDefaultHandlerFactory:
         pytest_configure(config)
         pytest_unconfigure(config)
 
-        from rampart.pytest_plugin.plugin import _rampart_key
+        from rampart.pytest_plugin.plugin import (
+            _rampart_key,  # pyright: ignore[reportPrivateUsage]
+        )
 
         assert config.stash.get(_rampart_key) is None
 
@@ -196,7 +204,7 @@ class TestRampartSession:
         assert group.unsafe == 2
         assert group.errors == 1
         assert group.threshold == 0.3
-        assert group.pass_rate == pytest.approx(0.4)
+        assert group.pass_rate == pytest.approx(0.4) # pyright: ignore[reportUnknownMemberType]
         assert not group.passed  # UNSAFE present → always fails
 
     def test_record_trial_group_all_errors(self) -> None:
@@ -493,7 +501,9 @@ class TestTerminalSummary:
         reporter = MagicMock()
         config = MagicMock()
         config.stash = _StashStub()
-        from rampart.pytest_plugin.plugin import _rampart_key
+        from rampart.pytest_plugin.plugin import (
+            _rampart_key,  # pyright: ignore[reportPrivateUsage]
+        )
 
         config.stash[_rampart_key] = RampartSession()
         pytest_terminal_summary(terminalreporter=reporter, exitstatus=0, config=config)
@@ -503,7 +513,9 @@ class TestTerminalSummary:
         reporter = MagicMock()
         config = MagicMock()
         config.stash = _StashStub()
-        from rampart.pytest_plugin.plugin import _rampart_key
+        from rampart.pytest_plugin.plugin import (
+            _rampart_key,  # pyright: ignore[reportPrivateUsage]
+        )
 
         config.stash[_rampart_key] = self._make_session_with_results()
         pytest_terminal_summary(terminalreporter=reporter, exitstatus=0, config=config)
@@ -513,7 +525,9 @@ class TestTerminalSummary:
         reporter = MagicMock()
         config = MagicMock()
         config.stash = _StashStub()
-        from rampart.pytest_plugin.plugin import _rampart_key
+        from rampart.pytest_plugin.plugin import (
+            _rampart_key,  # pyright: ignore[reportPrivateUsage]
+        )
 
         config.stash[_rampart_key] = self._make_session_with_results()
         pytest_terminal_summary(terminalreporter=reporter, exitstatus=0, config=config)
@@ -570,7 +584,7 @@ class TestRampartSessionAddSinks:
             pass
 
         with pytest.raises(TypeError, match="Expected ReportSink"):
-            session.add_sinks(sinks=[NotASink()])  # type: ignore[list-item]
+            session.add_sinks(sinks=[NotASink()])  # pyright: ignore[reportArgumentType]
 
     def test_add_sinks_preserves_existing(self) -> None:
         """Config-loaded sinks are not lost when fixture sinks are added."""
@@ -713,7 +727,10 @@ class TestSessionFinishIntegration:
     def test_sets_duration(self) -> None:
         import time
 
-        from rampart.pytest_plugin.plugin import _rampart_key, _session_start_key
+        from rampart.pytest_plugin.plugin import (
+            _rampart_key,  # pyright: ignore[reportPrivateUsage]
+            _session_start_key,  # pyright: ignore[reportPrivateUsage]
+        )
 
         session_mock = MagicMock()
         config_stash = _StashStub()

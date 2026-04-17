@@ -124,7 +124,7 @@ class TestGeneration:
     @pytest.mark.asyncio
     async def test_manifest_reaches_llm_prompt(self) -> None:
         """Manifest tools and agent name appear in the LLM user message."""
-        captured: dict = {}
+        captured: dict[str, str] = {}
 
         async def capture(*, system_message: str, user_message: str) -> str:
             captured["user_message"] = user_message
@@ -151,7 +151,7 @@ class TestGeneration:
     @pytest.mark.asyncio
     async def test_persona_becomes_system_message(self) -> None:
         """Persona system_prompt is forwarded as the LLM system message."""
-        captured: dict = {}
+        captured: dict[str, str] = {}
 
         async def capture(*, system_message: str, user_message: str) -> str:
             captured["system_message"] = system_message

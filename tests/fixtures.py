@@ -9,7 +9,7 @@ doubles aligned with the Session and AgentAdapter protocol contracts.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Self
+from typing import TYPE_CHECKING, Any, Self, cast
 
 from rampart.core.types import ObservabilityLevel, Request, Response
 
@@ -96,10 +96,14 @@ class MockAdapter:
         if not responses:
             raise ValueError("MockAdapter requires at least one response sequence.")
 
-        if isinstance(responses[0], list):
-            self._session_responses: list[list[Response]] = responses  # type: ignore[assignment]
+        if all(isinstance(r, list) for r in responses) and all(
+            isinstance(r, Response)
+            for sublist in cast("list[list[Any]]", responses)
+            for r in sublist
+        ):
+            self._session_responses = cast("list[list[Response]]", responses)
         else:
-            self._session_responses = [responses]  # type: ignore[list-item]
+            self._session_responses = [cast("list[Response]", responses)]
         self._manifest_value = manifest
         self._observability_profile_value = observability_profile
         self._session_index = 0

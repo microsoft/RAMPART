@@ -269,4 +269,4 @@ class TestDefaultHandlerFactory:
         from rampart.core.execution import register_default_handler_factory
 
         with pytest.raises(TypeError, match="callable"):
-            register_default_handler_factory("not a function")  # type: ignore[arg-type]
+            register_default_handler_factory("not a function")  # pyright: ignore[reportArgumentType]

@@ -4,6 +4,7 @@
 """Tests for rampart.payloads._store — PayloadStore persistence."""
 
 import json
+from pathlib import Path
 
 import pytest
 
@@ -12,17 +13,16 @@ from rampart.payloads._store import PayloadStore
 
 
 @pytest.fixture
-def store(tmp_path):
+def store(tmp_path: Path) -> PayloadStore:
     """PayloadStore rooted in a temporary directory."""
     return PayloadStore(root=tmp_path)
 
-
 class TestPayloadStoreSave:
-    def test_save_empty_raises(self, store) -> None:
+    def test_save_empty_raises(self, store: PayloadStore) -> None:
         with pytest.raises(ValueError, match="empty"):
             store.save("col1", payloads=[])
 
-    def test_save_stores_provenance(self, store, tmp_path) -> None:
+    def test_save_stores_provenance(self, store: PayloadStore, tmp_path: Path) -> None:
         payloads = [Payload(content="test", id="p1")]
         store.save(
             "col1",
@@ -35,14 +35,16 @@ class TestPayloadStoreSave:
         assert manifest["provenance"]["template"] == "email_exfil"
         assert manifest["count"] == 1
 
-    def test_save_overwrites_existing(self, store) -> None:
+    def test_save_overwrites_existing(self, store: PayloadStore) -> None:
         store.save("col1", payloads=[Payload(content="old", id="p1")])
         store.save("col1", payloads=[Payload(content="new", id="p2")])
         loaded = store.load("col1")
         assert len(loaded) == 1
         assert loaded[0].content == "new"
 
-    def test_save_binary_creates_artifact(self, store, tmp_path) -> None:
+    def test_save_binary_creates_artifact(
+        self, store: PayloadStore, tmp_path: Path,
+    ) -> None:
         source_file = tmp_path / "input.png"
         source_file.write_bytes(b"\x89PNG")
         payload = Payload(
@@ -58,7 +60,7 @@ class TestPayloadStoreSave:
 
 
 class TestPayloadStoreLoad:
-    def test_load_roundtrip_text(self, store) -> None:
+    def test_load_roundtrip_text(self, store: PayloadStore) -> None:
         original = Payload(
             content="evil stuff",
             id="t1",
@@ -73,7 +75,7 @@ class TestPayloadStoreLoad:
         assert loaded[0].metadata["persona"] == "stealth"
         assert loaded[0].artifact is None
 
-    def test_load_roundtrip_binary(self, store, tmp_path) -> None:
+    def test_load_roundtrip_binary(self, store: PayloadStore, tmp_path: Path) -> None:
         source_file = tmp_path / "input.pdf"
         source_file.write_bytes(b"\x00\x01\x02")
         original = Payload(
@@ -89,11 +91,11 @@ class TestPayloadStoreLoad:
         assert loaded[0].artifact is not None
         assert loaded[0].artifact.read_bytes() == b"\x00\x01\x02"
 
-    def test_load_missing_raises(self, store) -> None:
+    def test_load_missing_raises(self, store: PayloadStore) -> None:
         with pytest.raises(FileNotFoundError, match="not found"):
             store.load("nonexistent")
 
-    def test_load_with_format_filter(self, store) -> None:
+    def test_load_with_format_filter(self, store: PayloadStore) -> None:
         payloads = [
             Payload(content="text", id="t1", format=PayloadFormat.TEXT),
             Payload(content="<b>html</b>", id="h1", format=PayloadFormat.HTML),
@@ -105,18 +107,18 @@ class TestPayloadStoreLoad:
 
 
 class TestPayloadStoreCollectionManagement:
-    def test_list_collections(self, store) -> None:
+    def test_list_collections(self, store: PayloadStore) -> None:
         store.save("alpha", payloads=[Payload(content="x", id="p1")])
         store.save("beta", payloads=[Payload(content="y", id="p2")])
         collections = store.list_collections()
         assert collections == ["alpha", "beta"]
 
-    def test_delete_removes_collection(self, store) -> None:
+    def test_delete_removes_collection(self, store: PayloadStore) -> None:
         store.save("doomed", payloads=[Payload(content="x", id="p1")])
         store.delete("doomed")
         assert not store.exists("doomed")
 
-    def test_manifest_roundtrip(self, store) -> None:
+    def test_manifest_roundtrip(self, store: PayloadStore) -> None:
         store.save(
             "col1",
             payloads=[Payload(content="x", id="p1")],
@@ -127,13 +129,15 @@ class TestPayloadStoreCollectionManagement:
         assert m["count"] == 1
         assert m["provenance"]["template"] == "email_exfiltration"
 
-    def test_manifest_missing_raises(self, store) -> None:
+    def test_manifest_missing_raises(self, store: PayloadStore) -> None:
         with pytest.raises(FileNotFoundError, match="No manifest"):
             store.manifest("ghost")
 
 
 class TestPayloadStorePathPayload:
-    def test_path_based_payload_roundtrip(self, store, tmp_path) -> None:
+    def test_path_based_payload_roundtrip(
+        self, store: PayloadStore, tmp_path: Path,
+    ) -> None:
         source_file = tmp_path / "source.pdf"
         source_file.write_bytes(b"PDF_CONTENT")
         payload = Payload(

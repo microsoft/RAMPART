@@ -34,21 +34,6 @@ class _HtmlWrapConverter:
             metadata={**payload.metadata, "converter": "HtmlWrapConverter"},
         )
 
-
-class _FormatChangingConverter:
-    """Test converter that produces a binary-format payload."""
-
-    async def convert_async(self, *, payload: Payload) -> Payload:
-        fake_path = Path("/tmp/fake.png")
-        return Payload(
-            content=payload.content,
-            id=payload.id,
-            format=PayloadFormat.IMAGE,
-            artifact=fake_path,
-            metadata={**payload.metadata, "converter": "FormatChangingConverter"},
-        )
-
-
 class TestPayloadConverterProtocol:
     def test_converter_satisfies_protocol(self) -> None:
         assert isinstance(_UpperCaseConverter(), PayloadConverter)
@@ -102,7 +87,7 @@ class TestPayloadConverterProtocol:
         assert result.format is PayloadFormat.HTML
 
     @pytest.mark.asyncio
-    async def test_format_converter_preserves_content(self, tmp_path) -> None:
+    async def test_format_converter_preserves_content(self, tmp_path: Path) -> None:
         fake_file = tmp_path / "fake.png"
         fake_file.write_bytes(b"\x89PNG")
 
