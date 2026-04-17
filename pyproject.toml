@@ -50,10 +50,8 @@ dev = [
 
 [project.urls]
 Homepage = "https://github.com/microsoft/RAMPART"
-Documentation = "https://microsoft.github.io/RAMPART"
 Repository = "https://github.com/microsoft/RAMPART"
 Issues = "https://github.com/microsoft/RAMPART/issues"
-Changelog = "https://github.com/microsoft/RAMPART/blob/main/CHANGELOG.md"
 
 [project.entry-points.pytest11]
 rampart = "rampart.pytest_plugin.plugin"
