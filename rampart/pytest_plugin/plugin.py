@@ -44,6 +44,7 @@ from rampart.pytest_plugin._collection import (
     deactivate_collector,
 )
 from rampart.pytest_plugin._session import RampartSession
+from rampart.reporting.sink import ReportSink
 
 if TYPE_CHECKING:
     from collections.abc import Generator
@@ -215,7 +216,6 @@ def _create_trial_clones(
     for i in range(count):
         trial_name = f"{display_name}[trial-{i}]"
         from_parent_kwargs: dict[str, Any] = {
-            "parent": parent,
             "name": trial_name,
             "originalname": original_name,
         }
@@ -224,9 +224,9 @@ def _create_trial_clones(
         if fixtureinfo is not None:
             from_parent_kwargs["fixtureinfo"] = fixtureinfo
 
-        clone = type(item).from_parent(**from_parent_kwargs)  # type: ignore[arg-type]
-        clone._rampart_trial_index = i  # type: ignore[attr-defined]  # noqa: SLF001
-        clone._rampart_trial_base = item.nodeid  # type: ignore[attr-defined]  # noqa: SLF001
+        clone = type(item).from_parent(parent=parent, **from_parent_kwargs)  # pyright: ignore[reportUnknownMemberType]
+        clone._rampart_trial_index = i  # pyright: ignore[reportAttributeAccessIssue]  # noqa: SLF001
+        clone._rampart_trial_base = item.nodeid  # pyright: ignore[reportAttributeAccessIssue] # noqa: SLF001
 
         _copy_markers_to_clone(source=item, clone=clone)
         clone.add_marker(
@@ -308,7 +308,7 @@ def _absorb_results(
 
 
 @pytest.fixture(autouse=True)
-def _rampart_collect(  # type: ignore[reportUnusedFunction]  # pytest discovers this via autouse=True
+def _rampart_collect(  # pyright: ignore[reportUnusedFunction]  # pytest discovers this via autouse=True
     request: pytest.FixtureRequest,
 ) -> Generator[None, None, None]:
     """Installed automatically on every test. Invisible to test authors.
@@ -326,7 +326,7 @@ def _rampart_collect(  # type: ignore[reportUnusedFunction]  # pytest discovers 
     No test author ever imports or references this fixture.
     """
     collector = ResultCollector()
-    node = cast("pytest.Item", request.node)
+    node = cast("pytest.Item", request.node)  # pyright: ignore[reportUnknownMemberType]
     rampart_session = request.config.stash.get(_rampart_key, None)
     token = activate_collector(collector)
     yield
@@ -348,7 +348,7 @@ def _rampart_collect(  # type: ignore[reportUnusedFunction]  # pytest discovers 
 
 
 @pytest.fixture(scope="session", autouse=True)
-def _rampart_sink_bootstrap(  # type: ignore[reportUnusedFunction]  # pytest discovers this via autouse=True
+def _rampart_sink_bootstrap(  # pyright: ignore[reportUnusedFunction]  # pytest discovers this via autouse=True
     request: pytest.FixtureRequest,
 ) -> None:
     """Merge team-provided sinks into the RAMPART session.
@@ -381,6 +381,17 @@ def _rampart_sink_bootstrap(  # type: ignore[reportUnusedFunction]  # pytest dis
             type(user_sinks).__name__,
         )
         return
+
+    user_sinks = cast("list[object]", user_sinks)
+
+    if not all(isinstance(x, ReportSink) for x in user_sinks):
+        logger.warning(
+            "rampart_sinks fixture must return list[ReportSink], "
+            "got list with non-ReportSink items. Ignoring.",
+        )
+        return
+
+    user_sinks = cast("list[ReportSink]", user_sinks)
 
     rampart_session.add_sinks(sinks=user_sinks)
     logger.info(
