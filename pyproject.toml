@@ -74,9 +74,6 @@ include = ["rampart", "tests"]
 root = "tests"
 extraPaths = ["."]
 reportPrivateUsage = false
-# reportUnknownArgumentType = false
-reportUnknownLambdaType = false
-reportUnknownMemberType = false
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

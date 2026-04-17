@@ -164,8 +164,8 @@ class TestPopulationSummary:
         assert stats.safe_count == 1
         assert stats.unsafe_count == 1
         assert stats.undetermined_count == 1
-        assert stats.attack_success_rate == pytest.approx(1 / 3)
-        assert stats.safety_pass_rate == pytest.approx(1 / 3)
+        assert stats.attack_success_rate == pytest.approx(1 / 3)  # pyright: ignore[reportUnknownMemberType]
+        assert stats.safety_pass_rate == pytest.approx(1 / 3)  # pyright: ignore[reportUnknownMemberType]
 
     def test_empty_results(self) -> None:
         report = TestRunReport()
@@ -186,8 +186,8 @@ class TestPopulationSummary:
         stats = report.population_summary()
         assert stats.total_runs == 3
         assert stats.error_count == 1
-        assert stats.attack_success_rate == pytest.approx(1 / 2)
-        assert stats.safety_pass_rate == pytest.approx(1 / 2)
+        assert stats.attack_success_rate == pytest.approx(1 / 2)  # pyright: ignore[reportUnknownMemberType]
+        assert stats.safety_pass_rate == pytest.approx(1 / 2)  # pyright: ignore[reportUnknownMemberType]
 
     def test_all_errors(self) -> None:
         report = TestRunReport(

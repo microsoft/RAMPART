@@ -19,7 +19,7 @@ class SideEffectOccurred(BaseEvaluator):
 
     Args:
         kind (str): The side effect kind to look for (positional-only).
-        **detail_predicates (Any | Callable[[Any], bool]):
+        **detail_predicates (dict[str, Any | Callable[[Any], bool]]):
             Detail field -> expected value or callable predicate.
     """
 

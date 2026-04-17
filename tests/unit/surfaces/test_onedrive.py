@@ -14,9 +14,9 @@ from rampart.core.errors import InfrastructureError
 from rampart.core.injection import InjectionHandle, Surface
 from rampart.core.types import Payload
 from rampart.surfaces.onedrive import (
-    _MAX_SMALL_UPLOAD_BYTES,  # pyright: ignore[reportPrivateUsage]
+    _MAX_SMALL_UPLOAD_BYTES,
     OneDriveSurface,
-    _OneDriveInjection,  # pyright: ignore[reportPrivateUsage]
+    _OneDriveInjection,
 )
 
 _UNSET = object()

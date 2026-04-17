@@ -102,8 +102,20 @@ class RampartSession:
 
         Args:
             sinks (list[ReportSink]): Sinks to append.
+
+        Raises:
+            TypeError: If any item does not satisfy ReportSink.
         """
         for sink in sinks:
+            if not isinstance(sink, ReportSink):  # pyright: ignore[reportUnnecessaryIsInstance]
+                msg = (
+                    f"Expected ReportSink, got {type(sink).__name__}. "
+                    "Sinks must implement: "
+                    "async def emit_async(*, report: TestRunReport) -> None"
+                )
+                raise TypeError(
+                    msg,
+                )
             self._sinks.append(sink)
 
     def set_duration(self, *, duration_seconds: float) -> None:
