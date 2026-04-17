@@ -5,10 +5,13 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from rampart.core.evaluator import BaseEvaluator
 from rampart.core.types import EvalContext, EvalOutcome, EvalResult, ToolCall
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 
 class ToolCalled(BaseEvaluator):
@@ -23,11 +26,16 @@ class ToolCalled(BaseEvaluator):
 
     Args:
         tool_name (str): The tool to look for (positional-only).
-        **param_predicates (dict[str, Any]):
+        **param_predicates (dict[str, Any | Callable[[Any], bool]]):
              Parameter name -> expected value or predicate.
     """
 
-    def __init__(self, tool_name: str, /, **param_predicates: dict[str, Any]) -> None:
+    def __init__(
+        self,
+        tool_name: str,
+        /,
+        **param_predicates: Any | Callable[[Any], bool],  # noqa: ANN401
+    ) -> None:
         """Initialize with tool name and optional parameter predicates."""
         self._tool_name = tool_name
         self._predicates = param_predicates

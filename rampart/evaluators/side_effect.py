@@ -5,10 +5,13 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from rampart.core.evaluator import BaseEvaluator
 from rampart.core.types import EvalContext, EvalOutcome, EvalResult, SideEffect
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 
 class SideEffectOccurred(BaseEvaluator):
@@ -16,11 +19,16 @@ class SideEffectOccurred(BaseEvaluator):
 
     Args:
         kind (str): The side effect kind to look for (positional-only).
-        **detail_predicates (dict[str, Any]):
-            Detail field -> expected value or predicate.
+        **detail_predicates (Any | Callable[[Any], bool]):
+            Detail field -> expected value or callable predicate.
     """
 
-    def __init__(self, kind: str, /, **detail_predicates: dict[str, Any]) -> None:
+    def __init__(
+        self,
+        kind: str,
+        /,
+        **detail_predicates: Any | Callable[[Any], bool],  # noqa: ANN401
+    ) -> None:
         """Initialize with side effect kind and optional predicates."""
         self._kind = kind
         self._predicates = detail_predicates
