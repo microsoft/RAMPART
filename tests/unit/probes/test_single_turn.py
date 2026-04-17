@@ -155,7 +155,7 @@ class TestProbeParameterValidation:
 
     def test_both_prompt_and_driver_raises(self) -> None:
         with pytest.raises(ValueError, match="exactly one"):
-            Probes.behavior( # pyright: ignore[reportCallIssue]
+            Probes.behavior(  # pyright: ignore[reportCallIssue]
                 prompt="hello",
                 driver=StaticDriver(prompts=["driven"]),
                 evaluator=_DetectsAlways(),
@@ -163,7 +163,7 @@ class TestProbeParameterValidation:
 
     def test_both_prompt_and_prompts_raises(self) -> None:
         with pytest.raises(ValueError, match="exactly one"):
-            Probes.behavior( # pyright: ignore[reportCallIssue]
+            Probes.behavior(  # pyright: ignore[reportCallIssue]
                 prompt="hello",
                 prompts=["a", "b"],
                 evaluator=_DetectsAlways(),
@@ -171,7 +171,7 @@ class TestProbeParameterValidation:
 
     def test_no_source_raises(self) -> None:
         with pytest.raises(ValueError, match="exactly one"):
-            Probes.behavior(evaluator=_DetectsAlways()) # pyright: ignore[reportCallIssue]
+            Probes.behavior(evaluator=_DetectsAlways())  # pyright: ignore[reportCallIssue]
 
 
 class TestProbeInfrastructureError:

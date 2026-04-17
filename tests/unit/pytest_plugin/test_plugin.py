@@ -204,7 +204,7 @@ class TestRampartSession:
         assert group.unsafe == 2
         assert group.errors == 1
         assert group.threshold == 0.3
-        assert group.pass_rate == pytest.approx(0.4) # pyright: ignore[reportUnknownMemberType]
+        assert group.pass_rate == pytest.approx(0.4)  # pyright: ignore[reportUnknownMemberType]
         assert not group.passed  # UNSAFE present → always fails
 
     def test_record_trial_group_all_errors(self) -> None:

@@ -17,6 +17,7 @@ def store(tmp_path: Path) -> PayloadStore:
     """PayloadStore rooted in a temporary directory."""
     return PayloadStore(root=tmp_path)
 
+
 class TestPayloadStoreSave:
     def test_save_empty_raises(self, store: PayloadStore) -> None:
         with pytest.raises(ValueError, match="empty"):
@@ -43,7 +44,9 @@ class TestPayloadStoreSave:
         assert loaded[0].content == "new"
 
     def test_save_binary_creates_artifact(
-        self, store: PayloadStore, tmp_path: Path,
+        self,
+        store: PayloadStore,
+        tmp_path: Path,
     ) -> None:
         source_file = tmp_path / "input.png"
         source_file.write_bytes(b"\x89PNG")
@@ -136,7 +139,9 @@ class TestPayloadStoreCollectionManagement:
 
 class TestPayloadStorePathPayload:
     def test_path_based_payload_roundtrip(
-        self, store: PayloadStore, tmp_path: Path,
+        self,
+        store: PayloadStore,
+        tmp_path: Path,
     ) -> None:
         source_file = tmp_path / "source.pdf"
         source_file.write_bytes(b"PDF_CONTENT")

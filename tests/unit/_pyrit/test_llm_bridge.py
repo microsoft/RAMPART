@@ -41,7 +41,10 @@ class TestModelNameResolution:
         assert kwargs["underlying_model"] is None
 
     @patch("rampart._pyrit.llm_bridge.OpenAIChatTarget")
-    def test_deployment_becomes_model_name_with_model_as_underlying(self, mock_cls: Mock):
+    def test_deployment_becomes_model_name_with_model_as_underlying(
+        self,
+        mock_cls: Mock,
+    ):
         create_prompt_target(
             LLMConfig(
                 model="gpt-4o",

@@ -34,6 +34,7 @@ class _HtmlWrapConverter:
             metadata={**payload.metadata, "converter": "HtmlWrapConverter"},
         )
 
+
 class TestPayloadConverterProtocol:
     def test_converter_satisfies_protocol(self) -> None:
         assert isinstance(_UpperCaseConverter(), PayloadConverter)
