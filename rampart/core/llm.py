@@ -32,4 +32,4 @@ class LLMConfig:
     endpoint: str
     api_key: str | None = field(default=None, repr=False)
     deployment: str | None = None
-    metadata: dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict[str, Any])

@@ -74,7 +74,7 @@ class PayloadTemplate:
     description: str
     objective: str
     instruction: str
-    variables: dict[str, str] = field(default_factory=dict)
+    variables: dict[str, str] = field(default_factory=dict[str, str])
 
     def with_variables(self, **overrides: str) -> PayloadTemplate:
         """Return a copy with updated variable values.

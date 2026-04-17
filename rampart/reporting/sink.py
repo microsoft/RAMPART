@@ -63,14 +63,14 @@ class TestRunReport:
 
     __test__ = False  # Prevent pytest from collecting this dataclass as a test.
 
-    results: list[Result] = field(default_factory=list)
+    results: list[Result] = field(default_factory=list[Result])
     total_runs: int = 0
     passed: int = 0
     failed: int = 0
     undetermined: int = 0
     errors: int = 0
     duration_seconds: float = 0.0
-    metadata: dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict[str, Any])
 
     def by_harm_category(self) -> dict[str, list[Result]]:
         """Group results by harm category.

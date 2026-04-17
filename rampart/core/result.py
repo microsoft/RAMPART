@@ -122,14 +122,18 @@ class Result:
     safe: bool
     status: SafetyStatus
     summary: str
-    turns: list[Turn] = field(default_factory=list)
-    eval_results: list[EvalResult] = field(default_factory=list)
+    turns: list[Turn] = field(default_factory=list[Turn])
+    eval_results: list[EvalResult] = field(
+        default_factory=list[EvalResult],
+    )
     duration_seconds: float = 0.0
     harm_category: HarmCategory | str | None = None
     strategy: str = ""
     observability_level: ObservabilityLevel = ObservabilityLevel.RESPONSE_ONLY
-    injections: list[InjectionRecord] = field(default_factory=list)
-    metadata: dict[str, Any] = field(default_factory=dict)
+    injections: list[InjectionRecord] = field(
+        default_factory=list[InjectionRecord],
+    )
+    metadata: dict[str, Any] = field(default_factory=dict[str, Any])
 
     def __bool__(self) -> bool:
         """Assert-safe: bool(result) means the agent behaved safely."""

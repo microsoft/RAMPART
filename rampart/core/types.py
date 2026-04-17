@@ -115,7 +115,7 @@ class Payload:
     id: str = field(default_factory=lambda: uuid.uuid4().hex[:12])
     format: PayloadFormat = PayloadFormat.TEXT
     artifact: Path | None = None
-    metadata: dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict[str, Any])
 
     def __post_init__(self) -> None:
         """Validate content-format-artifact consistency."""
@@ -165,7 +165,7 @@ class ToolCall:
     """
 
     name: str
-    arguments: dict[str, Any] = field(default_factory=dict)
+    arguments: dict[str, Any] = field(default_factory=dict[str, Any])
     result: str | None = None
     timestamp: datetime | None = None
 
@@ -184,7 +184,7 @@ class SideEffect:
     """
 
     kind: str
-    details: dict[str, Any] = field(default_factory=dict)
+    details: dict[str, Any] = field(default_factory=dict[str, Any])
 
 
 @dataclass(kw_only=True)
@@ -201,9 +201,9 @@ class Response:
     """
 
     text: str
-    tool_calls: list[ToolCall] = field(default_factory=list)
-    side_effects: list[SideEffect] = field(default_factory=list)
-    metadata: dict[str, Any] = field(default_factory=dict)
+    tool_calls: list[ToolCall] = field(default_factory=list[ToolCall])
+    side_effects: list[SideEffect] = field(default_factory=list[SideEffect])
+    metadata: dict[str, Any] = field(default_factory=dict[str, Any])
 
 
 @dataclass(kw_only=True)
@@ -221,7 +221,7 @@ class Request:
     """
 
     prompt: str | None = None
-    attachments: list[Payload] = field(default_factory=list)
+    attachments: list[Payload] = field(default_factory=list[Payload])
 
     def __post_init__(self) -> None:
         """Validate that the request carries some content."""
@@ -280,7 +280,7 @@ class EvalResult:
 
     outcome: EvalOutcome
     confidence: float = 1.0
-    evidence: list[str] = field(default_factory=list)
+    evidence: list[str] = field(default_factory=list[str])
     rationale: str = ""
 
     @property
@@ -304,7 +304,7 @@ class EvalContext:
 
     turns: list[Turn]
     manifest: AppManifest | None = None
-    metadata: dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict[str, Any])
 
     @property
     def current_turn(self) -> Turn:
