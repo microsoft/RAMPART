@@ -6,7 +6,7 @@
 Two protocols serving two audiences: Surface is what surface authors
 implement; InjectionHandle is what execution strategies consume.
 
-``sleep_until_ready`` is a free helper for surfaces that only need
+``sleep_until_ready`` is a helper function for surfaces that only need
 a simple delay-based readiness wait.
 """
 
@@ -47,7 +47,7 @@ class InjectionHandle(Protocol):
         """Block until the injected content is visible to the agent.
 
         Implementations should raise `TimeoutError` if readiness
-        cannot be confirmed within a reasonable time.
+        operations are long-running to prevent indefinite blocking.
         """
         ...
 

@@ -200,7 +200,7 @@ class _OneDriveInjection:
         """Wait for the uploaded content to be indexed and discoverable.
 
         Note: Currently sleeps for `OneDriveSurface.indexing_delay` seconds.
-        Future versions will poll the Graph API for the file's availability instead and
+        Future versions will poll the Graph API for content availability instead and
         raise `TimeoutError` if it doesn't appear within the `indexing_delay`.
         """
         await sleep_until_ready(delay=self._surface.indexing_delay)
