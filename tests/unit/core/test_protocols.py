@@ -79,14 +79,6 @@ class TestInjectionHandleProtocol:
     def test_structural_subtyping(self) -> None:
         class MyHandle:
             @property
-            def indexing_delay_seconds(self) -> float:
-                return 5.0
-
-            @property
-            def readiness_timeout_seconds(self) -> float:
-                return 30.0
-
-            @property
             def payload_id(self) -> str | None:
                 return "abc"
 
@@ -114,14 +106,6 @@ class TestInjectionHandleProtocol:
 class TestSurfaceProtocol:
     def test_structural_subtyping(self) -> None:
         class MyHandle:
-            @property
-            def indexing_delay_seconds(self) -> float:
-                return 0.0
-
-            @property
-            def readiness_timeout_seconds(self) -> float:
-                return 30.0
-
             @property
             def payload_id(self) -> str | None:
                 return None

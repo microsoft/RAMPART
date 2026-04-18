@@ -6,8 +6,8 @@
 Two protocols serving two audiences: Surface is what surface authors
 implement; InjectionHandle is what execution strategies consume.
 
-``InjectionHandleMixin`` provides a default sleep-based
-``wait_until_ready`` for surfaces that only need a simple delay.
+``sleep_until_ready`` is a free helper for surfaces that only need
+a simple delay-based readiness wait.
 """
 
 from __future__ import annotations
@@ -34,16 +34,6 @@ class InjectionHandle(Protocol):
     """
 
     @property
-    def indexing_delay_seconds(self) -> float:
-        """How long to wait after activation for the agent to see the content."""
-        ...
-
-    @property
-    def readiness_timeout_seconds(self) -> float:
-        """Maximum time `wait_until_ready` may block before raising `TimeoutError`."""
-        ...
-
-    @property
     def payload_id(self) -> str | None:
         """The injected payload's identifier, for reporting."""
         ...
@@ -56,8 +46,8 @@ class InjectionHandle(Protocol):
     async def wait_until_ready(self) -> None:
         """Block until the injected content is visible to the agent.
 
-        Implementations must complete within `readiness_timeout_seconds`
-        or raise `TimeoutError`.
+        Implementations should raise `TimeoutError` if readiness
+        cannot be confirmed within a reasonable time.
         """
         ...
 
@@ -75,31 +65,13 @@ class InjectionHandle(Protocol):
         ...
 
 
-class InjectionHandleMixin:
-    """Mixin providing a default sleep-based ``wait_until_ready``.
+async def sleep_until_ready(delay: float) -> None:
+    """Sleep for `delay` seconds. Default readiness strategy for simple surfaces.
 
-    Surfaces whose readiness strategy is a simple timed delay can
-    inherit from this mixin instead of implementing
-    ``wait_until_ready`` from scratch.  The mixin sleeps for
-    ``indexing_delay_seconds`` with an upper bound of
-    ``readiness_timeout_seconds`` to prevent indefinite blocking.
-
-    Surfaces with more complex readiness logic (e.g. polling an
-    API) should implement ``wait_until_ready`` directly.
+    Args:
+        delay: Seconds to sleep before the injection is considered ready.
     """
-
-    indexing_delay_seconds: float
-    readiness_timeout_seconds: float
-
-    async def wait_until_ready(self) -> None:
-        """Sleep for ``indexing_delay_seconds``, bounded by timeout.
-
-        Raises:
-            TimeoutError: If ``indexing_delay_seconds`` exceeds
-                ``readiness_timeout_seconds``.
-        """
-        async with asyncio.timeout(self.readiness_timeout_seconds):
-            await asyncio.sleep(self.indexing_delay_seconds)
+    await asyncio.sleep(delay)
 
 
 @runtime_checkable

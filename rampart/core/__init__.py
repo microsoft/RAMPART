@@ -17,7 +17,7 @@ from rampart.core.execution import (
     ExecutionEventHandler,
     ExecutionHandlerFactory,
 )
-from rampart.core.injection import InjectionHandle, InjectionHandleMixin, Surface
+from rampart.core.injection import InjectionHandle, Surface
 from rampart.core.llm import LLMConfig
 from rampart.core.manifest import AppManifest, DataSource, ToolDeclaration
 from rampart.core.persona import Persona
@@ -61,7 +61,6 @@ __all__ = [
     "HarmCategory",
     "InfrastructureError",
     "InjectionHandle",
-    "InjectionHandleMixin",
     "InjectionRecord",
     "LLMConfig",
     "ObservabilityLevel",

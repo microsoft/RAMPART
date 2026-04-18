@@ -13,7 +13,7 @@ import logging
 from typing import TYPE_CHECKING, Self
 
 from rampart.core.errors import InfrastructureError
-from rampart.core.injection import InjectionHandleMixin
+from rampart.core.injection import sleep_until_ready
 
 if TYPE_CHECKING:
     import types
@@ -54,7 +54,6 @@ class OneDriveSurface:
     """
 
     DEFAULT_INDEXING_DELAY: float = 10.0
-    DEFAULT_READINESS_TIMEOUT: float = 120.0
 
     def __init__(
         self,
@@ -63,14 +62,12 @@ class OneDriveSurface:
         drive_id: str,
         folder_path: str,
         indexing_delay: float = DEFAULT_INDEXING_DELAY,
-        readiness_timeout: float = DEFAULT_READINESS_TIMEOUT,
     ) -> None:
         """Initialize with Graph client and OneDrive location."""
         self._graph_client = graph_client
         self._drive_id = drive_id
         self._folder_path = folder_path.strip("/")
         self._indexing_delay = indexing_delay
-        self._readiness_timeout = readiness_timeout
 
     @property
     def drive_id(self) -> str:
@@ -86,11 +83,6 @@ class OneDriveSurface:
     def indexing_delay(self) -> float:
         """Seconds to wait after upload for indexing."""
         return self._indexing_delay
-
-    @property
-    def readiness_timeout(self) -> float:
-        """Maximum readiness wait time in seconds."""
-        return self._readiness_timeout
 
     def inject(self, *, payload: Payload) -> _OneDriveInjection:
         """Prepare an injection into the configured OneDrive folder.
@@ -186,23 +178,13 @@ class OneDriveSurface:
         )
 
 
-class _OneDriveInjection(InjectionHandleMixin):
+class _OneDriveInjection:
     """InjectionHandle for OneDrive. Manages upload and cleanup lifecycle."""
 
     def __init__(self, *, surface: OneDriveSurface, payload: Payload) -> None:
         self._surface = surface
         self._payload = payload
         self._item_id: str | None = None
-
-    @property
-    def indexing_delay_seconds(self) -> float:
-        """How long to wait after upload for content to be discoverable."""
-        return self._surface.indexing_delay
-
-    @property
-    def readiness_timeout_seconds(self) -> float:
-        """Maximum time `wait_until_ready` may block."""
-        return self._surface.readiness_timeout
 
     @property
     def payload_id(self) -> str | None:
@@ -213,6 +195,15 @@ class _OneDriveInjection(InjectionHandleMixin):
     def surface_name(self) -> str:
         """Identifies this injection as OneDrive for reporting."""
         return "OneDrive"
+
+    async def wait_until_ready(self) -> None:
+        """Wait for the uploaded content to be indexed and discoverable.
+
+        Note: Currently sleeps for `OneDriveSurface.indexing_delay` seconds.
+        Future versions will poll the Graph API for the file's availability instead and
+        raise `TimeoutError` if it doesn't appear within the `indexing_delay`.
+        """
+        await sleep_until_ready(delay=self._surface.indexing_delay)
 
     async def __aenter__(self) -> Self:
         """Upload payload to OneDrive. Raises InfrastructureError on failure."""

@@ -5,7 +5,7 @@
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, MagicMock, call
+from unittest.mock import AsyncMock, MagicMock, call, patch
 
 import pytest
 
@@ -95,7 +95,6 @@ class TestOneDriveSurfaceInit:
         assert surface.drive_id == "drive-1"
         assert surface.folder_path == "Documents/payloads"
         assert surface.indexing_delay == OneDriveSurface.DEFAULT_INDEXING_DELAY
-        assert surface.readiness_timeout == OneDriveSurface.DEFAULT_READINESS_TIMEOUT
 
     def test_custom_indexing_delay(self) -> None:
         surface = OneDriveSurface(
@@ -159,28 +158,6 @@ class TestOneDriveInjectionProperties:
         payload = Payload(content="test", id="my-payload-id")
         handle = surface.inject(payload=payload)
         assert handle.payload_id == "my-payload-id"
-
-    def test_indexing_delay_from_surface(self) -> None:
-        surface = OneDriveSurface(
-            graph_client=MagicMock(),
-            drive_id="d",
-            folder_path="f",
-            indexing_delay=99.0,
-        )
-        payload = Payload(content="test")
-        handle = surface.inject(payload=payload)
-        assert handle.indexing_delay_seconds == 99.0
-
-    def test_readiness_timeout_from_surface(self) -> None:
-        surface = OneDriveSurface(
-            graph_client=MagicMock(),
-            drive_id="d",
-            folder_path="f",
-            readiness_timeout=60.0,
-        )
-        payload = Payload(content="test")
-        handle = surface.inject(payload=payload)
-        assert handle.readiness_timeout_seconds == 60.0
 
 
 class TestOneDriveInjectionLifecycle:
@@ -372,3 +349,26 @@ class TestOneDriveInjectionLifecycle:
                 pass
 
         assert exc_info.value is original
+
+
+class TestOneDriveInjectionWaitUntilReady:
+    """Test _OneDriveInjection.wait_until_ready wiring."""
+
+    @pytest.mark.asyncio
+    async def test_delegates_to_sleep_until_ready(self) -> None:
+        """Verifies correct arguments are passed to sleep_until_ready."""
+        surface = OneDriveSurface(
+            graph_client=MagicMock(),
+            drive_id="d",
+            folder_path="f",
+            indexing_delay=5.0,
+        )
+        handle = surface.inject(payload=Payload(content="test"))
+
+        with patch(
+            "rampart.surfaces.onedrive.sleep_until_ready",
+            new_callable=AsyncMock,
+        ) as mock_sleep:
+            await handle.wait_until_ready()
+
+        mock_sleep.assert_awaited_once_with(delay=5.0)
