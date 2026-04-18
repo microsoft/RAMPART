@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, call, patch
 
 import pytest
@@ -24,7 +25,7 @@ _UNSET = object()
 def _make_graph_client(
     *,
     upload_item_id: str = "item-abc-123",
-    upload_return: object = _UNSET,
+    upload_return: Any = _UNSET,
     upload_error: Exception | None = None,
     delete_error: Exception | None = None,
 ) -> MagicMock:
@@ -62,7 +63,7 @@ def _make_graph_client(
 
     items_mock = MagicMock()
 
-    def _by_drive_item_id_dispatch(item_id: str) -> object:
+    def _by_drive_item_id_dispatch(item_id: str) -> Any:
         if item_id.startswith("root:"):
             return upload_item_mock
         return delete_item_mock
