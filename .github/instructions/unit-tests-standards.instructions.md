@@ -6,6 +6,17 @@ applyTo: '**/tests/**'
 
 When generating unit tests, follow these guidelines to ensure consistent, maintainable, and thorough test coverage.
 
+## Relaxed Lint Rules for Tests
+
+The project intentionally disables several lint rules for test files (configured in `pyproject.toml` under `[tool.ruff.lint.per-file-ignores]`). Do **not** enforce these in test code:
+
+- **No docstrings required** — test classes and methods do not need docstrings
+- **No type annotations required** — parameters and return types may omit annotations
+- **Magic values allowed** — inline literals in assertions are fine (no need to extract constants)
+- **Private member access allowed** — tests may access `_private` members directly
+- **Unused arguments allowed** — fixture parameters and stubs may appear unused
+- **Local imports allowed** — imports inside test functions for isolation are acceptable
+
 ## Test Organization
 
 ### File & Class Structure
@@ -60,7 +71,7 @@ def _make_record(*, status: Status = Status.PENDING) -> Record:
 
 ### When to Use Fixtures
 - Use fixtures for shared resources that need setup/teardown (temp files, mock servers)
-- Check `conftest.py` and any shared test utilities before creating new fixtures
+- Check `tests/fixtures.py` and any shared test utilities before creating new fixtures
 - Prefer helper functions over fixtures when no cleanup is required
 
 ## What to Test

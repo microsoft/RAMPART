@@ -6,12 +6,22 @@ applyTo: '**/*.py'
 
 Follow these coding standards to ensure consistent, readable, and maintainable code across the project.
 
+## Copyright Header
+
+- **MANDATORY**: Every `.py` source file MUST begin with the two-line copyright notice
+- This is enforced by ruff's copyright rule (`[tool.ruff.lint.flake8-copyright]`) in `pyproject.toml`
+
+```python
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+```
+
 ## Imports
 
 ### Placement & Organization
 - **MANDATORY**: All import statements MUST be at the top of the file
 - Do NOT use inline/local imports inside functions or methods
-- The only exception is breaking circular import dependencies, which should be rare and documented
+- Exceptions: breaking circular import dependencies (should be rare and documented) and deferring heavy import chains (see [PyRIT Boundary Isolation](#pyrit-boundary-isolation))
 - Use `from __future__ import annotations` when needed for forward references
 - Use `TYPE_CHECKING` guards for imports only needed by type checkers
 
@@ -246,12 +256,6 @@ Order members within a class as follows:
 5. Protected/private methods (prefixed with `_`)
 6. Static/class methods
 
-## Error Handling
-
-- Define a small set of domain-specific exceptions for distinct failure modes
-- Use `raise ... from original` to preserve exception chains
-- Validate inputs in `__post_init__` or at system boundaries; do not over-validate internally
-
 ### Class-Level Constants
 - Define constants as class attributes, not module-level
 - Use UPPER_CASE naming for constants
@@ -307,30 +311,6 @@ async def execute_task_async(self, *, context: TaskContext) -> TaskResult:
 5. Private methods (internal implementation)
 6. Static methods and class methods at the end
 
-### Import Organization
-```python
-# Standard library imports
-import asyncio
-import json
-import logging
-from dataclasses import dataclass
-from enum import Enum
-from pathlib import Path
-from typing import Dict, List, Optional
-
-# Third-party imports
-import numpy as np
-from tqdm import tqdm
-
-# Local application imports
-from myapp.services.base import BaseService
-from myapp.models import TaskResult
-from myapp.clients import ServiceClient
-```
-
-Unless necessary, always import at the top of the file. Don't import inside a function or method.
-
-
 ### Import paths
 
 When importing from a different module than your namespace,
@@ -363,6 +343,10 @@ from myapp.clients.grpc.grpc_client import GrpcClient
 ```
 
 ## Error Handling
+
+- Define a small set of domain-specific exceptions for distinct failure modes
+- Use `raise ... from original` to preserve exception chains
+- Validate inputs in `__post_init__` or at system boundaries; do not over-validate internally
 
 ### Specific Exceptions
 - Raise specific exceptions with clear messages
@@ -446,6 +430,24 @@ async def temporary_config(self, **kwargs):
         yield
     finally:
         self._config = old_config
+```
+
+### Async Context Manager Protocols
+- `__aenter__` MUST return `Self`
+- `__aexit__` MUST be idempotent and MUST NOT raise — log warnings for cleanup failures instead
+- Use `AsyncExitStack` when managing multiple async resources
+
+```python
+# CORRECT
+async def __aenter__(self) -> Self:
+    self._session = await self._create_session()
+    return self
+
+async def __aexit__(self, *exc: object) -> None:
+    try:
+        await self._session.close()
+    except Exception:  # noqa: BLE001
+        logger.warning("cleanup failed", exc_info=True)
 ```
 
 ### Property Decorators
@@ -532,6 +534,39 @@ def process_large_dataset(self, *, file_path: Path) -> List[Result]:
     return [self._process_line(line) for line in lines]
 ```
 
+## Logging Conventions
+
+- Use `logger = logging.getLogger(__name__)` at module level
+- Use `%s`-style lazy formatting in log calls — do NOT use f-strings
+- Use `exc_info=True` when logging errors to preserve stack traces
+- Swallow cleanup errors with a warning log rather than re-raising
+
+```python
+# CORRECT
+logger = logging.getLogger(__name__)
+
+logger.info("Saved %d payloads to '%s'", len(payloads), name)
+logger.warning("Cleanup error during %s: %s", self.name, exc, exc_info=True)
+
+# INCORRECT
+logger.info(f"Saved {len(payloads)} payloads to '{name}'")
+```
+
+## PyRIT Boundary Isolation
+
+- **All PyRIT interaction MUST be isolated to `rampart/_pyrit/`**
+- Do NOT import PyRIT modules from anywhere else in the codebase (except `rampart/converters/` for converter wrappers)
+- PyRIT's import chain is heavy (~14s) — use lazy imports inside functions when wrapping PyRIT converters to defer the cost
+
+```python
+# CORRECT — lazy import in a converter wrapper
+def _get_converter(self) -> WordDocConverter:
+    """PyRIT's import chain is heavy (~14s), so defer until first use."""
+    from pyrit.prompt_converter.word_doc_converter import WordDocConverter  # noqa: PLC0415
+
+    return WordDocConverter()
+```
+
 ## Final Checklist
 
 Before committing code, ensure:
@@ -545,6 +580,9 @@ Before committing code, ensure:
 - [ ] Code follows the import organization pattern
 - [ ] No hard-coded dependencies
 - [ ] Complex logic is extracted to helper methods
+- [ ] Copyright header is present
+- [ ] Log calls use `%s`-style formatting (no f-strings)
+- [ ] PyRIT imports are isolated to `rampart/_pyrit/` (or lazy in converters)
 
 ---
 
