@@ -81,6 +81,10 @@ markers = [
     "harm(*categories): categorize test by harm type",
     "trial(n=, threshold=): statistical repetition of a test",
 ]
+filterwarnings = [
+    "ignore:.*invalid escape sequence:DeprecationWarning:.*confusables.*",
+    "ignore:.*invalid escape sequence:SyntaxWarning:.*confusables.*",
+]
 
 [tool.ruff.lint]
 select = ["ALL"]
