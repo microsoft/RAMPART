@@ -144,8 +144,7 @@ async def send_generation_request_async(
         conversation_id=conversation_id,
     )
 
-    # Can remove after https://github.com/microsoft/PyRIT/pull/1621 merged
-    # and local version updates pyrit
+    # Can remove after bumping to PyRIT v0.13.0
     request = cast("Message", request_piece.to_message())  # pyright: ignore[reportUnknownMemberType]
 
     responses = await target.send_prompt_async(message=request)
