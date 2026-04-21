@@ -1,5 +1,6 @@
 <!-- This repository loosely follows the "Conventional Commits" specification for commit messages. See https://www.conventionalcommits.org/ for more information. -->
-<!-- PR commit messages must follow the following pattern: ^\[(FEAT|FIX|REFACTOR|STYLE|TEST|DOCS|CI|MAINT|META|REVERT)\]( \[BREAKING\])?:\s.+\(#\d+\) -->
+<!-- Squash-merge commit messages must match: ^\[(FEAT|FIX|REFACTOR|STYLE|TEST|DOCS|CI|MAINT|META|REVERT)\]( \[BREAKING\])?:\s.+\(#\d+\) -->
+<!-- GitHub appends (#N) automatically during squash-merge; just use the [TAG]: description format for your PR title. -->
 <!-- If your PR is not yet ready for review, please mark it as [DRAFT]. -->
 
 ## Description
@@ -10,9 +11,7 @@
 
 
 ## Breaking changes
-<!-- Does this PR introduce breaking changes? If so, describe the impact and migration path. -->
-
-None
+<!-- If none, write "None". If breaking, describe the impact and migration path. -->
 
 ## Checklist
 

@@ -47,6 +47,7 @@ body:
         - "3.11"
         - "3.12"
         - "3.13"
+        - "Other"
     validations:
       required: true
 
@@ -68,6 +69,15 @@ body:
       placeholder: "0.1.0"
     validations:
       required: true
+
+  - type: textarea
+    id: code
+    attributes:
+      label: Code to reproduce
+      description: Minimal code snippet that reproduces the issue.
+      render: python
+    validations:
+      required: false
 
   - type: textarea
     id: context

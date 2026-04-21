@@ -1,0 +1,19 @@
+name: Documentation Improvement
+description: Report confusing or missing documentation
+labels: ["documentation"]
+body:
+  - type: textarea
+    id: issue
+    attributes:
+      label: What is confusing or missing?
+      description: Tell us what's unclear, incorrect, or absent in the docs.
+    validations:
+      required: true
+
+  - type: textarea
+    id: suggestion
+    attributes:
+      label: Suggested fix
+      description: How could the documentation be improved?
+    validations:
+      required: false
