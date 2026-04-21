@@ -25,24 +25,3 @@ updates:
       interval: weekly
     commit-message:
       prefix: "[MAINT]"
-
-  - package-ecosystem: docker
-    directory: /
-    schedule:
-      interval: weekly
-    commit-message:
-      prefix: "[MAINT]"
-
-  - package-ecosystem: docker-compose
-    directory: /
-    schedule:
-      interval: weekly
-    commit-message:
-      prefix: "[MAINT]"
-
-  - package-ecosystem: devcontainers
-    directory: /
-    schedule:
-      interval: weekly
-    commit-message:
-      prefix: "[MAINT]"
