@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 from rampart.core.prompt_driver import PromptDriver
 from rampart.core.types import Request
 from rampart.drivers.static import StaticDriver
