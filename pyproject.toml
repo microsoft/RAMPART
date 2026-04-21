@@ -116,4 +116,4 @@ known-first-party = ["rampart"]
 convention = "google"
 
 [tool.uv.sources]
-pyrit = { git = "https://github.com/microsoft/PyRIT", rev = "6dc8b94139757390286bbce7d53c1f7e58e66e29" }
+pyrit = { git = "https://github.com/microsoft/PyRIT", rev = "6dc8b94139757390286bbce7d53c1f7e58e66e29" } # v0.13.0
