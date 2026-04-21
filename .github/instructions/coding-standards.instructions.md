@@ -52,6 +52,7 @@ Use parenthesized multi-line imports when importing 3+ names from the same modul
 ### Async Functions
 - **MANDATORY**: All async functions and methods MUST end with `_async` suffix
 - This applies to ALL async functions without exception
+- **Exception**: Dunder methods (`__aenter__`, `__aexit__`, etc.) follow Python's protocol naming and are exempt
 
 ```python
 # CORRECT
@@ -101,6 +102,7 @@ def process_items(self, items, limit=10):
 ### Keyword-Only Arguments
 - Functions with more than 1 parameter MUST use `*` after self/cls to enforce keyword-only arguments
 - This prevents positional argument errors and improves API clarity
+- **Exception**: Dunder methods with Python-defined signatures (`__or__`, `__and__`, `__eq__`, `__contains__`, etc.) are exempt since Python calls them with positional arguments
 
 ```python
 # CORRECT
@@ -140,7 +142,7 @@ class Record:
     content: str
     id: str = field(default_factory=lambda: uuid.uuid4().hex[:12])
     format: RecordFormat = RecordFormat.TEXT
-    metadata: dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict[str, Any])
 
     def __post_init__(self) -> None:
         if not self.content:
@@ -371,7 +373,7 @@ if not self._model:
 
 ```python
 # CORRECT
-def process_items(self, *, items: List[str]) -> List[str]:
+def process_items(self, *, items: list[str]) -> list[str]:
     if not items:
         return []
 
@@ -382,7 +384,7 @@ def process_items(self, *, items: List[str]) -> List[str]:
     return [self._process_single(item) for item in items]
 
 # INCORRECT - Excessive nesting
-def process_items(self, *, items: List[str]) -> List[str]:
+def process_items(self, *, items: list[str]) -> list[str]:
     if items:
         if len(items) == 1:
             return [self._process_single(items[0])]
@@ -483,7 +485,7 @@ class TaskExecutor:
         *,
         client: ServiceClient,
         scorer: Scorer,
-        logger: Optional[logging.Logger] = None
+        logger: logging.Logger | None = None
     ) -> None:
         self._client = client
         self._scorer = scorer
@@ -528,7 +530,7 @@ def process_large_dataset(self, *, file_path: Path) -> Generator[Result, None, N
             yield self._process_line(line)
 
 # INCORRECT
-def process_large_dataset(self, *, file_path: Path) -> List[Result]:
+def process_large_dataset(self, *, file_path: Path) -> list[Result]:
     with open(file_path) as f:
         lines = f.readlines()  # Loads entire file into memory
     return [self._process_line(line) for line in lines]
