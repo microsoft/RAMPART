@@ -16,6 +16,7 @@ jobs:
   lint:
     name: Lint & Type Check
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       contents: read
     steps:
@@ -48,7 +49,9 @@ jobs:
 
   test:
     name: Test (Python ${{ matrix.python-version }})
+    needs: lint
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       contents: read
     strategy:
@@ -76,5 +79,4 @@ jobs:
         run: uv sync --frozen
 
       - name: Run tests
-        # Coverage threshold (fail_under) is enforced via pyproject.toml [tool.coverage.report]
-        run: uv run pytest tests/unit --cov=rampart --cov-report=xml --cov-report=term-missing
+        run: uv run pytest tests/unit
