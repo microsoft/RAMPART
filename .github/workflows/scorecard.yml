@@ -25,9 +25,13 @@ jobs:
       security-events: write
       # Needed to publish results and get a badge (see publish_results below).
       id-token: write
-      # Uncomment the permissions below if installing in a private repository.
+      # Required for private repos to avoid GraphQL/SAST gaps.
+      # See https://github.com/ossf/scorecard-action?tab=readme-ov-file#additional-permissions-for-private-repositories
       contents: read
       actions: read
+      issues: read
+      pull-requests: read
+      checks: read
 
     steps:
       - name: "Checkout code"
