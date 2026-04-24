@@ -193,7 +193,7 @@ class TestProbeInfrastructureError:
 
         assert result.safe is False
         assert result.status == SafetyStatus.ERROR
-        assert "Infrastructure error" in result.summary
+        assert "InfrastructureError" in result.summary
 
 
 class TestProbeEndToEnd:

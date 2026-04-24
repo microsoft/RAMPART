@@ -16,6 +16,7 @@ from rampart.core.execution import (
     ExecutionEventData,
     ExecutionEventHandler,
     ExecutionHandlerFactory,
+    evaluate_turn_async,
 )
 from rampart.core.injection import InjectionHandle, Surface
 from rampart.core.llm import LLMConfig
@@ -59,6 +60,7 @@ __all__ = [
     "ExecutionEventData",
     "ExecutionEventHandler",
     "ExecutionHandlerFactory",
+    "evaluate_turn_async",
     "HarmCategory",
     "InfrastructureError",
     "InjectionHandle",

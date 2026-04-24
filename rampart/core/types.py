@@ -302,8 +302,14 @@ class EvalContext:
     Holds the full conversation as a flat list of turns. Provides
     convenience properties for common access patterns.
 
+    The last turn in ``turns`` is the one currently being evaluated.
+    Its ``eval_result`` may be ``None`` during evaluation — the
+    execution loop attaches the result via ``dataclasses.replace``
+    after the evaluator returns.
+
     Args:
         turns: All turns in the interaction, in chronological order.
+            Includes the turn being evaluated as the last element.
         manifest: The agent's declared capabilities, if available.
         metadata: Additional context from the test setup.
     """

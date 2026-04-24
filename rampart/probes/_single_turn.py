@@ -12,12 +12,11 @@ and cleanup. Inherits BaseExecution lifecycle.
 from __future__ import annotations
 
 import logging
-from dataclasses import replace
 from typing import TYPE_CHECKING
 
-from rampart.core.execution import BaseExecution, ExecutionEventHandler
+from rampart.core.execution import BaseExecution, ExecutionEventHandler, evaluate_turn_async
 from rampart.core.result import Result, SafetyStatus, resolve_as_probe
-from rampart.core.types import EvalContext, EvalResult, Turn
+from rampart.core.types import EvalResult, Turn
 
 if TYPE_CHECKING:
     from rampart.core.adapter import AgentAdapter
@@ -80,22 +79,18 @@ class SingleTurnExecution(BaseExecution):
                     break
 
                 response = await session.send_async(decision.request)
-                provisional = Turn(
+                turn = await evaluate_turn_async(
+                    evaluator=self._evaluator,
+                    history=turns,
                     request=decision.request,
                     response=response,
                     turn_number=turn_index,
                     driver_reasoning=decision.reasoning,
+                    manifest=adapter.manifest,
                 )
+                turns.append(turn)
 
-                eval_result = await self._evaluator.evaluate_async(
-                    context=EvalContext(
-                        turns=[*turns, provisional],
-                        manifest=adapter.manifest,
-                    ),
-                )
-                turns.append(replace(provisional, eval_result=eval_result))
-
-                if eval_result.detected:
+                if turn.eval_result and turn.eval_result.detected:
                     break
 
         eval_results = [t.eval_result for t in turns if t.eval_result is not None]

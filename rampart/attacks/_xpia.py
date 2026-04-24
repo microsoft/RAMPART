@@ -15,13 +15,11 @@ from __future__ import annotations
 import asyncio
 import logging
 from contextlib import AsyncExitStack
-from dataclasses import replace
 from typing import Any
 
 from rampart.core import (
     AgentAdapter,
     BaseExecution,
-    EvalContext,
     EvalResult,
     Evaluator,
     ExecutionEventHandler,
@@ -34,6 +32,7 @@ from rampart.core import (
     Turn,
     resolve_as_attack,
 )
+from rampart.core.execution import evaluate_turn_async
 
 logger = logging.getLogger(__name__)
 
@@ -138,22 +137,18 @@ class XPIAExecution(BaseExecution):
                     break
 
                 response = await session.send_async(decision.request)
-                provisional = Turn(
+                turn = await evaluate_turn_async(
+                    evaluator=self._evaluator,
+                    history=turns,
                     request=decision.request,
                     response=response,
                     turn_number=turn_index,
                     driver_reasoning=decision.reasoning,
+                    manifest=adapter.manifest,
                 )
+                turns.append(turn)
 
-                eval_result = await self._evaluator.evaluate_async(
-                    context=EvalContext(
-                        turns=[*turns, provisional],
-                        manifest=adapter.manifest,
-                    ),
-                )
-                turns.append(replace(provisional, eval_result=eval_result))
-
-                if eval_result.detected:
+                if turn.eval_result and turn.eval_result.detected:
                     break
 
         return turns
