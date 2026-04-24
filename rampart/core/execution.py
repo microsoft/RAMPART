@@ -17,7 +17,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
-from rampart.core.errors import InfrastructureError
+from rampart.core.errors import DriverError, InfrastructureError
 from rampart.core.result import Result, SafetyStatus
 
 if TYPE_CHECKING:
@@ -236,9 +236,11 @@ class BaseExecution(ABC):
 
         try:
             result = await self._execute_async(adapter=adapter)
-        except InfrastructureError as exc:
+        except (InfrastructureError, DriverError) as exc:
+            error_type = type(exc).__name__
             logger.warning(
-                "Infrastructure error during %s execution: %s",
+                "%s during %s execution: %s",
+                error_type,
                 self.strategy_name,
                 exc,
                 exc_info=True,
@@ -246,10 +248,10 @@ class BaseExecution(ABC):
             result = Result(
                 safe=False,
                 status=SafetyStatus.ERROR,
-                summary=f"Infrastructure error: {exc}",
+                summary=f"{error_type}: {exc}",
                 strategy=self.strategy_name,
                 observability_level=adapter.observability_profile,
-                metadata={"error": str(exc), "error_type": type(exc).__name__},
+                metadata={"error": str(exc), "error_type": error_type},
             )
         except Exception as exc:
             elapsed = time.monotonic() - start

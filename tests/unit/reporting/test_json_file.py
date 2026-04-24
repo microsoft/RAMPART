@@ -11,7 +11,15 @@ from pathlib import Path
 import pytest
 
 from rampart.core.result import HarmCategory, Result, SafetyStatus
-from rampart.core.types import Request, Response, SideEffect, ToolCall, Turn
+from rampart.core.types import (
+    EvalOutcome,
+    EvalResult,
+    Request,
+    Response,
+    SideEffect,
+    ToolCall,
+    Turn,
+)
 from rampart.reporting.json_file import JsonFileReportSink
 from rampart.reporting.sink import TestRunReport
 
@@ -132,6 +140,68 @@ class TestSerializeResult:
         turn_data = data["turns"][0]
         assert "side_effects" in turn_data
         assert turn_data["side_effects"][0]["kind"] == "http_request"
+
+    def test_turns_include_eval_result_when_present(self) -> None:
+        sink = JsonFileReportSink(output_dir=Path("/tmp"))
+        turn = Turn(
+            request=Request(prompt="hi"),
+            response=Response(text="done"),
+            turn_number=0,
+            eval_result=EvalResult(
+                outcome=EvalOutcome.DETECTED,
+                confidence=0.95,
+                rationale="found secret",
+            ),
+        )
+        result = Result(
+            safe=False,
+            status=SafetyStatus.UNSAFE,
+            summary="bad",
+            turns=[turn],
+        )
+
+        data = sink._serialize_result(result)
+
+        turn_data = data["turns"][0]
+        assert turn_data["eval_outcome"] == "detected"
+        assert turn_data["eval_confidence"] == 0.95
+        assert turn_data["eval_rationale"] == "found secret"
+
+    def test_turns_omit_eval_result_when_none(self) -> None:
+        sink = JsonFileReportSink(output_dir=Path("/tmp"))
+        result = _result_with_turns()
+
+        data = sink._serialize_result(result)
+
+        turn_data = data["turns"][0]
+        assert "eval_outcome" not in turn_data
+
+    def test_turns_include_driver_reasoning_when_present(self) -> None:
+        sink = JsonFileReportSink(output_dir=Path("/tmp"))
+        turn = Turn(
+            request=Request(prompt="hi"),
+            response=Response(text="done"),
+            turn_number=0,
+            driver_reasoning="Trying a different angle",
+        )
+        result = Result(
+            safe=True,
+            status=SafetyStatus.SAFE,
+            summary="ok",
+            turns=[turn],
+        )
+
+        data = sink._serialize_result(result)
+
+        assert data["turns"][0]["driver_reasoning"] == "Trying a different angle"
+
+    def test_turns_omit_driver_reasoning_when_empty(self) -> None:
+        sink = JsonFileReportSink(output_dir=Path("/tmp"))
+        result = _result_with_turns()
+
+        data = sink._serialize_result(result)
+
+        assert "driver_reasoning" not in data["turns"][0]
 
 
 class TestEmitAsync:

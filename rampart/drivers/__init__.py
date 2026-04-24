@@ -3,17 +3,22 @@
 
 """Driver implementations.
 
-Re-exports StaticDriver and provides the _coerce_driver helper
-for ergonomic prompt/driver coercion.
+Re-exports StaticDriver, LLMDriver, and provides the _coerce_driver
+helper for ergonomic prompt/driver coercion.
 """
 
 from __future__ import annotations
 
 from rampart.core.prompt_driver import PromptDriver
 from rampart.core.types import Request
+from rampart.drivers.llm import LLMDriver
 from rampart.drivers.static import StaticDriver
 
-__all__ = ["StaticDriver", "_coerce_driver"]
+__all__ = [
+    "LLMDriver",
+    "StaticDriver",
+    "_coerce_driver",
+]
 
 
 def _coerce_driver(

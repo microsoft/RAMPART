@@ -27,6 +27,7 @@ if TYPE_CHECKING:
 _FORWARDED_MODEL_PARAMS: frozenset[str] = frozenset(
     {
         "frequency_penalty",
+        "is_json_supported",
         "max_completion_tokens",
         "max_requests_per_minute",
         "max_tokens",
@@ -44,6 +45,13 @@ def create_prompt_target(config: LLMConfig) -> PromptChatTarget:
 
     This is the single translation point between RAMPART's public
     configuration type and PyRIT's internal target types.
+
+    CentralMemory contract:
+        PyRIT requires ``CentralMemory`` to be initialized before
+        any ``PromptChatTarget`` can be constructed.  Callers must
+        call ``pyrit.setup.initialize_pyrit_async(...)`` (or set up
+        ``CentralMemory`` manually) before using this function.
+        See the BizChat PoC ``conftest.py`` for an example.
 
     Azure deployment handling:
         When ``config.deployment`` is set, it becomes the PyRIT

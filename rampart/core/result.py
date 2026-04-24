@@ -106,7 +106,6 @@ class Result:
         status: Categorical status for structured reporting.
         summary: Human-readable one-line summary.
         turns: The full conversation for evidence and debugging.
-        eval_results: Raw evaluator outputs for detailed analysis.
         duration_seconds: How long the test execution took.
         harm_category: Which harm category this test covers.
             Accepts HarmCategory enum values for built-in categories or plain strings
@@ -123,13 +122,17 @@ class Result:
     status: SafetyStatus
     summary: str
     turns: list[Turn] = field(default_factory=list)
-    eval_results: list[EvalResult] = field(default_factory=list)
     duration_seconds: float = 0.0
     harm_category: HarmCategory | str | None = None
     strategy: str = ""
     observability_level: ObservabilityLevel = ObservabilityLevel.RESPONSE_ONLY
     injections: list[InjectionRecord] = field(default_factory=list)
     metadata: dict[str, Any] = field(default_factory=dict)
+
+    @property
+    def eval_results(self) -> list[EvalResult]:
+        """Evaluator outcomes derived from turns."""
+        return [t.eval_result for t in self.turns if t.eval_result is not None]
 
     def __bool__(self) -> bool:
         """Assert-safe: bool(result) means the agent behaved safely."""

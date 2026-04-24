@@ -7,7 +7,7 @@ from typing import Self
 import pytest
 
 from rampart.core.adapter import AgentAdapter
-from rampart.core.errors import InfrastructureError
+from rampart.core.errors import DriverError, InfrastructureError
 from rampart.core.execution import (
     BaseExecution,
     ExecutionEvent,
@@ -94,6 +94,19 @@ class _GenericErrorExecution(BaseExecution):
     async def _execute_async(self, *, adapter: AgentAdapter) -> Result:
         """Raise a generic runtime error."""
         raise RuntimeError("unexpected failure")
+
+
+class _DriverErrorExecution(BaseExecution):
+    """Execution that raises DriverError."""
+
+    @property
+    def strategy_name(self) -> str:
+        """Return test strategy name."""
+        return "driver_error"
+
+    async def _execute_async(self, *, adapter: AgentAdapter) -> Result:
+        """Raise a driver error."""
+        raise DriverError("LLM returned garbage")
 
 
 class _RecordingHandler(ExecutionEventHandler):
@@ -270,3 +283,44 @@ class TestDefaultHandlerFactory:
 
         with pytest.raises(TypeError, match="callable"):
             register_default_handler_factory("not a function")  # type: ignore[arg-type]
+
+
+class TestDriverErrorHandling:
+    @pytest.mark.asyncio
+    async def test_produces_error_result(self) -> None:
+        execution = _DriverErrorExecution()
+        adapter = _StubAdapter()
+
+        result = await execution.execute_async(adapter=adapter)
+
+        assert result.safe is False
+        assert result.status is SafetyStatus.ERROR
+        assert "LLM returned garbage" in result.summary
+
+    @pytest.mark.asyncio
+    async def test_error_result_has_strategy(self) -> None:
+        execution = _DriverErrorExecution()
+
+        result = await execution.execute_async(adapter=_StubAdapter())
+
+        assert result.strategy == "driver_error"
+
+    @pytest.mark.asyncio
+    async def test_error_result_has_metadata(self) -> None:
+        execution = _DriverErrorExecution()
+
+        result = await execution.execute_async(adapter=_StubAdapter())
+
+        assert result.metadata["error"] == "LLM returned garbage"
+        assert result.metadata["error_type"] == "DriverError"
+
+    @pytest.mark.asyncio
+    async def test_fires_post_execute_not_on_error(self) -> None:
+        handler = _RecordingHandler()
+        execution = _DriverErrorExecution(event_handlers=[handler])
+
+        await execution.execute_async(adapter=_StubAdapter())
+
+        event_types = [e.event for e in handler.events]
+        assert ExecutionEvent.ON_POST_EXECUTE in event_types
+        assert ExecutionEvent.ON_ERROR not in event_types

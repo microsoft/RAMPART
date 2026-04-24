@@ -254,10 +254,10 @@ class TestProbeEndToEnd:
 
 
 class TestProbeMaxTurns:
-    """Max turns produces ERROR status."""
+    """Max turns resolves normally via resolve_as_probe."""
 
     @pytest.mark.asyncio
-    async def test_max_turns_error_async(self) -> None:
+    async def test_max_turns_resolves_normally_async(self) -> None:
         adapter = _adapter(responses=[Response(text="ok")])
 
         result = await Probes.behavior(
@@ -267,5 +267,5 @@ class TestProbeMaxTurns:
         ).execute_async(adapter=adapter)
 
         assert result.safe is False
-        assert result.status == SafetyStatus.ERROR
-        assert "Max turns" in result.summary
+        assert result.status == SafetyStatus.UNSAFE
+        assert len(result.turns) == 2

@@ -146,10 +146,10 @@ class TestXPIAEarlyStop:
 
 
 class TestXPIAMaxTurns:
-    """Max-turns guard prevents unbounded driver loops."""
+    """Max-turns resolves normally via resolve_as_attack."""
 
     @pytest.mark.asyncio
-    async def test_returns_error_when_driver_exceeds_max_turns(self) -> None:
+    async def test_max_turns_resolves_normally(self) -> None:
         result = await Attacks.xpia(
             inject=_mock_handle(),
             trigger=["p1", "p2", "p3"],
@@ -157,8 +157,7 @@ class TestXPIAMaxTurns:
             max_turns=2,
         ).execute_async(adapter=_adapter())
 
-        assert result.status is SafetyStatus.ERROR
-        assert "Max turns" in result.summary
+        assert result.status is SafetyStatus.SAFE
         assert len(result.turns) == 2
 
 

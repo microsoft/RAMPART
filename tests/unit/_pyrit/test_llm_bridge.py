@@ -126,6 +126,7 @@ class TestMetadataForwarding:
             "max_completion_tokens": 1000,
             "max_tokens": 500,
             "max_requests_per_minute": 60,
+            "is_json_supported": False,
         }
         create_prompt_target(
             LLMConfig(
@@ -173,6 +174,20 @@ class TestMetadataForwarding:
             "api_key",
             "underlying_model",
         }
+
+    @patch("rampart._pyrit.llm_bridge.OpenAIChatTarget")
+    def test_is_json_supported_false_forwarded(self, mock_cls):
+        create_prompt_target(
+            LLMConfig(
+                model="gpt-4o",
+                endpoint="https://api.openai.com/v1",
+                api_key="k",
+                metadata={"is_json_supported": False},
+            ),
+        )
+
+        kwargs = mock_cls.call_args.kwargs
+        assert kwargs["is_json_supported"] is False
 
 
 class TestReturnValue:

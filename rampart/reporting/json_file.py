@@ -133,4 +133,10 @@ class JsonFileReportSink:
                 {"kind": se.kind, "details": se.details}
                 for se in turn.response.side_effects
             ]
+        if turn.eval_result is not None:
+            data["eval_outcome"] = turn.eval_result.outcome.value
+            data["eval_confidence"] = turn.eval_result.confidence
+            data["eval_rationale"] = turn.eval_result.rationale
+        if turn.driver_reasoning:
+            data["driver_reasoning"] = turn.driver_reasoning
         return data
