@@ -172,11 +172,6 @@ class LLMDriver:
             )
         else:
             # LLMConfig path: create everything from scratch
-            if self._llm is None:
-                raise DriverError(
-                    "LLMDriver: no LLMConfig or target provided. "
-                    "Use LLMDriver(llm=...) or LLMDriver.from_target(target=...).",
-                )
             self._target = create_prompt_target(self._llm)
             self._normalizer = PromptNormalizer()
             self._target.set_system_prompt(
@@ -244,11 +239,6 @@ class LLMDriver:
         asked to continue a conversation it did not author — either it was
         reused across tests, or resumed from a history it did not replay.
         """
-        if self._target is None:
-            raise DriverError(
-                "LLMDriver: driver not initialized. "
-                "Call next_prompt_async before checking consistency.",
-            )
         memory = CentralMemory.get_memory_instance()
         messages = memory.get_conversation(
             conversation_id=self._conversation_id,
@@ -314,11 +304,6 @@ class LLMDriver:
 
     async def _send_async(self, user_message: str) -> str:
         """Send a user message on the driver-side conversation via PyRIT."""
-        if self._target is None or self._normalizer is None:
-            raise DriverError(
-                "LLMDriver: driver not initialized. "
-                "Call next_prompt_async to initialize before sending.",
-            )
         return await send_user_turn_async(
             normalizer=self._normalizer,
             target=self._target,
