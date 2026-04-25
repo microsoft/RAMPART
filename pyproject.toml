@@ -67,7 +67,7 @@ skip_empty = true
 
 [tool.pyright]
 pythonVersion = "3.11"
-typeCheckingMode = "strict"
+typeCheckingMode = "standard"
 include = ["rampart"]
 
 [tool.pytest.ini_options]

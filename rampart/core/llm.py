@@ -7,7 +7,7 @@ LLMConfig is the team-facing abstraction for specifying which LLM to
 use for adversarial payload generation, multi-turn attack drivers, and
 LLM-backed evaluators.  Teams construct it from environment variables
 or programmatic values; the framework translates it to internal engine
-types behind ``rampart._pyrit`` — no PyRIT type ever surfaces here.
+types behind ``rampart.pyrit_bridge`` — no PyRIT type ever surfaces here.
 """
 
 from __future__ import annotations

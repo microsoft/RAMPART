@@ -36,13 +36,6 @@ _TEST_PERSONA = Persona(
 )
 
 
-def _mock_response(text: str) -> MagicMock:
-    """Build a mock matching PyRIT's Message.get_value() shape."""
-    msg = MagicMock()
-    msg.get_value.return_value = text
-    return msg
-
-
 def _make_turn(
     *,
     prompt: str = "p",
@@ -62,205 +55,214 @@ def _make_turn(
 
 class TestLLMDriverProtocolCompliance:
     def test_satisfies_prompt_driver(self) -> None:
+        driver = LLMDriver(llm=_TEST_LLM, persona=_TEST_PERSONA)
+        assert isinstance(driver, PromptDriver)
+
+
+class TestLLMDriverLazyInit:
+    def test_construction_does_not_call_create_prompt_target(self) -> None:
+        """LLMDriver can be constructed before initialize_pyrit_async."""
         with patch(
             "rampart.drivers.llm.create_prompt_target",
-            return_value=MagicMock(),
+        ) as mock_create:
+            LLMDriver(llm=_TEST_LLM, persona=_TEST_PERSONA)
+            mock_create.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_first_call_initializes_target(self) -> None:
+        mock_target = MagicMock()
+        mock_memory = MagicMock()
+        mock_memory.get_conversation.return_value = []
+
+        with (
+            patch(
+                "rampart.drivers.llm.create_prompt_target",
+                return_value=mock_target,
+            ) as mock_create,
+            patch(
+                "rampart.drivers.llm.PromptNormalizer",
+            ),
+            patch(
+                "rampart.drivers.llm.CentralMemory.get_memory_instance",
+                return_value=mock_memory,
+            ),
+            patch(
+                "rampart.drivers.llm.send_user_turn_async",
+                new_callable=AsyncMock,
+                return_value="hello",
+            ),
         ):
             driver = LLMDriver(llm=_TEST_LLM, persona=_TEST_PERSONA)
-            assert isinstance(driver, PromptDriver)
+            mock_create.assert_not_called()
+
+            await driver.next_prompt_async(history=[])
+            mock_create.assert_called_once_with(_TEST_LLM)
+            mock_target.set_system_prompt.assert_called_once()
 
 
 class TestLLMDriverConstruction:
-    def test_calls_create_prompt_target_once(self) -> None:
+    @pytest.mark.asyncio
+    async def test_system_prompt_includes_persona(self) -> None:
         mock_target = MagicMock()
-        with patch(
-            "rampart.drivers.llm.create_prompt_target",
-            return_value=mock_target,
-        ) as mock_create:
-            LLMDriver(llm=_TEST_LLM, persona=_TEST_PERSONA)
-            mock_create.assert_called_once_with(_TEST_LLM)
+        mock_memory = MagicMock()
+        mock_memory.get_conversation.return_value = []
 
-    def test_calls_set_system_prompt_once(self) -> None:
-        mock_target = MagicMock()
-        with patch(
-            "rampart.drivers.llm.create_prompt_target",
-            return_value=mock_target,
+        with (
+            patch("rampart.drivers.llm.create_prompt_target", return_value=mock_target),
+            patch("rampart.drivers.llm.PromptNormalizer"),
+            patch("rampart.drivers.llm.CentralMemory.get_memory_instance", return_value=mock_memory),
+            patch("rampart.drivers.llm.send_user_turn_async", new_callable=AsyncMock, return_value="hi"),
         ):
-            LLMDriver(llm=_TEST_LLM, persona=_TEST_PERSONA)
-            mock_target.set_system_prompt.assert_called_once()
+            driver = LLMDriver(llm=_TEST_LLM, persona=_TEST_PERSONA)
+            await driver.next_prompt_async(history=[])
+            sp = mock_target.set_system_prompt.call_args.kwargs["system_prompt"]
+            assert "You are a test persona." in sp
 
-    def test_system_prompt_includes_persona(self) -> None:
+    @pytest.mark.asyncio
+    async def test_system_prompt_includes_objective_when_provided(self) -> None:
         mock_target = MagicMock()
-        with patch(
-            "rampart.drivers.llm.create_prompt_target",
-            return_value=mock_target,
-        ):
-            LLMDriver(llm=_TEST_LLM, persona=_TEST_PERSONA)
-            args = mock_target.set_system_prompt.call_args
-            assert "You are a test persona." in args.kwargs["system_prompt"]
+        mock_memory = MagicMock()
+        mock_memory.get_conversation.return_value = []
 
-    def test_system_prompt_includes_objective_when_provided(self) -> None:
-        mock_target = MagicMock()
-        with patch(
-            "rampart.drivers.llm.create_prompt_target",
-            return_value=mock_target,
+        with (
+            patch("rampart.drivers.llm.create_prompt_target", return_value=mock_target),
+            patch("rampart.drivers.llm.PromptNormalizer"),
+            patch("rampart.drivers.llm.CentralMemory.get_memory_instance", return_value=mock_memory),
+            patch("rampart.drivers.llm.send_user_turn_async", new_callable=AsyncMock, return_value="hi"),
         ):
-            LLMDriver(
+            driver = LLMDriver(
                 llm=_TEST_LLM,
                 persona=_TEST_PERSONA,
                 objective="Extract secret data",
             )
+            await driver.next_prompt_async(history=[])
             sp = mock_target.set_system_prompt.call_args.kwargs["system_prompt"]
             assert "Objective" in sp
             assert "Extract secret data" in sp
 
-    def test_system_prompt_omits_objective_when_none(self) -> None:
+    @pytest.mark.asyncio
+    async def test_system_prompt_omits_objective_when_none(self) -> None:
         mock_target = MagicMock()
-        with patch(
-            "rampart.drivers.llm.create_prompt_target",
-            return_value=mock_target,
+        mock_memory = MagicMock()
+        mock_memory.get_conversation.return_value = []
+
+        with (
+            patch("rampart.drivers.llm.create_prompt_target", return_value=mock_target),
+            patch("rampart.drivers.llm.PromptNormalizer"),
+            patch("rampart.drivers.llm.CentralMemory.get_memory_instance", return_value=mock_memory),
+            patch("rampart.drivers.llm.send_user_turn_async", new_callable=AsyncMock, return_value="hi"),
         ):
-            LLMDriver(llm=_TEST_LLM, persona=_TEST_PERSONA)
+            driver = LLMDriver(llm=_TEST_LLM, persona=_TEST_PERSONA)
+            await driver.next_prompt_async(history=[])
             sp = mock_target.set_system_prompt.call_args.kwargs["system_prompt"]
             assert "Objective" not in sp
 
-    def test_system_prompt_includes_injections(self) -> None:
+    @pytest.mark.asyncio
+    async def test_system_prompt_includes_injection_metadata_not_content(self) -> None:
         mock_target = MagicMock()
-        with patch(
-            "rampart.drivers.llm.create_prompt_target",
-            return_value=mock_target,
+        mock_memory = MagicMock()
+        mock_memory.get_conversation.return_value = []
+
+        with (
+            patch("rampart.drivers.llm.create_prompt_target", return_value=mock_target),
+            patch("rampart.drivers.llm.PromptNormalizer"),
+            patch("rampart.drivers.llm.CentralMemory.get_memory_instance", return_value=mock_memory),
+            patch("rampart.drivers.llm.send_user_turn_async", new_callable=AsyncMock, return_value="hi"),
         ):
             payload = Payload(
                 content="secret doc content",
                 id="pay-1",
                 metadata={"description": "Q3 financial report"},
             )
-            LLMDriver(
+            driver = LLMDriver(
                 llm=_TEST_LLM,
                 persona=_TEST_PERSONA,
                 injections=[payload],
             )
+            await driver.next_prompt_async(history=[])
             sp = mock_target.set_system_prompt.call_args.kwargs["system_prompt"]
             assert "Injected Context" in sp
             assert "pay-1" in sp
             assert "Q3 financial report" in sp
-            # Raw payload content must NOT appear in the system prompt
             assert "secret doc content" not in sp
 
-    def test_system_prompt_omits_injections_when_empty(self) -> None:
-        mock_target = MagicMock()
-        with patch(
-            "rampart.drivers.llm.create_prompt_target",
-            return_value=mock_target,
-        ):
-            LLMDriver(llm=_TEST_LLM, persona=_TEST_PERSONA)
-            sp = mock_target.set_system_prompt.call_args.kwargs["system_prompt"]
-            assert "Injected Context" not in sp
-
-    def test_different_personas_produce_different_system_prompts(self) -> None:
-        prompts = []
-        for name in ("persona_a", "persona_b"):
-            mock_target = MagicMock()
-            with patch(
-                "rampart.drivers.llm.create_prompt_target",
-                return_value=mock_target,
-            ):
-                LLMDriver(
-                    llm=_TEST_LLM,
-                    persona=Persona(name=name, system_prompt=f"I am {name}"),
-                )
-                prompts.append(
-                    mock_target.set_system_prompt.call_args.kwargs["system_prompt"]
-                )
-        assert prompts[0] != prompts[1]
-
-    def test_same_persona_different_objectives_produce_different_prompts(self) -> None:
-        prompts = []
-        for obj in ("objective_a", "objective_b"):
-            mock_target = MagicMock()
-            with patch(
-                "rampart.drivers.llm.create_prompt_target",
-                return_value=mock_target,
-            ):
-                LLMDriver(llm=_TEST_LLM, persona=_TEST_PERSONA, objective=obj)
-                prompts.append(
-                    mock_target.set_system_prompt.call_args.kwargs["system_prompt"]
-                )
-        assert prompts[0] != prompts[1]
-
     def test_two_drivers_have_distinct_conversation_ids(self) -> None:
-        drivers = []
-        for _ in range(2):
-            mock_target = MagicMock()
-            with patch(
-                "rampart.drivers.llm.create_prompt_target",
-                return_value=mock_target,
-            ):
-                drivers.append(LLMDriver(llm=_TEST_LLM, persona=_TEST_PERSONA))
-        assert drivers[0]._conversation_id != drivers[1]._conversation_id
+        d1 = LLMDriver(llm=_TEST_LLM, persona=_TEST_PERSONA)
+        d2 = LLMDriver(llm=_TEST_LLM, persona=_TEST_PERSONA)
+        assert d1._conversation_id != d2._conversation_id
 
 
 class TestLLMDriverSendFlow:
     @pytest.mark.asyncio
     async def test_returns_plain_text_as_prompt(self) -> None:
         mock_target = MagicMock()
-        mock_target.send_prompt_async = AsyncMock(
-            return_value=[_mock_response("Tell me about Q3 earnings")],
-        )
-        with patch(
-            "rampart.drivers.llm.create_prompt_target",
-            return_value=mock_target,
+        mock_memory = MagicMock()
+        mock_memory.get_conversation.return_value = []
+
+        with (
+            patch("rampart.drivers.llm.create_prompt_target", return_value=mock_target),
+            patch("rampart.drivers.llm.PromptNormalizer"),
+            patch("rampart.drivers.llm.CentralMemory.get_memory_instance", return_value=mock_memory),
+            patch(
+                "rampart.drivers.llm.send_user_turn_async",
+                new_callable=AsyncMock,
+                return_value="Tell me about Q3 earnings",
+            ),
         ):
             driver = LLMDriver(llm=_TEST_LLM, persona=_TEST_PERSONA)
             decision = await driver.next_prompt_async(history=[])
-
-            mock_target.send_prompt_async.assert_awaited_once()
             assert decision is not None
             assert decision.request.prompt == "Tell me about Q3 earnings"
 
     @pytest.mark.asyncio
-    async def test_conversation_id_on_sent_message(self) -> None:
+    async def test_send_uses_normalizer_helper(self) -> None:
         mock_target = MagicMock()
-        mock_target.send_prompt_async = AsyncMock(
-            return_value=[_mock_response("hi")],
-        )
-        with patch(
-            "rampart.drivers.llm.create_prompt_target",
-            return_value=mock_target,
+        mock_memory = MagicMock()
+        mock_memory.get_conversation.return_value = []
+
+        with (
+            patch("rampart.drivers.llm.create_prompt_target", return_value=mock_target),
+            patch("rampart.drivers.llm.PromptNormalizer"),
+            patch("rampart.drivers.llm.CentralMemory.get_memory_instance", return_value=mock_memory),
+            patch(
+                "rampart.drivers.llm.send_user_turn_async",
+                new_callable=AsyncMock,
+                return_value="hi",
+            ) as mock_send,
         ):
             driver = LLMDriver(llm=_TEST_LLM, persona=_TEST_PERSONA)
             await driver.next_prompt_async(history=[])
 
-            sent_message = mock_target.send_prompt_async.call_args.kwargs["message"]
-            piece = sent_message.message_pieces[0]
-            assert piece.conversation_id == driver._conversation_id
-
-    @pytest.mark.asyncio
-    async def test_empty_history_sends_seed_message(self) -> None:
-        mock_target = MagicMock()
-        mock_target.send_prompt_async = AsyncMock(
-            return_value=[_mock_response("hello")],
-        )
-        with patch(
-            "rampart.drivers.llm.create_prompt_target",
-            return_value=mock_target,
-        ):
-            driver = LLMDriver(llm=_TEST_LLM, persona=_TEST_PERSONA)
-            await driver.next_prompt_async(history=[])
-
-            sent_message = mock_target.send_prompt_async.call_args.kwargs["message"]
-            user_text = sent_message.message_pieces[0].original_value
-            assert "Begin" in user_text
+            mock_send.assert_awaited_once()
+            call_kwargs = mock_send.call_args.kwargs
+            assert call_kwargs["conversation_id"] == driver._conversation_id
+            assert call_kwargs["user_message"] == "Begin. Send the first user prompt."
+            assert "rampart.component" in call_kwargs["labels"]
 
     @pytest.mark.asyncio
     async def test_non_empty_history_sends_agent_response(self) -> None:
         mock_target = MagicMock()
-        mock_target.send_prompt_async = AsyncMock(
-            return_value=[_mock_response("next question")],
-        )
-        with patch(
-            "rampart.drivers.llm.create_prompt_target",
-            return_value=mock_target,
+        mock_memory = MagicMock()
+        # System prompt message + 1 user + 1 assistant = history matches 1 turn
+        mock_piece = MagicMock()
+        mock_piece.api_role = "user"
+        mock_msg = MagicMock()
+        mock_msg.get_piece.return_value = mock_piece
+        mock_memory.get_conversation.return_value = [
+            MagicMock(get_piece=MagicMock(return_value=MagicMock(api_role="system"))),
+            mock_msg,
+            MagicMock(get_piece=MagicMock(return_value=MagicMock(api_role="assistant"))),
+        ]
+
+        with (
+            patch("rampart.drivers.llm.create_prompt_target", return_value=mock_target),
+            patch("rampart.drivers.llm.PromptNormalizer"),
+            patch("rampart.drivers.llm.CentralMemory.get_memory_instance", return_value=mock_memory),
+            patch(
+                "rampart.drivers.llm.send_user_turn_async",
+                new_callable=AsyncMock,
+                return_value="next question",
+            ) as mock_send,
         ):
             driver = LLMDriver(llm=_TEST_LLM, persona=_TEST_PERSONA)
             turn0 = _make_turn(
@@ -272,69 +274,25 @@ class TestLLMDriverSendFlow:
             )
             await driver.next_prompt_async(history=[turn0])
 
-            sent_message = mock_target.send_prompt_async.call_args.kwargs["message"]
-            user_text = sent_message.message_pieces[0].original_value
-            assert "agent said this" in user_text
-            assert "not_detected" in user_text
-            assert "not found" in user_text
-
-    @pytest.mark.asyncio
-    async def test_only_latest_turn_sent(self) -> None:
-        mock_target = MagicMock()
-        mock_target.send_prompt_async = AsyncMock(
-            return_value=[_mock_response("next")],
-        )
-        with patch(
-            "rampart.drivers.llm.create_prompt_target",
-            return_value=mock_target,
-        ):
-            driver = LLMDriver(llm=_TEST_LLM, persona=_TEST_PERSONA)
-            turn0 = _make_turn(response_text="resp0", turn_number=0)
-            turn1 = _make_turn(response_text="resp1", turn_number=1)
-            await driver.next_prompt_async(history=[turn0, turn1])
-
-            sent_message = mock_target.send_prompt_async.call_args.kwargs["message"]
-            user_text = sent_message.message_pieces[0].original_value
-            assert "resp1" in user_text
-            assert "resp0" not in user_text
-
-    @pytest.mark.asyncio
-    async def test_empty_response_returns_none(self) -> None:
-        mock_target = MagicMock()
-        mock_target.send_prompt_async = AsyncMock(
-            return_value=[_mock_response("")],
-        )
-        with patch(
-            "rampart.drivers.llm.create_prompt_target",
-            return_value=mock_target,
-        ):
-            driver = LLMDriver(llm=_TEST_LLM, persona=_TEST_PERSONA)
-            decision = await driver.next_prompt_async(history=[])
-            assert decision is None
-
-    @pytest.mark.asyncio
-    async def test_whitespace_only_response_returns_none(self) -> None:
-        mock_target = MagicMock()
-        mock_target.send_prompt_async = AsyncMock(
-            return_value=[_mock_response("   \n  ")],
-        )
-        with patch(
-            "rampart.drivers.llm.create_prompt_target",
-            return_value=mock_target,
-        ):
-            driver = LLMDriver(llm=_TEST_LLM, persona=_TEST_PERSONA)
-            decision = await driver.next_prompt_async(history=[])
-            assert decision is None
+            user_msg = mock_send.call_args.kwargs["user_message"]
+            assert "agent said this" in user_msg
+            assert "not_detected" in user_msg
+            assert "not found" in user_msg
 
     @pytest.mark.asyncio
     async def test_strips_whitespace_from_response(self) -> None:
-        mock_target = MagicMock()
-        mock_target.send_prompt_async = AsyncMock(
-            return_value=[_mock_response("  Tell me about Q3  \n")],
-        )
-        with patch(
-            "rampart.drivers.llm.create_prompt_target",
-            return_value=mock_target,
+        mock_memory = MagicMock()
+        mock_memory.get_conversation.return_value = []
+
+        with (
+            patch("rampart.drivers.llm.create_prompt_target", return_value=MagicMock()),
+            patch("rampart.drivers.llm.PromptNormalizer"),
+            patch("rampart.drivers.llm.CentralMemory.get_memory_instance", return_value=mock_memory),
+            patch(
+                "rampart.drivers.llm.send_user_turn_async",
+                new_callable=AsyncMock,
+                return_value="  Tell me about Q3  \n",
+            ),
         ):
             driver = LLMDriver(llm=_TEST_LLM, persona=_TEST_PERSONA)
             decision = await driver.next_prompt_async(history=[])
@@ -344,29 +302,137 @@ class TestLLMDriverSendFlow:
 
 class TestLLMDriverErrorHandling:
     @pytest.mark.asyncio
-    async def test_send_exception_wrapped_in_driver_error(self) -> None:
-        mock_target = MagicMock()
-        mock_target.send_prompt_async = AsyncMock(
-            side_effect=RuntimeError("connection refused"),
-        )
-        with patch(
-            "rampart.drivers.llm.create_prompt_target",
-            return_value=mock_target,
+    async def test_empty_response_raises_driver_error(self) -> None:
+        mock_memory = MagicMock()
+        mock_memory.get_conversation.return_value = []
+
+        with (
+            patch("rampart.drivers.llm.create_prompt_target", return_value=MagicMock()),
+            patch("rampart.drivers.llm.PromptNormalizer"),
+            patch("rampart.drivers.llm.CentralMemory.get_memory_instance", return_value=mock_memory),
+            patch(
+                "rampart.drivers.llm.send_user_turn_async",
+                new_callable=AsyncMock,
+                return_value="",
+            ),
         ):
             driver = LLMDriver(llm=_TEST_LLM, persona=_TEST_PERSONA)
-            with pytest.raises(DriverError, match="send_prompt_async failed"):
+            with pytest.raises(DriverError, match="empty response"):
+                await driver.next_prompt_async(history=[])
+
+    @pytest.mark.asyncio
+    async def test_whitespace_only_response_raises_driver_error(self) -> None:
+        mock_memory = MagicMock()
+        mock_memory.get_conversation.return_value = []
+
+        with (
+            patch("rampart.drivers.llm.create_prompt_target", return_value=MagicMock()),
+            patch("rampart.drivers.llm.PromptNormalizer"),
+            patch("rampart.drivers.llm.CentralMemory.get_memory_instance", return_value=mock_memory),
+            patch(
+                "rampart.drivers.llm.send_user_turn_async",
+                new_callable=AsyncMock,
+                return_value="   \n  ",
+            ),
+        ):
+            driver = LLMDriver(llm=_TEST_LLM, persona=_TEST_PERSONA)
+            with pytest.raises(DriverError, match="empty response"):
+                await driver.next_prompt_async(history=[])
+
+    @pytest.mark.asyncio
+    async def test_send_exception_wrapped_in_driver_error(self) -> None:
+        mock_memory = MagicMock()
+        mock_memory.get_conversation.return_value = []
+
+        with (
+            patch("rampart.drivers.llm.create_prompt_target", return_value=MagicMock()),
+            patch("rampart.drivers.llm.PromptNormalizer"),
+            patch("rampart.drivers.llm.CentralMemory.get_memory_instance", return_value=mock_memory),
+            patch(
+                "rampart.drivers.llm.send_user_turn_async",
+                new_callable=AsyncMock,
+                side_effect=RuntimeError("connection refused"),
+            ),
+        ):
+            driver = LLMDriver(llm=_TEST_LLM, persona=_TEST_PERSONA)
+            with pytest.raises(DriverError, match="send_user_turn_async failed"):
                 await driver.next_prompt_async(history=[])
 
     @pytest.mark.asyncio
     async def test_driver_error_preserves_cause(self) -> None:
         original = RuntimeError("timeout")
-        mock_target = MagicMock()
-        mock_target.send_prompt_async = AsyncMock(side_effect=original)
-        with patch(
-            "rampart.drivers.llm.create_prompt_target",
-            return_value=mock_target,
+        mock_memory = MagicMock()
+        mock_memory.get_conversation.return_value = []
+
+        with (
+            patch("rampart.drivers.llm.create_prompt_target", return_value=MagicMock()),
+            patch("rampart.drivers.llm.PromptNormalizer"),
+            patch("rampart.drivers.llm.CentralMemory.get_memory_instance", return_value=mock_memory),
+            patch(
+                "rampart.drivers.llm.send_user_turn_async",
+                new_callable=AsyncMock,
+                side_effect=original,
+            ),
         ):
             driver = LLMDriver(llm=_TEST_LLM, persona=_TEST_PERSONA)
             with pytest.raises(DriverError) as exc_info:
                 await driver.next_prompt_async(history=[])
             assert exc_info.value.__cause__ is original
+
+
+class TestLLMDriverDesyncDetection:
+    @pytest.mark.asyncio
+    async def test_desync_raises_driver_error(self) -> None:
+        """Passing history that doesn't match driver-side memory raises."""
+        mock_memory = MagicMock()
+        # Driver-side has 0 user turns but we pass 1 agent-side turn
+        mock_memory.get_conversation.return_value = []
+
+        with (
+            patch("rampart.drivers.llm.create_prompt_target", return_value=MagicMock()),
+            patch("rampart.drivers.llm.PromptNormalizer"),
+            patch("rampart.drivers.llm.CentralMemory.get_memory_instance", return_value=mock_memory),
+        ):
+            driver = LLMDriver(llm=_TEST_LLM, persona=_TEST_PERSONA)
+            turn = _make_turn(turn_number=0)
+            with pytest.raises(DriverError, match="desync"):
+                await driver.next_prompt_async(history=[turn])
+
+
+class TestLLMDriverFromTarget:
+    def test_from_target_does_not_require_llm_config(self) -> None:
+        mock_target = MagicMock()
+        driver = LLMDriver.from_target(
+            target=mock_target,
+            persona=_TEST_PERSONA,
+        )
+        assert driver._llm is None
+        assert driver._target is mock_target
+
+    @pytest.mark.asyncio
+    async def test_from_target_sets_system_prompt_on_first_use(self) -> None:
+        mock_target = MagicMock()
+        mock_memory = MagicMock()
+        mock_memory.get_conversation.return_value = []
+
+        with (
+            patch("rampart.drivers.llm.PromptNormalizer"),
+            patch("rampart.drivers.llm.CentralMemory.get_memory_instance", return_value=mock_memory),
+            patch(
+                "rampart.drivers.llm.send_user_turn_async",
+                new_callable=AsyncMock,
+                return_value="hello",
+            ),
+        ):
+            driver = LLMDriver.from_target(
+                target=mock_target,
+                persona=_TEST_PERSONA,
+                objective="test objective",
+            )
+            mock_target.set_system_prompt.assert_not_called()
+
+            await driver.next_prompt_async(history=[])
+            mock_target.set_system_prompt.assert_called_once()
+            sp = mock_target.set_system_prompt.call_args.kwargs["system_prompt"]
+            assert "You are a test persona." in sp
+            assert "test objective" in sp

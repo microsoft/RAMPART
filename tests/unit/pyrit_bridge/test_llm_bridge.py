@@ -15,7 +15,7 @@ from unittest.mock import patch
 
 import pytest
 
-from rampart._pyrit.llm_bridge import create_prompt_target
+from rampart.pyrit_bridge.llm_bridge import create_prompt_target
 from rampart.core.llm import LLMConfig
 
 # ---------------------------------------------------------------------------
@@ -26,7 +26,7 @@ from rampart.core.llm import LLMConfig
 class TestModelNameResolution:
     """LLMConfig.model and .deployment map to PyRIT's model_name / underlying_model."""
 
-    @patch("rampart._pyrit.llm_bridge.OpenAIChatTarget")
+    @patch("rampart.pyrit_bridge.llm_bridge.OpenAIChatTarget")
     def test_model_becomes_model_name_without_deployment(self, mock_cls):
         create_prompt_target(
             LLMConfig(
@@ -40,7 +40,7 @@ class TestModelNameResolution:
         assert kwargs["model_name"] == "gpt-4o"
         assert kwargs["underlying_model"] is None
 
-    @patch("rampart._pyrit.llm_bridge.OpenAIChatTarget")
+    @patch("rampart.pyrit_bridge.llm_bridge.OpenAIChatTarget")
     def test_deployment_becomes_model_name_with_model_as_underlying(self, mock_cls):
         create_prompt_target(
             LLMConfig(
@@ -59,7 +59,7 @@ class TestModelNameResolution:
 class TestEndpointAndAuth:
     """Endpoint and api_key are forwarded directly to PyRIT."""
 
-    @patch("rampart._pyrit.llm_bridge.OpenAIChatTarget")
+    @patch("rampart.pyrit_bridge.llm_bridge.OpenAIChatTarget")
     def test_endpoint_forwarded(self, mock_cls):
         create_prompt_target(
             LLMConfig(
@@ -71,7 +71,7 @@ class TestEndpointAndAuth:
 
         assert mock_cls.call_args.kwargs["endpoint"] == "https://custom.endpoint.com/v1"
 
-    @patch("rampart._pyrit.llm_bridge.OpenAIChatTarget")
+    @patch("rampart.pyrit_bridge.llm_bridge.OpenAIChatTarget")
     def test_api_key_forwarded(self, mock_cls):
         create_prompt_target(
             LLMConfig(
@@ -83,7 +83,7 @@ class TestEndpointAndAuth:
 
         assert mock_cls.call_args.kwargs["api_key"] == "sk-secret"
 
-    @patch("rampart._pyrit.llm_bridge.OpenAIChatTarget")
+    @patch("rampart.pyrit_bridge.llm_bridge.OpenAIChatTarget")
     def test_none_api_key_forwarded_for_entra_auth(self, mock_cls):
         """None api_key lets PyRIT use Entra ID auth for Azure endpoints."""
         create_prompt_target(
@@ -99,7 +99,7 @@ class TestEndpointAndAuth:
 class TestMetadataForwarding:
     """Recognised model parameters in metadata are forwarded; unknown keys are not."""
 
-    @patch("rampart._pyrit.llm_bridge.OpenAIChatTarget")
+    @patch("rampart.pyrit_bridge.llm_bridge.OpenAIChatTarget")
     def test_temperature_and_top_p_forwarded(self, mock_cls):
         create_prompt_target(
             LLMConfig(
@@ -114,7 +114,7 @@ class TestMetadataForwarding:
         assert kwargs["temperature"] == 0.7
         assert kwargs["top_p"] == 0.9
 
-    @patch("rampart._pyrit.llm_bridge.OpenAIChatTarget")
+    @patch("rampart.pyrit_bridge.llm_bridge.OpenAIChatTarget")
     def test_all_recognised_params_forwarded(self, mock_cls):
         meta = {
             "temperature": 0.5,
@@ -141,7 +141,7 @@ class TestMetadataForwarding:
         for key, value in meta.items():
             assert kwargs[key] == value, f"metadata[{key!r}] not forwarded"
 
-    @patch("rampart._pyrit.llm_bridge.OpenAIChatTarget")
+    @patch("rampart.pyrit_bridge.llm_bridge.OpenAIChatTarget")
     def test_unknown_metadata_keys_not_forwarded(self, mock_cls):
         create_prompt_target(
             LLMConfig(
@@ -156,7 +156,7 @@ class TestMetadataForwarding:
         assert "custom_key" not in kwargs
         assert kwargs["temperature"] == 0.5
 
-    @patch("rampart._pyrit.llm_bridge.OpenAIChatTarget")
+    @patch("rampart.pyrit_bridge.llm_bridge.OpenAIChatTarget")
     def test_empty_metadata_adds_no_extra_kwargs(self, mock_cls):
         create_prompt_target(
             LLMConfig(
@@ -175,7 +175,7 @@ class TestMetadataForwarding:
             "underlying_model",
         }
 
-    @patch("rampart._pyrit.llm_bridge.OpenAIChatTarget")
+    @patch("rampart.pyrit_bridge.llm_bridge.OpenAIChatTarget")
     def test_is_json_supported_false_forwarded(self, mock_cls):
         create_prompt_target(
             LLMConfig(
@@ -193,7 +193,7 @@ class TestMetadataForwarding:
 class TestReturnValue:
     """create_prompt_target returns the constructed target."""
 
-    @patch("rampart._pyrit.llm_bridge.OpenAIChatTarget")
+    @patch("rampart.pyrit_bridge.llm_bridge.OpenAIChatTarget")
     def test_returns_constructed_target(self, mock_cls):
         result = create_prompt_target(
             LLMConfig(

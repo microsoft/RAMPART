@@ -15,7 +15,7 @@ Used in two contexts:
 - **Pre-injection**: applied directly in test code before
   passing a payload to a surface.
 
-The PyRIT bridge in ``_pyrit/converter_bridge.py`` will adapt
+The PyRIT bridge in ``pyrit_bridge/converter_bridge.py`` will adapt
 ``PromptConverter`` to this protocol. Teams can also implement
 custom converters directly.
 """

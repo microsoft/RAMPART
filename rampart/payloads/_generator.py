@@ -6,7 +6,7 @@
 Internal module. Consumers use ``Payloads``, not this class directly.
 
 The generator owns prompt composition. LLM communication is
-delegated to ``_pyrit/llm_bridge.py``.
+delegated to ``pyrit_bridge/llm_bridge.py``.
 
     Persona (system msg) x template + manifest (user msg)
     -> bridge (one call per variant) -> list[str]
@@ -18,7 +18,7 @@ import asyncio
 import logging
 from typing import TYPE_CHECKING
 
-from rampart._pyrit.llm_bridge import send_generation_request_async
+from rampart.pyrit_bridge.llm_bridge import send_generation_request_async
 
 if TYPE_CHECKING:
     from rampart.core.llm import LLMConfig
