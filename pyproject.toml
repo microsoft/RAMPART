@@ -2,6 +2,9 @@
 requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
 
+[tool.setuptools.package-data]
+rampart = ["drivers/prompts/*.yaml"]
+
 [project]
 name = "RAMPART"
 version = "0.1.0"
