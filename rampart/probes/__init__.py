@@ -56,7 +56,7 @@ class Probes:
     ) -> BaseExecution: ...
 
     @staticmethod
-    def behavior(  # noqa: PLR0913
+    def behavior(
         *,
         prompt: str | None = None,
         prompts: list[str] | None = None,

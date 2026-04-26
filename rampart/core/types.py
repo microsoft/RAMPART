@@ -232,13 +232,18 @@ class Request:
             )
 
 
-@dataclass(kw_only=True)
+@dataclass(frozen=True, kw_only=True)
 class Turn:
     """One prompt-response exchange.
+
+    Turn is immutable. The execution loop constructs a provisional Turn
+    (without eval_result) for the evaluator call, then produces the
+    final Turn via dataclasses.replace before appending to history.
 
     Args:
         request: What was sent to the agent.
         response: What the agent returned.
+        eval_result: Evaluator outcome for this turn.
         turn_number: Position in the conversation (0-indexed).
         timestamp: When this exchange occurred.
         driver_reasoning: Why the driver chose this request.
@@ -246,6 +251,7 @@ class Turn:
 
     request: Request
     response: Response
+    eval_result: EvalResult | None = None
     turn_number: int = 0
     timestamp: datetime | None = None
     driver_reasoning: str = ""
@@ -296,8 +302,14 @@ class EvalContext:
     Holds the full conversation as a flat list of turns. Provides
     convenience properties for common access patterns.
 
+    The last turn in ``turns`` is the one currently being evaluated.
+    Its ``eval_result`` may be ``None`` during evaluation — the
+    execution loop attaches the result via ``dataclasses.replace``
+    after the evaluator returns.
+
     Args:
         turns: All turns in the interaction, in chronological order.
+            Includes the turn being evaluated as the last element.
         manifest: The agent's declared capabilities, if available.
         metadata: Additional context from the test setup.
     """

@@ -16,7 +16,14 @@ from rampart.core.result import (
     resolve_as_attack,
     resolve_as_probe,
 )
-from rampart.core.types import EvalOutcome, EvalResult, ObservabilityLevel
+from rampart.core.types import (
+    EvalOutcome,
+    EvalResult,
+    ObservabilityLevel,
+    Request,
+    Response,
+    Turn,
+)
 
 
 def _er(outcome: EvalOutcome) -> EvalResult:
@@ -126,6 +133,58 @@ class TestResult:
             harm_category="custom_product_risk",
         )
         assert r.harm_category == "custom_product_risk"
+
+
+class TestResultEvalResultsProperty:
+    """eval_results is a property derived from turns."""
+
+    def test_empty_turns_gives_empty_eval_results(self) -> None:
+        r = Result(safe=True, status=SafetyStatus.SAFE, summary="ok")
+        assert r.eval_results == []
+
+    def test_turns_with_eval_results_returned_in_order(self) -> None:
+        er1 = _er(EvalOutcome.NOT_DETECTED)
+        er2 = _er(EvalOutcome.DETECTED)
+        turns = [
+            Turn(
+                request=Request(prompt="p1"),
+                response=Response(text="r1"),
+                eval_result=er1,
+            ),
+            Turn(
+                request=Request(prompt="p2"),
+                response=Response(text="r2"),
+                eval_result=er2,
+            ),
+        ]
+        r = Result(
+            safe=False,
+            status=SafetyStatus.UNSAFE,
+            summary="bad",
+            turns=turns,
+        )
+        assert r.eval_results == [er1, er2]
+
+    def test_turns_without_eval_result_filtered(self) -> None:
+        er = _er(EvalOutcome.DETECTED)
+        turns = [
+            Turn(
+                request=Request(prompt="p1"),
+                response=Response(text="r1"),
+            ),
+            Turn(
+                request=Request(prompt="p2"),
+                response=Response(text="r2"),
+                eval_result=er,
+            ),
+        ]
+        r = Result(
+            safe=False,
+            status=SafetyStatus.UNSAFE,
+            summary="bad",
+            turns=turns,
+        )
+        assert r.eval_results == [er]
 
 
 class TestResolveAsAttack:

@@ -1,13 +1,12 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT license.
 
-"""PyRIT LLM bridge — translates LLMConfig to PyRIT prompt targets.
+"""PyRIT integration bridge.
 
-This is the ONLY module that instantiates PyRIT prompt target types.
-All other RAMPART code works with LLMConfig exclusively.  This isolation
-means PyRIT version upgrades only require changes to this file.
-
-Internal module — never imported by consumer code.
+Centralizes ergonomic translation from RAMPART's public LLMConfig
+into fully-configured PyRIT prompt targets, and provides helpers
+for RAMPART components that integrate with PyRIT (drivers,
+payload generators).
 """
 
 from __future__ import annotations
@@ -15,7 +14,9 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 from uuid import uuid4
 
+from pyrit.identifiers import ComponentIdentifier
 from pyrit.models import MessagePiece
+from pyrit.prompt_normalizer import PromptNormalizer
 from pyrit.prompt_target import OpenAIChatTarget, PromptChatTarget
 
 if TYPE_CHECKING:
@@ -27,6 +28,7 @@ if TYPE_CHECKING:
 _FORWARDED_MODEL_PARAMS: frozenset[str] = frozenset(
     {
         "frequency_penalty",
+        "is_json_supported",
         "max_completion_tokens",
         "max_requests_per_minute",
         "max_tokens",
@@ -42,8 +44,15 @@ _FORWARDED_MODEL_PARAMS: frozenset[str] = frozenset(
 def create_prompt_target(config: LLMConfig) -> PromptChatTarget:
     """Translate a RAMPART LLMConfig into a PyRIT PromptChatTarget.
 
-    This is the single translation point between RAMPART's public
-    configuration type and PyRIT's internal target types.
+    Ergonomic helper for the common case: OpenAI-compatible endpoints
+    configured via LLMConfig. For custom targets, construct them
+    directly and pass to ``LLMDriver.from_target``.
+
+    CentralMemory contract:
+        PyRIT requires ``CentralMemory`` to be initialized before
+        any ``PromptChatTarget`` can be constructed. Callers must
+        call ``pyrit.setup.initialize_pyrit_async(...)`` (or set up
+        ``CentralMemory`` manually) before calling this function.
 
     Azure deployment handling:
         When ``config.deployment`` is set, it becomes the PyRIT
@@ -105,6 +114,50 @@ def _extract_model_params(metadata: dict[str, Any]) -> dict[str, Any]:
     return {k: v for k, v in metadata.items() if k in _FORWARDED_MODEL_PARAMS}
 
 
+async def send_user_turn_async(
+    *,
+    normalizer: PromptNormalizer,
+    target: PromptChatTarget,
+    conversation_id: str,
+    user_message: str,
+    labels: dict[str, str] | None = None,
+    attack_identifier: ComponentIdentifier | None = None,
+) -> str:
+    """Send one user turn on an existing conversation via PromptNormalizer.
+
+    Used by multi-turn components (e.g. LLMDriver) where the system
+    prompt has already been set and the conversation_id is owned by
+    the caller. The normalizer attaches labels and attack_identifier
+    to the resulting memory entries for observability.
+
+    Args:
+        normalizer: PromptNormalizer instance. Cheap to construct;
+            callers may reuse one per component lifetime.
+        target: The configured PromptChatTarget.
+        conversation_id: The caller-owned conversation id. The
+            system prompt for this id must already be set.
+        user_message: The user turn content.
+        labels: Optional memory labels for this turn.
+        attack_identifier: Optional component identifier for tracing.
+
+    Returns:
+        The model's text response.
+    """
+    request = MessagePiece(
+        role="user",
+        original_value=user_message,
+        conversation_id=conversation_id,
+    ).to_message()
+    response = await normalizer.send_prompt_async(
+        message=request,
+        target=target,
+        conversation_id=conversation_id,
+        labels=labels,
+        attack_identifier=attack_identifier,
+    )
+    return response.get_value()
+
+
 async def send_generation_request_async(
     *,
     config: LLMConfig,
@@ -143,7 +196,6 @@ async def send_generation_request_async(
         original_value=user_message,
         conversation_id=conversation_id,
     )
-
     request = request_piece.to_message()
 
     responses = await target.send_prompt_async(message=request)

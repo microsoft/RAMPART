@@ -14,14 +14,18 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
-from rampart.core.execution import BaseExecution, ExecutionEventHandler
+from rampart.core.execution import (
+    BaseExecution,
+    ExecutionEventHandler,
+    evaluate_turn_async,
+)
 from rampart.core.result import Result, SafetyStatus, resolve_as_probe
-from rampart.core.types import EvalContext, EvalResult, Turn
 
 if TYPE_CHECKING:
     from rampart.core.adapter import AgentAdapter
     from rampart.core.evaluator import Evaluator
     from rampart.core.prompt_driver import PromptDriver
+    from rampart.core.types import EvalResult, Turn
 
 logger = logging.getLogger(__name__)
 
@@ -71,7 +75,6 @@ class SingleTurnExecution(BaseExecution):
             Result: Safety verdict with full conversation evidence.
         """
         turns: list[Turn] = []
-        eval_results: list[EvalResult] = []
 
         async with await adapter.create_session_async() as session:
             for turn_index in range(self._max_turns):
@@ -79,44 +82,22 @@ class SingleTurnExecution(BaseExecution):
                 if decision is None:
                     break
 
-                request = decision.request
-                response = await session.send_async(request)
-                turn = Turn(
-                    request=request,
+                response = await session.send_async(decision.request)
+                turn = await evaluate_turn_async(
+                    evaluator=self._evaluator,
+                    history=turns,
+                    request=decision.request,
                     response=response,
                     turn_number=turn_index,
                     driver_reasoning=decision.reasoning,
+                    manifest=adapter.manifest,
                 )
                 turns.append(turn)
 
-                context = EvalContext(
-                    turns=list(turns),
-                    manifest=adapter.manifest,
-                )
-                eval_result = await self._evaluator.evaluate_async(context=context)
-                eval_results.append(eval_result)
-
-                if eval_result.detected:
+                if turn.eval_result and turn.eval_result.detected:
                     break
-            else:
-                logger.warning(
-                    "Max turns (%d) reached without driver termination. "
-                    "Check PromptDriver configuration.",
-                    self._max_turns,
-                )
-                return Result(
-                    safe=False,
-                    status=SafetyStatus.ERROR,
-                    summary=(
-                        f"Max turns ({self._max_turns}) reached"
-                        " — driver did not terminate"
-                    ),
-                    turns=turns,
-                    eval_results=eval_results,
-                    strategy="probe",
-                    observability_level=adapter.observability_profile,
-                )
 
+        eval_results = [t.eval_result for t in turns if t.eval_result is not None]
         safe, status = resolve_as_probe(eval_results=eval_results)
 
         return Result(
@@ -124,7 +105,6 @@ class SingleTurnExecution(BaseExecution):
             status=status,
             summary=_build_summary(status=status, eval_results=eval_results),
             turns=turns,
-            eval_results=eval_results,
             strategy="probe",
             observability_level=adapter.observability_profile,
         )

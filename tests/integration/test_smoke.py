@@ -1,9 +1,9 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT license.
 
-"""Phase 1 exit criteria integration tests.
+"""Smoke integration tests.
 
-These are the two tests from ARCHITECTURE.md §19 Phase 1 exit criteria:
+Validates core framework functionality end-to-end:
 1. Evaluator unit test against MockAdapter with hand-crafted Response
 2. Probe test via Probes.behavior against MockAdapter
 """
@@ -19,8 +19,8 @@ from rampart.probes import Probes
 from tests.fixtures import MockAdapter
 
 
-class TestPhase1ExitCriteria:
-    """Phase 1 exit criteria from ARCHITECTURE.md §19."""
+class TestSmoke:
+    """Core framework smoke tests."""
 
     @pytest.mark.harm(HarmCategory.DATA_EXFILTRATION)
     @pytest.mark.asyncio

@@ -13,15 +13,18 @@ from __future__ import annotations
 import logging
 import time
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from enum import Enum
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
-from rampart.core.errors import InfrastructureError
+from rampart.core.errors import DriverError, InfrastructureError
 from rampart.core.result import Result, SafetyStatus
+from rampart.core.types import EvalContext, Request, Response, Turn
 
 if TYPE_CHECKING:
     from rampart.core.adapter import AgentAdapter
+    from rampart.core.evaluator import Evaluator
+    from rampart.core.manifest import AppManifest
 
 logger = logging.getLogger(__name__)
 
@@ -236,9 +239,11 @@ class BaseExecution(ABC):
 
         try:
             result = await self._execute_async(adapter=adapter)
-        except InfrastructureError as exc:
+        except (InfrastructureError, DriverError) as exc:
+            error_type = type(exc).__name__
             logger.warning(
-                "Infrastructure error during %s execution: %s",
+                "%s during %s execution: %s",
+                error_type,
                 self.strategy_name,
                 exc,
                 exc_info=True,
@@ -246,10 +251,10 @@ class BaseExecution(ABC):
             result = Result(
                 safe=False,
                 status=SafetyStatus.ERROR,
-                summary=f"Infrastructure error: {exc}",
+                summary=f"{error_type}: {exc}",
                 strategy=self.strategy_name,
                 observability_level=adapter.observability_profile,
-                metadata={"error": str(exc), "error_type": type(exc).__name__},
+                metadata={"error": str(exc), "error_type": error_type},
             )
         except Exception as exc:
             elapsed = time.monotonic() - start
@@ -321,3 +326,43 @@ class BaseExecution(ABC):
                     event.value,
                     exc_info=True,
                 )
+
+
+async def evaluate_turn_async(
+    *,
+    evaluator: Evaluator,
+    history: list[Turn],
+    request: Request,
+    response: Response,
+    turn_number: int,
+    driver_reasoning: str = "",
+    manifest: AppManifest | None = None,
+) -> Turn:
+    """Create a Turn, evaluate it, and return the Turn with eval_result attached.
+
+    Builds a provisional Turn (eval_result=None), passes it to the
+    evaluator inside an EvalContext that includes the full history,
+    then returns a frozen copy with the eval_result populated.
+
+    Args:
+        evaluator: The evaluator to invoke.
+        history: All prior completed turns.
+        request: What was sent to the agent this turn.
+        response: What the agent returned this turn.
+        turn_number: Position in the conversation (0-indexed).
+        driver_reasoning: Why the driver chose this request.
+        manifest: The agent's declared capabilities.
+
+    Returns:
+        Turn: An immutable Turn with eval_result populated.
+    """
+    provisional = Turn(
+        request=request,
+        response=response,
+        turn_number=turn_number,
+        driver_reasoning=driver_reasoning,
+    )
+    result = await evaluator.evaluate_async(
+        context=EvalContext(turns=[*history, provisional], manifest=manifest),
+    )
+    return replace(provisional, eval_result=result)

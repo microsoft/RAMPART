@@ -25,3 +25,11 @@ class InfrastructureError(Exception):
     Use ``raise InfrastructureError(...) from original_exception`` to
     preserve the causal chain via Python's native ``__cause__`` attribute.
     """
+
+
+class DriverError(Exception):
+    """Raised by a PromptDriver when it cannot produce a decision.
+
+    BaseExecution.execute_async catches this and produces a Result with
+    SafetyStatus.ERROR.
+    """

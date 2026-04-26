@@ -8,7 +8,7 @@ Re-exports all public core types for convenient access via rampart.core.
 
 from rampart.core.adapter import AgentAdapter, Session
 from rampart.core.converter import PayloadConverter
-from rampart.core.errors import InfrastructureError
+from rampart.core.errors import DriverError, InfrastructureError
 from rampart.core.evaluator import BaseEvaluator, Evaluator
 from rampart.core.execution import (
     BaseExecution,
@@ -16,6 +16,7 @@ from rampart.core.execution import (
     ExecutionEventData,
     ExecutionEventHandler,
     ExecutionHandlerFactory,
+    evaluate_turn_async,
 )
 from rampart.core.injection import InjectionHandle, Surface
 from rampart.core.llm import LLMConfig
@@ -50,6 +51,7 @@ __all__ = [
     "BaseEvaluator",
     "BaseExecution",
     "DataSource",
+    "DriverError",
     "EvalContext",
     "EvalOutcome",
     "EvalResult",
@@ -80,6 +82,7 @@ __all__ = [
     "ToolCall",
     "ToolDeclaration",
     "Turn",
+    "evaluate_turn_async",
     "resolve_as_attack",
     "resolve_as_probe",
 ]

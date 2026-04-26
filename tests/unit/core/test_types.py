@@ -3,6 +3,8 @@
 
 """Tests for rampart.core.types — core data model."""
 
+import dataclasses
+
 import pytest
 
 from rampart.core.types import (
@@ -76,6 +78,22 @@ class TestTurn:
         assert t.request.attachments == []
         assert t.timestamp is None
         assert t.driver_reasoning == ""
+        assert t.eval_result is None
+
+    def test_eval_result_round_trips(self):
+        er = EvalResult(outcome=EvalOutcome.DETECTED, rationale="found it")
+        t = Turn(
+            request=Request(prompt="p"),
+            response=Response(text="r"),
+            eval_result=er,
+        )
+        assert t.eval_result is er
+        assert t.eval_result is not None and t.eval_result.detected is True
+
+    def test_frozen_prevents_mutation(self):
+        t = Turn(request=Request(prompt="p"), response=Response(text="r"))
+        with pytest.raises(dataclasses.FrozenInstanceError):
+            t.eval_result = EvalResult(outcome=EvalOutcome.DETECTED)  # type: ignore[misc]
 
 
 class TestEvalResult:

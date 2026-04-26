@@ -18,7 +18,7 @@ import asyncio
 import logging
 from typing import TYPE_CHECKING
 
-from rampart._pyrit.llm_bridge import send_generation_request_async
+from rampart.pyrit_bridge.llm_bridge import send_generation_request_async
 
 if TYPE_CHECKING:
     from rampart.core.llm import LLMConfig

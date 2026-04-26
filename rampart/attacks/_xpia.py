@@ -20,7 +20,6 @@ from typing import Any
 from rampart.core import (
     AgentAdapter,
     BaseExecution,
-    EvalContext,
     EvalResult,
     Evaluator,
     ExecutionEventHandler,
@@ -33,6 +32,7 @@ from rampart.core import (
     Turn,
     resolve_as_attack,
 )
+from rampart.core.execution import evaluate_turn_async
 
 logger = logging.getLogger(__name__)
 
@@ -96,8 +96,7 @@ class XPIAExecution(BaseExecution):
         """Orchestrate the XPIA lifecycle and return a safety Result.
 
         Delegates phase execution to ``_run_phases_async`` and result
-        construction to ``_build_attack_result`` or
-        ``_max_turns_error_result``.
+        construction to ``_build_attack_result``.
 
         InfrastructureError is NOT caught here — it propagates to
         ``BaseExecution.execute_async``.
@@ -108,36 +107,23 @@ class XPIAExecution(BaseExecution):
         Returns:
             Result: Safety verdict with full conversation evidence.
         """
-        turns, eval_results, max_turns_hit = await self._run_phases_async(
-            adapter=adapter,
-        )
-        if max_turns_hit:
-            return self._max_turns_error_result(
-                adapter=adapter,
-                turns=turns,
-                eval_results=eval_results,
-            )
-        return self._build_attack_result(
-            adapter=adapter,
-            turns=turns,
-            eval_results=eval_results,
-        )
+        turns = await self._run_phases_async(adapter=adapter)
+        return self._build_attack_result(adapter=adapter, turns=turns)
 
     async def _run_phases_async(
         self,
         *,
         adapter: AgentAdapter,
-    ) -> tuple[list[Turn], list[EvalResult], bool]:
+    ) -> list[Turn]:
         """Run XPIA phases 1-5 inside a cleanup-guaranteed context.
 
         Args:
             adapter (AgentAdapter): The agent adapter.
 
         Returns:
-            tuple: (turns, eval_results, max_turns_exceeded).
+            list[Turn]: Completed turns with eval_result populated.
         """
         turns: list[Turn] = []
-        eval_results: list[EvalResult] = []
 
         async with AsyncExitStack() as stack:
             await self._activate_handles_async(stack=stack)
@@ -150,31 +136,22 @@ class XPIAExecution(BaseExecution):
                 if decision is None:
                     break
 
-                request = decision.request
-                response = await session.send_async(request)
-                turns.append(
-                    Turn(
-                        request=request,
-                        response=response,
-                        turn_number=turn_index,
-                        driver_reasoning=decision.reasoning,
-                    ),
+                response = await session.send_async(decision.request)
+                turn = await evaluate_turn_async(
+                    evaluator=self._evaluator,
+                    history=turns,
+                    request=decision.request,
+                    response=response,
+                    turn_number=turn_index,
+                    driver_reasoning=decision.reasoning,
+                    manifest=adapter.manifest,
                 )
+                turns.append(turn)
 
-                eval_result = await self._evaluator.evaluate_async(
-                    context=EvalContext(
-                        turns=list(turns),
-                        manifest=adapter.manifest,
-                    ),
-                )
-                eval_results.append(eval_result)
-
-                if eval_result.detected:
+                if turn.eval_result and turn.eval_result.detected:
                     break
-            else:
-                return turns, eval_results, True
 
-        return turns, eval_results, False
+        return turns
 
     async def _activate_handles_async(
         self,
@@ -199,7 +176,6 @@ class XPIAExecution(BaseExecution):
         *,
         adapter: AgentAdapter,
         turns: list[Turn],
-        eval_results: list[EvalResult],
     ) -> Result:
         """Resolve eval results into a final attack Result.
 
@@ -208,11 +184,11 @@ class XPIAExecution(BaseExecution):
         Args:
             adapter (AgentAdapter): The adapter under test.
             turns (list[Turn]): Conversation history.
-            eval_results (list[EvalResult]): Evaluator outputs.
 
         Returns:
             Result: The final safety verdict.
         """
+        eval_results = [t.eval_result for t in turns if t.eval_result is not None]
         safe, status = resolve_as_attack(eval_results=eval_results)
 
         if status == SafetyStatus.SAFE:
@@ -228,43 +204,6 @@ class XPIAExecution(BaseExecution):
             status=status,
             summary=_build_summary(status=status, eval_results=eval_results),
             turns=turns,
-            eval_results=eval_results,
-            strategy=self.strategy_name,
-            observability_level=adapter.observability_profile,
-            injections=self._build_injection_records(),
-            metadata=_collect_response_metadata(turns=turns),
-        )
-
-    def _max_turns_error_result(
-        self,
-        *,
-        adapter: AgentAdapter,
-        turns: list[Turn],
-        eval_results: list[EvalResult],
-    ) -> Result:
-        """Build an ERROR result when the driver exceeds max_turns.
-
-        Args:
-            adapter (AgentAdapter): The adapter under test.
-            turns (list[Turn]): Conversation history.
-            eval_results (list[EvalResult]): Evaluator outputs so far.
-
-        Returns:
-            Result: Error result with max-turns summary.
-        """
-        logger.warning(
-            "Max turns (%d) reached without driver termination. "
-            "Check PromptDriver configuration.",
-            self._max_turns,
-        )
-        return Result(
-            safe=False,
-            status=SafetyStatus.ERROR,
-            summary=(
-                f"Max turns ({self._max_turns}) reached — driver did not terminate"
-            ),
-            turns=turns,
-            eval_results=eval_results,
             strategy=self.strategy_name,
             observability_level=adapter.observability_profile,
             injections=self._build_injection_records(),

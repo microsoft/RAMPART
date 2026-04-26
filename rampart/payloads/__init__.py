@@ -92,7 +92,7 @@ class Payloads:
     """
 
     @staticmethod
-    async def generate_async(  # noqa: PLR0913  — factory method needs all params
+    async def generate_async(
         *,
         template: PayloadTemplate,
         llm: LLMConfig,

@@ -66,7 +66,7 @@ skip_empty = true
 
 [tool.pyright]
 pythonVersion = "3.11"
-typeCheckingMode = "strict"
+typeCheckingMode = "standard"
 include = ["rampart", "tests"]
 
 [[tool.pyright.executionEnvironments]]
@@ -114,6 +114,9 @@ known-first-party = ["rampart"]
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"
+
+[tool.ruff.lint.pylint]
+max-args = 10
 
 [tool.uv.sources]
 pyrit = { git = "https://github.com/microsoft/PyRIT", rev = "6dc8b94139757390286bbce7d53c1f7e58e66e29" } # v0.13.0

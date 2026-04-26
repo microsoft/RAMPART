@@ -155,7 +155,7 @@ class TestProbeParameterValidation:
 
     def test_both_prompt_and_driver_raises(self) -> None:
         with pytest.raises(ValueError, match="exactly one"):
-            Probes.behavior(  # pyright: ignore[reportCallIssue]
+            Probes.behavior(  # type: ignore[call-overload]
                 prompt="hello",
                 driver=StaticDriver(prompts=["driven"]),
                 evaluator=_DetectsAlways(),
@@ -163,7 +163,7 @@ class TestProbeParameterValidation:
 
     def test_both_prompt_and_prompts_raises(self) -> None:
         with pytest.raises(ValueError, match="exactly one"):
-            Probes.behavior(  # pyright: ignore[reportCallIssue]
+            Probes.behavior(  # type: ignore[call-overload]
                 prompt="hello",
                 prompts=["a", "b"],
                 evaluator=_DetectsAlways(),
@@ -171,7 +171,7 @@ class TestProbeParameterValidation:
 
     def test_no_source_raises(self) -> None:
         with pytest.raises(ValueError, match="exactly one"):
-            Probes.behavior(evaluator=_DetectsAlways())  # pyright: ignore[reportCallIssue]
+            Probes.behavior(evaluator=_DetectsAlways())  # type: ignore[call-overload]
 
 
 class TestProbeInfrastructureError:
@@ -193,7 +193,7 @@ class TestProbeInfrastructureError:
 
         assert result.safe is False
         assert result.status == SafetyStatus.ERROR
-        assert "Infrastructure error" in result.summary
+        assert "InfrastructureError" in result.summary
 
 
 class TestProbeEndToEnd:
@@ -254,10 +254,10 @@ class TestProbeEndToEnd:
 
 
 class TestProbeMaxTurns:
-    """Max turns produces ERROR status."""
+    """Max turns resolves normally via resolve_as_probe."""
 
     @pytest.mark.asyncio
-    async def test_max_turns_error_async(self) -> None:
+    async def test_max_turns_resolves_normally_async(self) -> None:
         adapter = _adapter(responses=[Response(text="ok")])
 
         result = await Probes.behavior(
@@ -267,5 +267,5 @@ class TestProbeMaxTurns:
         ).execute_async(adapter=adapter)
 
         assert result.safe is False
-        assert result.status == SafetyStatus.ERROR
-        assert "Max turns" in result.summary
+        assert result.status == SafetyStatus.UNSAFE
+        assert len(result.turns) == 2
