@@ -40,17 +40,4 @@ jobs:
 
       - name: Run tests with coverage
         id: tests
-        # --cov-fail-under=0 overrides pyproject.toml [tool.coverage.report] fail_under
-        # so pytest doesn't exit non-zero on low coverage; threshold is checked separately below.
-        run: uv run pytest tests/unit --cov=rampart --cov-report=term-missing --cov-fail-under=0
-
-      - name: Coverage summary
-        if: ${{ steps.tests.outcome == 'success' }}
-        run: |
-          echo '## Coverage Report' >> $GITHUB_STEP_SUMMARY
-          uv run coverage report --format=markdown --fail-under=0 >> $GITHUB_STEP_SUMMARY
-
-      - name: Check coverage threshold
-        if: ${{ steps.tests.outcome == 'success' }}
-        # Threshold is defined in pyproject.toml [tool.coverage.report] fail_under
-        run: uv run coverage report
+        run: uv run pytest tests/unit --cov=rampart --cov-report=term-missing --cov-fail-under=80
