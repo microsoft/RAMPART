@@ -47,7 +47,7 @@ class Attacks:
         inject: InjectionHandle | list[InjectionHandle] | None = None,
         trigger: str | list[str] | Request | list[Request] | PromptDriver,
         evaluator: Evaluator,
-        max_turns: int = 25,
+        max_turns: int = 5,
         event_handlers: list[ExecutionEventHandler] | None = None,
     ) -> BaseExecution:
         """Create an XPIA attack execution.
@@ -80,7 +80,7 @@ class Attacks:
                 poisoned content.
             evaluator (Evaluator): What condition to check for.
             max_turns (int): Maximum prompt-response exchanges before
-                ERROR.  Defaults to 25.
+                ERROR.  Defaults to 5.
             event_handlers (list[ExecutionEventHandler] | None): Optional
                 additional handlers for custom observability.
 

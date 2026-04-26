@@ -436,3 +436,98 @@ class TestLLMDriverFromTarget:
             sp = mock_target.set_system_prompt.call_args.kwargs["system_prompt"]
             assert "You are a test persona." in sp
             assert "test objective" in sp
+
+
+class TestLLMDriverAttachments:
+    @pytest.mark.asyncio
+    async def test_first_turn_attaches_injections(self) -> None:
+        """Injections should be attached to the first request."""
+        mock_memory = MagicMock()
+        mock_memory.get_conversation.return_value = []
+
+        payload = Payload(
+            content="report content",
+            id="pay-1",
+            metadata={"description": "Q3 report"},
+        )
+
+        with (
+            patch("rampart.drivers.llm.create_prompt_target", return_value=MagicMock()),
+            patch("rampart.drivers.llm.PromptNormalizer"),
+            patch("rampart.drivers.llm.CentralMemory.get_memory_instance", return_value=mock_memory),
+            patch(
+                "rampart.drivers.llm.send_user_turn_async",
+                new_callable=AsyncMock,
+                return_value="Summarize the document",
+            ),
+        ):
+            driver = LLMDriver(
+                llm=_TEST_LLM,
+                persona=_TEST_PERSONA,
+                injections=[payload],
+            )
+            decision = await driver.next_prompt_async(history=[])
+            assert decision is not None
+            assert decision.request.attachments == [payload]
+
+    @pytest.mark.asyncio
+    async def test_subsequent_turns_have_no_attachments(self) -> None:
+        """Only the first turn should carry attachments."""
+        mock_piece_user = MagicMock()
+        mock_piece_user.api_role = "user"
+        mock_msg_user = MagicMock()
+        mock_msg_user.get_piece.return_value = mock_piece_user
+
+        mock_memory = MagicMock()
+        mock_memory.get_conversation.return_value = [
+            MagicMock(get_piece=MagicMock(return_value=MagicMock(api_role="system"))),
+            mock_msg_user,
+            MagicMock(get_piece=MagicMock(return_value=MagicMock(api_role="assistant"))),
+        ]
+
+        payload = Payload(
+            content="report content",
+            id="pay-1",
+            metadata={"description": "Q3 report"},
+        )
+
+        with (
+            patch("rampart.drivers.llm.create_prompt_target", return_value=MagicMock()),
+            patch("rampart.drivers.llm.PromptNormalizer"),
+            patch("rampart.drivers.llm.CentralMemory.get_memory_instance", return_value=mock_memory),
+            patch(
+                "rampart.drivers.llm.send_user_turn_async",
+                new_callable=AsyncMock,
+                return_value="follow-up question",
+            ),
+        ):
+            driver = LLMDriver(
+                llm=_TEST_LLM,
+                persona=_TEST_PERSONA,
+                injections=[payload],
+            )
+            turn0 = _make_turn(turn_number=0)
+            decision = await driver.next_prompt_async(history=[turn0])
+            assert decision is not None
+            assert decision.request.attachments == []
+
+    @pytest.mark.asyncio
+    async def test_no_injections_means_no_attachments(self) -> None:
+        """Without injections, first turn should have empty attachments."""
+        mock_memory = MagicMock()
+        mock_memory.get_conversation.return_value = []
+
+        with (
+            patch("rampart.drivers.llm.create_prompt_target", return_value=MagicMock()),
+            patch("rampart.drivers.llm.PromptNormalizer"),
+            patch("rampart.drivers.llm.CentralMemory.get_memory_instance", return_value=mock_memory),
+            patch(
+                "rampart.drivers.llm.send_user_turn_async",
+                new_callable=AsyncMock,
+                return_value="hello",
+            ),
+        ):
+            driver = LLMDriver(llm=_TEST_LLM, persona=_TEST_PERSONA)
+            decision = await driver.next_prompt_async(history=[])
+            assert decision is not None
+            assert decision.request.attachments == []

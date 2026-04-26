@@ -172,6 +172,11 @@ class LLMDriver:
             )
         else:
             # LLMConfig path: create everything from scratch
+            if self._llm is None:
+                raise DriverError(
+                    "LLMDriver: no LLM config and no target — use "
+                    "from_target() or provide an LLMConfig.",
+                )
             self._target = create_prompt_target(self._llm)
             self._normalizer = PromptNormalizer()
             self._target.set_system_prompt(
@@ -228,7 +233,15 @@ class LLMDriver:
                 f"conversation_id={self._conversation_id}",
             )
 
-        return PromptDecision(request=Request(prompt=prompt_text))
+        # Attach injection payloads on the first turn so the agent
+        # receives the actual files alongside the prompt — mirroring
+        # how static requests deliver attachments.  Subsequent turns
+        # carry only the LLM-generated text.
+        attachments = self._injections if not history else []
+
+        return PromptDecision(
+            request=Request(prompt=prompt_text, attachments=attachments),
+        )
 
     def _assert_conversations_consistent(self, history: list[Turn]) -> None:
         """Verify agent-side history length matches driver-side memory state.
@@ -304,6 +317,11 @@ class LLMDriver:
 
     async def _send_async(self, user_message: str) -> str:
         """Send a user message on the driver-side conversation via PyRIT."""
+        if self._normalizer is None or self._target is None:
+            raise DriverError(
+                "LLMDriver: driver not initialized — call "
+                "next_prompt_async before _send_async.",
+            )
         return await send_user_turn_async(
             normalizer=self._normalizer,
             target=self._target,
