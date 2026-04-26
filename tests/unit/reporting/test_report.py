@@ -8,7 +8,7 @@ from __future__ import annotations
 import pytest
 
 from rampart.core.result import HarmCategory, Result, SafetyStatus
-from rampart.reporting.sink import ReportSink, TestRunReport
+from rampart.reporting.sink import PopulationSummary, ReportSink, TestRunReport
 
 
 class TestReportSinkProtocol:
@@ -269,3 +269,93 @@ class TestPopulationSummary:
         stats = report.population_summary(harm_category="nonexistent")
         assert stats.total_runs == 0
         assert stats.attack_success_rate == 0.0
+
+
+class TestPopulationSummaryProperties:
+    def test_has_failures_true(self) -> None:
+        s = PopulationSummary(
+            total_runs=2,
+            safe_count=1,
+            unsafe_count=1,
+            undetermined_count=0,
+            error_count=0,
+            attack_success_rate=0.5,
+            safety_pass_rate=0.5,
+        )
+        assert s.has_failures is True
+
+    def test_has_failures_false(self) -> None:
+        s = PopulationSummary(
+            total_runs=2,
+            safe_count=2,
+            unsafe_count=0,
+            undetermined_count=0,
+            error_count=0,
+            attack_success_rate=0.0,
+            safety_pass_rate=1.0,
+        )
+        assert s.has_failures is False
+
+    def test_is_clean_run_true(self) -> None:
+        s = PopulationSummary(
+            total_runs=3,
+            safe_count=3,
+            unsafe_count=0,
+            undetermined_count=0,
+            error_count=0,
+            attack_success_rate=0.0,
+            safety_pass_rate=1.0,
+        )
+        assert s.is_clean_run is True
+
+    def test_is_clean_run_false_unsafe(self) -> None:
+        s = PopulationSummary(
+            total_runs=2,
+            safe_count=1,
+            unsafe_count=1,
+            undetermined_count=0,
+            error_count=0,
+            attack_success_rate=0.5,
+            safety_pass_rate=0.5,
+        )
+        assert s.is_clean_run is False
+
+    def test_is_clean_run_false_undetermined(self) -> None:
+        s = PopulationSummary(
+            total_runs=2,
+            safe_count=1,
+            unsafe_count=0,
+            undetermined_count=1,
+            error_count=0,
+            attack_success_rate=0.0,
+            safety_pass_rate=0.5,
+        )
+        assert s.is_clean_run is False
+
+    def test_is_clean_run_false_error(self) -> None:
+        s = PopulationSummary(
+            total_runs=2,
+            safe_count=1,
+            unsafe_count=0,
+            undetermined_count=0,
+            error_count=1,
+            attack_success_rate=0.0,
+            safety_pass_rate=0.5,
+        )
+        assert s.is_clean_run is False
+
+
+class TestTestRunReportDefaults:
+    def test_defaults(self) -> None:
+        report = TestRunReport()
+        assert report.results == []
+        assert report.total_runs == 0
+        assert report.passed == 0
+        assert report.failed == 0
+        assert report.undetermined == 0
+        assert report.errors == 0
+        assert report.duration_seconds == 0.0
+        assert report.metadata == {}
+
+    def test_not_collected_by_pytest(self) -> None:
+        assert TestRunReport.__test__ is False

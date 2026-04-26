@@ -15,8 +15,8 @@ from unittest.mock import patch
 
 import pytest
 
-from rampart.pyrit_bridge.llm_bridge import create_prompt_target
 from rampart.core.llm import LLMConfig
+from rampart.pyrit_bridge.llm_bridge import create_prompt_target
 
 
 class TestModelNameResolution:
@@ -225,7 +225,7 @@ class TestValidation:
 
     def test_none_model_raises_value_error(self):
         config = LLMConfig(  # type: ignore[arg-type]
-            model=None, # type: ignore
+            model=None,  # type: ignore[arg-type]
             endpoint="https://api.openai.com/v1",
         )
         with pytest.raises(ValueError, match="model"):
@@ -234,7 +234,7 @@ class TestValidation:
     def test_none_endpoint_raises_value_error(self):
         config = LLMConfig(  # type: ignore[arg-type]
             model="gpt-4o",
-            endpoint=None, # type: ignore
+            endpoint=None,  # type: ignore[arg-type]
         )
         with pytest.raises(ValueError, match="endpoint"):
             create_prompt_target(config)

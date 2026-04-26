@@ -30,20 +30,24 @@ from __future__ import annotations
 import logging
 import uuid
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import yaml
 from jinja2 import Template
 from pyrit.exceptions import EmptyResponseException
 from pyrit.memory import CentralMemory
 from pyrit.prompt_normalizer import PromptNormalizer
-from pyrit.prompt_target import PromptChatTarget
 
 from rampart.core.errors import DriverError
-from rampart.core.llm import LLMConfig
-from rampart.core.persona import Persona
 from rampart.core.prompt_driver import PromptDecision
 from rampart.core.types import Payload, Request, Turn
 from rampart.pyrit_bridge.llm_bridge import create_prompt_target, send_user_turn_async
+
+if TYPE_CHECKING:
+    from pyrit.prompt_target import PromptChatTarget
+
+    from rampart.core.llm import LLMConfig
+    from rampart.core.persona import Persona
 
 logger = logging.getLogger(__name__)
 
@@ -100,18 +104,36 @@ class LLMDriver:
     def __init__(
         self,
         *,
-        llm: LLMConfig,
         persona: Persona,
+        llm: LLMConfig | None = None,
+        target: PromptChatTarget | None = None,
         objective: str | None = None,
         injections: list[Payload] | None = None,
     ) -> None:
-        self._llm: LLMConfig | None = llm
+        """Initialize with LLM config or pre-configured target.
+
+        Args:
+            persona: System-prompt identity for the LLM.
+            llm: LLM configuration. Required unless ``target`` is provided.
+            target: Pre-configured PromptChatTarget. Mutually exclusive
+                with ``llm`` — provide one or the other.
+            objective: Per-test goal as a natural-language string.
+            injections: Payloads placed in the agent's data sources.
+
+        Raises:
+            TypeError: If both ``llm`` and ``target`` are provided.
+        """
+        if llm is not None and target is not None:
+            msg = "Provide either 'llm' or 'target', not both."
+            raise TypeError(msg)
+
+        self._llm = llm
         self._persona = persona
         self._objective = objective
         self._injections = injections or []
 
         self._conversation_id = str(uuid.uuid4())
-        self._target: PromptChatTarget | None = None
+        self._target = target
         self._normalizer: PromptNormalizer | None = None
         self._initialized = False
 
@@ -141,16 +163,12 @@ class LLMDriver:
             objective: Optional per-test goal.
             injections: Optional injection metadata for the system prompt.
         """
-        driver = cls.__new__(cls)
-        driver._llm = None
-        driver._persona = persona
-        driver._objective = objective
-        driver._injections = injections or []
-        driver._conversation_id = str(uuid.uuid4())
-        driver._target = target
-        driver._normalizer = None
-        driver._initialized = False
-        return driver
+        return cls(
+            target=target,
+            persona=persona,
+            objective=objective,
+            injections=injections,
+        )
 
     def _ensure_initialized(self) -> None:
         """Construct the PyRIT target and set the system prompt on first use.
@@ -173,10 +191,11 @@ class LLMDriver:
         else:
             # LLMConfig path: create everything from scratch
             if self._llm is None:
-                raise DriverError(
+                msg = (
                     "LLMDriver: no LLM config and no target — use "
-                    "from_target() or provide an LLMConfig.",
+                    "from_target() or provide an LLMConfig."
                 )
+                raise DriverError(msg)
             self._target = create_prompt_target(self._llm)
             self._normalizer = PromptNormalizer()
             self._target.set_system_prompt(
@@ -215,23 +234,24 @@ class LLMDriver:
         try:
             prompt_text = await self._send_async(user_message)
         except EmptyResponseException as exc:
-            raise DriverError(
+            msg = (
                 "LLMDriver: driving LLM returned empty response after retries. "
-                f"conversation_id={self._conversation_id}",
-            ) from exc
+                f"conversation_id={self._conversation_id}"
+            )
+            raise DriverError(msg) from exc
         except Exception as exc:
-            raise DriverError(
-                f"LLMDriver: send_user_turn_async failed: {exc}",
-            ) from exc
+            msg = f"LLMDriver: send_user_turn_async failed: {exc}"
+            raise DriverError(msg) from exc
 
         prompt_text = prompt_text.strip()
         if not prompt_text:
-            raise DriverError(
+            msg = (
                 "LLMDriver: driving LLM returned empty response. "
                 "This typically indicates a provider hiccup, a safety filter "
                 "trigger on the driver itself, or a misconfigured model. "
-                f"conversation_id={self._conversation_id}",
+                f"conversation_id={self._conversation_id}"
             )
+            raise DriverError(msg)
 
         # Attach injection payloads on the first turn so the agent
         # receives the actual files alongside the prompt — mirroring
@@ -260,15 +280,16 @@ class LLMDriver:
             1 for m in messages if m.get_piece().api_role == "user"
         )
         if user_turns_in_memory != len(history):
-            raise DriverError(
+            msg = (
                 f"LLMDriver state desync: agent-side history has "
                 f"{len(history)} turns, but driver-side memory has "
                 f"{user_turns_in_memory} user turns for conversation "
                 f"{self._conversation_id}. Possible causes: the driver was "
                 f"reused across tests (construct a new LLMDriver per test), "
                 f"or a caller tried to resume a driver mid-conversation "
-                f"without replaying history into memory.",
+                f"without replaying history into memory."
             )
+            raise DriverError(msg)
 
     def _build_system_prompt(self) -> str:
         """Build the full system prompt from persona, objective, and injections.
@@ -318,10 +339,11 @@ class LLMDriver:
     async def _send_async(self, user_message: str) -> str:
         """Send a user message on the driver-side conversation via PyRIT."""
         if self._normalizer is None or self._target is None:
-            raise DriverError(
+            msg = (
                 "LLMDriver: driver not initialized — call "
-                "next_prompt_async before _send_async.",
+                "next_prompt_async before _send_async."
             )
+            raise DriverError(msg)
         return await send_user_turn_async(
             normalizer=self._normalizer,
             target=self._target,

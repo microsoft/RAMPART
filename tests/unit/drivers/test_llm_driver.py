@@ -58,6 +58,15 @@ class TestLLMDriverProtocolCompliance:
         driver = LLMDriver(llm=_TEST_LLM, persona=_TEST_PERSONA)
         assert isinstance(driver, PromptDriver)
 
+    def test_rejects_both_llm_and_target(self) -> None:
+        mock_target = MagicMock()
+        with pytest.raises(TypeError, match="Provide either"):
+            LLMDriver(
+                llm=_TEST_LLM,
+                target=mock_target,
+                persona=_TEST_PERSONA,
+            )
+
 
 class TestLLMDriverLazyInit:
     def test_construction_does_not_call_create_prompt_target(self) -> None:
@@ -110,8 +119,15 @@ class TestLLMDriverConstruction:
         with (
             patch("rampart.drivers.llm.create_prompt_target", return_value=mock_target),
             patch("rampart.drivers.llm.PromptNormalizer"),
-            patch("rampart.drivers.llm.CentralMemory.get_memory_instance", return_value=mock_memory),
-            patch("rampart.drivers.llm.send_user_turn_async", new_callable=AsyncMock, return_value="hi"),
+            patch(
+                "rampart.drivers.llm.CentralMemory.get_memory_instance",
+                return_value=mock_memory,
+            ),
+            patch(
+                "rampart.drivers.llm.send_user_turn_async",
+                new_callable=AsyncMock,
+                return_value="hi",
+            ),
         ):
             driver = LLMDriver(llm=_TEST_LLM, persona=_TEST_PERSONA)
             await driver.next_prompt_async(history=[])
@@ -127,8 +143,15 @@ class TestLLMDriverConstruction:
         with (
             patch("rampart.drivers.llm.create_prompt_target", return_value=mock_target),
             patch("rampart.drivers.llm.PromptNormalizer"),
-            patch("rampart.drivers.llm.CentralMemory.get_memory_instance", return_value=mock_memory),
-            patch("rampart.drivers.llm.send_user_turn_async", new_callable=AsyncMock, return_value="hi"),
+            patch(
+                "rampart.drivers.llm.CentralMemory.get_memory_instance",
+                return_value=mock_memory,
+            ),
+            patch(
+                "rampart.drivers.llm.send_user_turn_async",
+                new_callable=AsyncMock,
+                return_value="hi",
+            ),
         ):
             driver = LLMDriver(
                 llm=_TEST_LLM,
@@ -149,8 +172,15 @@ class TestLLMDriverConstruction:
         with (
             patch("rampart.drivers.llm.create_prompt_target", return_value=mock_target),
             patch("rampart.drivers.llm.PromptNormalizer"),
-            patch("rampart.drivers.llm.CentralMemory.get_memory_instance", return_value=mock_memory),
-            patch("rampart.drivers.llm.send_user_turn_async", new_callable=AsyncMock, return_value="hi"),
+            patch(
+                "rampart.drivers.llm.CentralMemory.get_memory_instance",
+                return_value=mock_memory,
+            ),
+            patch(
+                "rampart.drivers.llm.send_user_turn_async",
+                new_callable=AsyncMock,
+                return_value="hi",
+            ),
         ):
             driver = LLMDriver(llm=_TEST_LLM, persona=_TEST_PERSONA)
             await driver.next_prompt_async(history=[])
@@ -166,8 +196,15 @@ class TestLLMDriverConstruction:
         with (
             patch("rampart.drivers.llm.create_prompt_target", return_value=mock_target),
             patch("rampart.drivers.llm.PromptNormalizer"),
-            patch("rampart.drivers.llm.CentralMemory.get_memory_instance", return_value=mock_memory),
-            patch("rampart.drivers.llm.send_user_turn_async", new_callable=AsyncMock, return_value="hi"),
+            patch(
+                "rampart.drivers.llm.CentralMemory.get_memory_instance",
+                return_value=mock_memory,
+            ),
+            patch(
+                "rampart.drivers.llm.send_user_turn_async",
+                new_callable=AsyncMock,
+                return_value="hi",
+            ),
         ):
             payload = Payload(
                 content="secret doc content",
@@ -202,7 +239,10 @@ class TestLLMDriverSendFlow:
         with (
             patch("rampart.drivers.llm.create_prompt_target", return_value=mock_target),
             patch("rampart.drivers.llm.PromptNormalizer"),
-            patch("rampart.drivers.llm.CentralMemory.get_memory_instance", return_value=mock_memory),
+            patch(
+                "rampart.drivers.llm.CentralMemory.get_memory_instance",
+                return_value=mock_memory,
+            ),
             patch(
                 "rampart.drivers.llm.send_user_turn_async",
                 new_callable=AsyncMock,
@@ -223,7 +263,10 @@ class TestLLMDriverSendFlow:
         with (
             patch("rampart.drivers.llm.create_prompt_target", return_value=mock_target),
             patch("rampart.drivers.llm.PromptNormalizer"),
-            patch("rampart.drivers.llm.CentralMemory.get_memory_instance", return_value=mock_memory),
+            patch(
+                "rampart.drivers.llm.CentralMemory.get_memory_instance",
+                return_value=mock_memory,
+            ),
             patch(
                 "rampart.drivers.llm.send_user_turn_async",
                 new_callable=AsyncMock,
@@ -251,13 +294,18 @@ class TestLLMDriverSendFlow:
         mock_memory.get_conversation.return_value = [
             MagicMock(get_piece=MagicMock(return_value=MagicMock(api_role="system"))),
             mock_msg,
-            MagicMock(get_piece=MagicMock(return_value=MagicMock(api_role="assistant"))),
+            MagicMock(
+                get_piece=MagicMock(return_value=MagicMock(api_role="assistant")),
+            ),
         ]
 
         with (
             patch("rampart.drivers.llm.create_prompt_target", return_value=mock_target),
             patch("rampart.drivers.llm.PromptNormalizer"),
-            patch("rampart.drivers.llm.CentralMemory.get_memory_instance", return_value=mock_memory),
+            patch(
+                "rampart.drivers.llm.CentralMemory.get_memory_instance",
+                return_value=mock_memory,
+            ),
             patch(
                 "rampart.drivers.llm.send_user_turn_async",
                 new_callable=AsyncMock,
@@ -287,7 +335,10 @@ class TestLLMDriverSendFlow:
         with (
             patch("rampart.drivers.llm.create_prompt_target", return_value=MagicMock()),
             patch("rampart.drivers.llm.PromptNormalizer"),
-            patch("rampart.drivers.llm.CentralMemory.get_memory_instance", return_value=mock_memory),
+            patch(
+                "rampart.drivers.llm.CentralMemory.get_memory_instance",
+                return_value=mock_memory,
+            ),
             patch(
                 "rampart.drivers.llm.send_user_turn_async",
                 new_callable=AsyncMock,
@@ -309,7 +360,10 @@ class TestLLMDriverErrorHandling:
         with (
             patch("rampart.drivers.llm.create_prompt_target", return_value=MagicMock()),
             patch("rampart.drivers.llm.PromptNormalizer"),
-            patch("rampart.drivers.llm.CentralMemory.get_memory_instance", return_value=mock_memory),
+            patch(
+                "rampart.drivers.llm.CentralMemory.get_memory_instance",
+                return_value=mock_memory,
+            ),
             patch(
                 "rampart.drivers.llm.send_user_turn_async",
                 new_callable=AsyncMock,
@@ -328,7 +382,10 @@ class TestLLMDriverErrorHandling:
         with (
             patch("rampart.drivers.llm.create_prompt_target", return_value=MagicMock()),
             patch("rampart.drivers.llm.PromptNormalizer"),
-            patch("rampart.drivers.llm.CentralMemory.get_memory_instance", return_value=mock_memory),
+            patch(
+                "rampart.drivers.llm.CentralMemory.get_memory_instance",
+                return_value=mock_memory,
+            ),
             patch(
                 "rampart.drivers.llm.send_user_turn_async",
                 new_callable=AsyncMock,
@@ -347,7 +404,10 @@ class TestLLMDriverErrorHandling:
         with (
             patch("rampart.drivers.llm.create_prompt_target", return_value=MagicMock()),
             patch("rampart.drivers.llm.PromptNormalizer"),
-            patch("rampart.drivers.llm.CentralMemory.get_memory_instance", return_value=mock_memory),
+            patch(
+                "rampart.drivers.llm.CentralMemory.get_memory_instance",
+                return_value=mock_memory,
+            ),
             patch(
                 "rampart.drivers.llm.send_user_turn_async",
                 new_callable=AsyncMock,
@@ -367,7 +427,10 @@ class TestLLMDriverErrorHandling:
         with (
             patch("rampart.drivers.llm.create_prompt_target", return_value=MagicMock()),
             patch("rampart.drivers.llm.PromptNormalizer"),
-            patch("rampart.drivers.llm.CentralMemory.get_memory_instance", return_value=mock_memory),
+            patch(
+                "rampart.drivers.llm.CentralMemory.get_memory_instance",
+                return_value=mock_memory,
+            ),
             patch(
                 "rampart.drivers.llm.send_user_turn_async",
                 new_callable=AsyncMock,
@@ -391,7 +454,10 @@ class TestLLMDriverDesyncDetection:
         with (
             patch("rampart.drivers.llm.create_prompt_target", return_value=MagicMock()),
             patch("rampart.drivers.llm.PromptNormalizer"),
-            patch("rampart.drivers.llm.CentralMemory.get_memory_instance", return_value=mock_memory),
+            patch(
+                "rampart.drivers.llm.CentralMemory.get_memory_instance",
+                return_value=mock_memory,
+            ),
         ):
             driver = LLMDriver(llm=_TEST_LLM, persona=_TEST_PERSONA)
             turn = _make_turn(turn_number=0)
@@ -417,7 +483,10 @@ class TestLLMDriverFromTarget:
 
         with (
             patch("rampart.drivers.llm.PromptNormalizer"),
-            patch("rampart.drivers.llm.CentralMemory.get_memory_instance", return_value=mock_memory),
+            patch(
+                "rampart.drivers.llm.CentralMemory.get_memory_instance",
+                return_value=mock_memory,
+            ),
             patch(
                 "rampart.drivers.llm.send_user_turn_async",
                 new_callable=AsyncMock,
@@ -454,7 +523,10 @@ class TestLLMDriverAttachments:
         with (
             patch("rampart.drivers.llm.create_prompt_target", return_value=MagicMock()),
             patch("rampart.drivers.llm.PromptNormalizer"),
-            patch("rampart.drivers.llm.CentralMemory.get_memory_instance", return_value=mock_memory),
+            patch(
+                "rampart.drivers.llm.CentralMemory.get_memory_instance",
+                return_value=mock_memory,
+            ),
             patch(
                 "rampart.drivers.llm.send_user_turn_async",
                 new_callable=AsyncMock,
@@ -482,7 +554,9 @@ class TestLLMDriverAttachments:
         mock_memory.get_conversation.return_value = [
             MagicMock(get_piece=MagicMock(return_value=MagicMock(api_role="system"))),
             mock_msg_user,
-            MagicMock(get_piece=MagicMock(return_value=MagicMock(api_role="assistant"))),
+            MagicMock(
+                get_piece=MagicMock(return_value=MagicMock(api_role="assistant")),
+            ),
         ]
 
         payload = Payload(
@@ -494,7 +568,10 @@ class TestLLMDriverAttachments:
         with (
             patch("rampart.drivers.llm.create_prompt_target", return_value=MagicMock()),
             patch("rampart.drivers.llm.PromptNormalizer"),
-            patch("rampart.drivers.llm.CentralMemory.get_memory_instance", return_value=mock_memory),
+            patch(
+                "rampart.drivers.llm.CentralMemory.get_memory_instance",
+                return_value=mock_memory,
+            ),
             patch(
                 "rampart.drivers.llm.send_user_turn_async",
                 new_callable=AsyncMock,
@@ -520,7 +597,10 @@ class TestLLMDriverAttachments:
         with (
             patch("rampart.drivers.llm.create_prompt_target", return_value=MagicMock()),
             patch("rampart.drivers.llm.PromptNormalizer"),
-            patch("rampart.drivers.llm.CentralMemory.get_memory_instance", return_value=mock_memory),
+            patch(
+                "rampart.drivers.llm.CentralMemory.get_memory_instance",
+                return_value=mock_memory,
+            ),
             patch(
                 "rampart.drivers.llm.send_user_turn_async",
                 new_callable=AsyncMock,

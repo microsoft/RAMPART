@@ -95,3 +95,43 @@ class TestAppManifest:
         assert m.declares_tool("create_event") is True
         assert m.get_tool("send_email") is t1
         assert m.get_tool("create_event") is t2
+
+    def test_str_minimal(self) -> None:
+        m = AppManifest(name="TestBot")
+        assert "TARGET AGENT: TestBot" in str(m)
+
+    def test_str_with_description(self) -> None:
+        m = AppManifest(name="TestBot", description="A helpful bot")
+        result = str(m)
+        assert "TARGET AGENT: TestBot" in result
+        assert "A helpful bot" in result
+
+    def test_str_with_tools(self) -> None:
+        m = AppManifest(
+            name="Agent",
+            tools=[
+                ToolDeclaration(
+                    name="send_email",
+                    description="Send an email",
+                    parameters={"to": "string"},
+                ),
+            ],
+        )
+        result = str(m)
+        assert "send_email" in result
+        assert "Send an email" in result
+        assert "Available tools:" in result
+
+    def test_str_with_data_sources(self) -> None:
+        m = AppManifest(
+            name="Agent",
+            data_sources=[
+                DataSource(name="SharePoint", writable_by_untrusted=True),
+                DataSource(name="Exchange"),
+            ],
+        )
+        result = str(m)
+        assert "SharePoint" in result
+        assert "writable by untrusted users" in result
+        assert "Exchange" in result
+        assert "Accessible data sources:" in result

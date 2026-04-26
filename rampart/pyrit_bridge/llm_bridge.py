@@ -14,12 +14,13 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 from uuid import uuid4
 
-from pyrit.identifiers import ComponentIdentifier
 from pyrit.models import MessagePiece
-from pyrit.prompt_normalizer import PromptNormalizer
 from pyrit.prompt_target import OpenAIChatTarget, PromptChatTarget
 
 if TYPE_CHECKING:
+    from pyrit.identifiers import ComponentIdentifier
+    from pyrit.prompt_normalizer import PromptNormalizer
+
     from rampart.core.llm import LLMConfig
 
 # OpenAIChatTarget constructor parameters that can be forwarded

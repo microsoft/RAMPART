@@ -324,3 +324,100 @@ class TestDriverErrorHandling:
         event_types = [e.event for e in handler.events]
         assert ExecutionEvent.ON_POST_EXECUTE in event_types
         assert ExecutionEvent.ON_ERROR not in event_types
+
+
+class TestEvaluateTurnAsync:
+    @pytest.mark.asyncio
+    async def test_returns_turn_with_eval_result(self) -> None:
+        from unittest.mock import AsyncMock
+
+        from rampart.core.execution import evaluate_turn_async
+        from rampart.core.types import (
+            EvalOutcome,
+            EvalResult,
+            Request,
+            Response,
+        )
+
+        evaluator = AsyncMock()
+        evaluator.evaluate_async.return_value = EvalResult(
+            outcome=EvalOutcome.DETECTED,
+            rationale="found it",
+        )
+
+        turn = await evaluate_turn_async(
+            evaluator=evaluator,
+            history=[],
+            request=Request(prompt="hello"),
+            response=Response(text="world"),
+            turn_number=0,
+        )
+
+        assert turn.eval_result is not None
+        assert turn.eval_result.outcome is EvalOutcome.DETECTED
+        assert turn.request.prompt == "hello"
+        assert turn.response.text == "world"
+        assert turn.turn_number == 0
+
+    @pytest.mark.asyncio
+    async def test_includes_history_in_context(self) -> None:
+        from unittest.mock import AsyncMock
+
+        from rampart.core.execution import evaluate_turn_async
+        from rampart.core.types import (
+            EvalOutcome,
+            EvalResult,
+            Request,
+            Response,
+            Turn,
+        )
+
+        captured_context = None
+
+        async def capture_eval(*, context):
+            nonlocal captured_context
+            captured_context = context
+            return EvalResult(outcome=EvalOutcome.NOT_DETECTED)
+
+        evaluator = AsyncMock()
+        evaluator.evaluate_async.side_effect = capture_eval
+
+        history_turn = Turn(
+            request=Request(prompt="prev"),
+            response=Response(text="prev_resp"),
+        )
+
+        await evaluate_turn_async(
+            evaluator=evaluator,
+            history=[history_turn],
+            request=Request(prompt="current"),
+            response=Response(text="current_resp"),
+            turn_number=1,
+            driver_reasoning="test reasoning",
+        )
+
+        assert captured_context is not None
+        assert len(captured_context.turns) == 2
+        assert captured_context.turns[0].request.prompt == "prev"
+        assert captured_context.turns[1].request.prompt == "current"
+
+    @pytest.mark.asyncio
+    async def test_preserves_driver_reasoning(self) -> None:
+        from unittest.mock import AsyncMock
+
+        from rampart.core.execution import evaluate_turn_async
+        from rampart.core.types import EvalOutcome, EvalResult, Request, Response
+
+        evaluator = AsyncMock()
+        evaluator.evaluate_async.return_value = EvalResult(outcome=EvalOutcome.DETECTED)
+
+        turn = await evaluate_turn_async(
+            evaluator=evaluator,
+            history=[],
+            request=Request(prompt="p"),
+            response=Response(text="r"),
+            turn_number=0,
+            driver_reasoning="choosing carefully",
+        )
+
+        assert turn.driver_reasoning == "choosing carefully"
