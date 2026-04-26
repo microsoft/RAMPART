@@ -40,4 +40,20 @@ jobs:
 
       - name: Run tests with coverage
         id: tests
-        run: uv run pytest tests/unit --cov=rampart --cov-report=term-missing --cov-fail-under=80
+        # Use 'coverage run' instead of 'pytest --cov' so that coverage
+        # starts BEFORE pytest loads plugins. rampart registers a pytest
+        # plugin via the pytest11 entry point — if coverage starts after
+        # plugin loading, all module-level code imported during plugin
+        # setup is invisible to the tracer.
+        run: uv run coverage run -m pytest tests/unit -q
+
+      - name: Coverage summary
+        if: ${{ steps.tests.outcome == 'success' }}
+        run: |
+          echo '## Coverage Report' >> $GITHUB_STEP_SUMMARY
+          uv run coverage report --format=markdown --fail-under=0 >> $GITHUB_STEP_SUMMARY
+
+      - name: Check coverage threshold
+        if: ${{ steps.tests.outcome == 'success' }}
+        # Threshold is defined in pyproject.toml [tool.coverage.report] fail_under
+        run: uv run coverage report
