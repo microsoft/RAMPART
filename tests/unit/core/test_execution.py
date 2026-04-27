@@ -16,7 +16,13 @@ from rampart.core.execution import (
 )
 from rampart.core.manifest import AppManifest
 from rampart.core.result import Result, SafetyStatus
-from rampart.core.types import ObservabilityLevel, Request, Response
+from rampart.core.types import (
+    EvalContext,
+    EvalResult,
+    ObservabilityLevel,
+    Request,
+    Response,
+)
 
 
 class _StubSession:
@@ -351,7 +357,6 @@ class TestEvaluateTurnAsync:
         from rampart.core.execution import evaluate_turn_async
         from rampart.core.types import (
             EvalOutcome,
-            EvalResult,
             Request,
             Response,
         )
@@ -383,7 +388,6 @@ class TestEvaluateTurnAsync:
         from rampart.core.execution import evaluate_turn_async
         from rampart.core.types import (
             EvalOutcome,
-            EvalResult,
             Request,
             Response,
             Turn,
@@ -391,7 +395,7 @@ class TestEvaluateTurnAsync:
 
         captured_context = None
 
-        async def capture_eval(*, context):
+        async def capture_eval(*, context: EvalContext) -> EvalResult:
             nonlocal captured_context
             captured_context = context
             return EvalResult(outcome=EvalOutcome.NOT_DETECTED)
@@ -423,7 +427,7 @@ class TestEvaluateTurnAsync:
         from unittest.mock import AsyncMock
 
         from rampart.core.execution import evaluate_turn_async
-        from rampart.core.types import EvalOutcome, EvalResult, Request, Response
+        from rampart.core.types import EvalOutcome, Request, Response
 
         evaluator = AsyncMock()
         evaluator.evaluate_async.return_value = EvalResult(outcome=EvalOutcome.DETECTED)

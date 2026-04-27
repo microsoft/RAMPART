@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import ast
 import importlib.util
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -23,7 +23,10 @@ class TestModelNameResolution:
     """LLMConfig.model and .deployment map to PyRIT's model_name / underlying_model."""
 
     @patch("rampart.pyrit_bridge.llm_bridge.OpenAIChatTarget")
-    def test_model_becomes_model_name_without_deployment(self, mock_cls):
+    def test_model_becomes_model_name_without_deployment(
+        self,
+        mock_cls: MagicMock,
+    ) -> None:
         create_prompt_target(
             LLMConfig(
                 model="gpt-4o",
@@ -37,7 +40,10 @@ class TestModelNameResolution:
         assert kwargs["underlying_model"] is None
 
     @patch("rampart.pyrit_bridge.llm_bridge.OpenAIChatTarget")
-    def test_deployment_becomes_model_name_with_model_as_underlying(self, mock_cls):
+    def test_deployment_becomes_model_name_with_model_as_underlying(
+        self,
+        mock_cls: MagicMock,
+    ) -> None:
         create_prompt_target(
             LLMConfig(
                 model="gpt-4o",
@@ -56,7 +62,7 @@ class TestEndpointAndAuth:
     """Endpoint and api_key are forwarded directly to PyRIT."""
 
     @patch("rampart.pyrit_bridge.llm_bridge.OpenAIChatTarget")
-    def test_endpoint_forwarded(self, mock_cls):
+    def test_endpoint_forwarded(self, mock_cls: MagicMock) -> None:
         create_prompt_target(
             LLMConfig(
                 model="gpt-4o",
@@ -68,7 +74,7 @@ class TestEndpointAndAuth:
         assert mock_cls.call_args.kwargs["endpoint"] == "https://custom.endpoint.com/v1"
 
     @patch("rampart.pyrit_bridge.llm_bridge.OpenAIChatTarget")
-    def test_api_key_forwarded(self, mock_cls):
+    def test_api_key_forwarded(self, mock_cls: MagicMock) -> None:
         create_prompt_target(
             LLMConfig(
                 model="gpt-4o",
@@ -80,7 +86,7 @@ class TestEndpointAndAuth:
         assert mock_cls.call_args.kwargs["api_key"] == "sk-secret"
 
     @patch("rampart.pyrit_bridge.llm_bridge.OpenAIChatTarget")
-    def test_none_api_key_forwarded_for_entra_auth(self, mock_cls):
+    def test_none_api_key_forwarded_for_entra_auth(self, mock_cls: MagicMock) -> None:
         """None api_key lets PyRIT use Entra ID auth for Azure endpoints."""
         create_prompt_target(
             LLMConfig(
@@ -96,7 +102,7 @@ class TestMetadataForwarding:
     """Recognised model parameters in metadata are forwarded; unknown keys are not."""
 
     @patch("rampart.pyrit_bridge.llm_bridge.OpenAIChatTarget")
-    def test_temperature_and_top_p_forwarded(self, mock_cls):
+    def test_temperature_and_top_p_forwarded(self, mock_cls: MagicMock) -> None:
         create_prompt_target(
             LLMConfig(
                 model="gpt-4o",
@@ -111,7 +117,7 @@ class TestMetadataForwarding:
         assert kwargs["top_p"] == 0.9
 
     @patch("rampart.pyrit_bridge.llm_bridge.OpenAIChatTarget")
-    def test_all_recognised_params_forwarded(self, mock_cls):
+    def test_all_recognised_params_forwarded(self, mock_cls: MagicMock) -> None:
         meta = {
             "temperature": 0.5,
             "top_p": 0.8,
@@ -138,7 +144,7 @@ class TestMetadataForwarding:
             assert kwargs[key] == value, f"metadata[{key!r}] not forwarded"
 
     @patch("rampart.pyrit_bridge.llm_bridge.OpenAIChatTarget")
-    def test_unknown_metadata_keys_not_forwarded(self, mock_cls):
+    def test_unknown_metadata_keys_not_forwarded(self, mock_cls: MagicMock) -> None:
         create_prompt_target(
             LLMConfig(
                 model="gpt-4o",
@@ -153,7 +159,7 @@ class TestMetadataForwarding:
         assert kwargs["temperature"] == 0.5
 
     @patch("rampart.pyrit_bridge.llm_bridge.OpenAIChatTarget")
-    def test_empty_metadata_adds_no_extra_kwargs(self, mock_cls):
+    def test_empty_metadata_adds_no_extra_kwargs(self, mock_cls: MagicMock) -> None:
         create_prompt_target(
             LLMConfig(
                 model="gpt-4o",
@@ -172,7 +178,7 @@ class TestMetadataForwarding:
         }
 
     @patch("rampart.pyrit_bridge.llm_bridge.OpenAIChatTarget")
-    def test_is_json_supported_false_forwarded(self, mock_cls):
+    def test_is_json_supported_false_forwarded(self, mock_cls: MagicMock) -> None:
         create_prompt_target(
             LLMConfig(
                 model="gpt-4o",
@@ -190,7 +196,7 @@ class TestReturnValue:
     """create_prompt_target returns the constructed target."""
 
     @patch("rampart.pyrit_bridge.llm_bridge.OpenAIChatTarget")
-    def test_returns_constructed_target(self, mock_cls):
+    def test_returns_constructed_target(self, mock_cls: MagicMock) -> None:
         result = create_prompt_target(
             LLMConfig(
                 model="gpt-4o",

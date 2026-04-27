@@ -4,6 +4,7 @@
 """Tests for rampart.core.types — core data model."""
 
 import dataclasses
+from pathlib import Path
 
 import pytest
 
@@ -43,18 +44,18 @@ class TestPayload:
         with pytest.raises(TypeError, match="requires an artifact"):
             Payload(content="img", format=PayloadFormat.IMAGE)
 
-    def test_text_format_rejects_artifact(self, tmp_path):
+    def test_text_format_rejects_artifact(self, tmp_path: Path) -> None:
         artifact = tmp_path / "file.txt"
         artifact.write_text("x")
         with pytest.raises(TypeError, match="artifact must be None"):
             Payload(content="text", format=PayloadFormat.TEXT, artifact=artifact)
 
-    def test_binary_format_with_missing_artifact(self, tmp_path):
+    def test_binary_format_with_missing_artifact(self, tmp_path: Path) -> None:
         missing = tmp_path / "missing.png"
         with pytest.raises(FileNotFoundError, match="does not exist"):
             Payload(content="img", format=PayloadFormat.IMAGE, artifact=missing)
 
-    def test_binary_format_with_valid_artifact(self, tmp_path):
+    def test_binary_format_with_valid_artifact(self, tmp_path: Path) -> None:
         artifact = tmp_path / "test.png"
         artifact.write_bytes(b"\x89PNG")
         p = Payload(content="img", format=PayloadFormat.IMAGE, artifact=artifact)
