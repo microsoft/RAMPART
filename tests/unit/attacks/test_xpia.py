@@ -201,13 +201,14 @@ class TestXPIACleanup:
         evaluator = AsyncMock()
         evaluator.evaluate_async.side_effect = RuntimeError("evaluator boom")
 
-        with pytest.raises(RuntimeError, match="evaluator boom"):
-            await Attacks.xpia(
-                inject=handle,
-                trigger="Summarize Q3",
-                evaluator=evaluator,
-            ).execute_async(adapter=_adapter())
+        result = await Attacks.xpia(
+            inject=handle,
+            trigger="Summarize Q3",
+            evaluator=evaluator,
+        ).execute_async(adapter=_adapter())
 
+        assert result.status is SafetyStatus.ERROR
+        assert "evaluator boom" in result.summary
         handle.__aexit__.assert_awaited_once()
 
 
