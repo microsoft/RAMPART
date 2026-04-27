@@ -203,34 +203,51 @@ class TestInfrastructureErrorHandling:
         assert ExecutionEvent.ON_ERROR not in event_types
 
 
-class TestGenericErrorPropagation:
+class TestGenericErrorHandling:
     @pytest.mark.asyncio
-    async def test_non_infra_error_propagates(self) -> None:
+    async def test_produces_error_result(self) -> None:
         execution = _GenericErrorExecution()
 
-        with pytest.raises(RuntimeError, match="unexpected failure"):
-            await execution.execute_async(adapter=_StubAdapter())
+        result = await execution.execute_async(adapter=_StubAdapter())
+
+        assert result.safe is False
+        assert result.status is SafetyStatus.ERROR
+        assert "unexpected failure" in result.summary
 
     @pytest.mark.asyncio
-    async def test_on_error_fires_before_propagation(self) -> None:
+    async def test_error_result_has_strategy(self) -> None:
+        execution = _GenericErrorExecution()
+
+        result = await execution.execute_async(adapter=_StubAdapter())
+
+        assert result.strategy == "generic_error"
+
+    @pytest.mark.asyncio
+    async def test_error_result_has_metadata(self) -> None:
+        execution = _GenericErrorExecution()
+
+        result = await execution.execute_async(adapter=_StubAdapter())
+
+        assert result.metadata["error"] == "unexpected failure"
+        assert result.metadata["error_type"] == "RuntimeError"
+
+    @pytest.mark.asyncio
+    async def test_fires_on_error_and_post_execute(self) -> None:
         handler = _RecordingHandler()
         execution = _GenericErrorExecution(event_handlers=[handler])
 
-        with pytest.raises(RuntimeError):
-            await execution.execute_async(adapter=_StubAdapter())
+        await execution.execute_async(adapter=_StubAdapter())
 
         event_types = [e.event for e in handler.events]
-        assert ExecutionEvent.ON_PRE_EXECUTE in event_types
         assert ExecutionEvent.ON_ERROR in event_types
-        assert ExecutionEvent.ON_POST_EXECUTE not in event_types
+        assert ExecutionEvent.ON_POST_EXECUTE in event_types
 
     @pytest.mark.asyncio
     async def test_on_error_contains_exception(self) -> None:
         handler = _RecordingHandler()
         execution = _GenericErrorExecution(event_handlers=[handler])
 
-        with pytest.raises(RuntimeError):
-            await execution.execute_async(adapter=_StubAdapter())
+        await execution.execute_async(adapter=_StubAdapter())
 
         error_event = [e for e in handler.events if e.event is ExecutionEvent.ON_ERROR][
             0

@@ -16,7 +16,7 @@ RAMPART is organized as a modular framework with these main components:
 - **Payloads** (`rampart/payloads/`) — Payload generation, storage, and templating.
 - **Reporting** (`rampart/reporting/`) — Test result reporting (JSON file sink).
 - **Pytest Plugin** (`rampart/pytest_plugin/`) — Native pytest integration for test collection and session management.
-- **PyRIT Bridge** (`rampart/_pyrit/`) — Isolated boundary for all PyRIT framework interaction (see coding standards for import rules).
+- **PyRIT Bridge** (`rampart/pyrit_bridge/`) — Isolated boundary for all PyRIT framework interaction (see coding standards for import rules).
 
 ## Instruction Files
 

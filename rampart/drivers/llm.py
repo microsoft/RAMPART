@@ -88,17 +88,6 @@ class LLMDriver:
 
     One driver instance = one driver-side conversation. Construct a
     new driver per test. Use ``from_target`` for custom targets.
-
-    Args:
-        llm: LLM configuration for the driving model.
-        persona: System-prompt identity for the LLM. Personas are
-            reusable across many tests.
-        objective: Per-test goal as a natural-language string. Optional;
-            XPIA benign-trigger flows often leave this None.
-        injections: Payloads placed in the agent's data sources.
-            Metadata (id, format, description) is embedded in the
-            system prompt so the LLM can reference them naturally.
-            None when no injections.
     """
 
     def __init__(
@@ -121,10 +110,13 @@ class LLMDriver:
             injections: Payloads placed in the agent's data sources.
 
         Raises:
-            TypeError: If both ``llm`` and ``target`` are provided.
+            TypeError: If both or neither of ``llm`` and ``target`` are provided.
         """
         if llm is not None and target is not None:
             msg = "Provide either 'llm' or 'target', not both."
+            raise TypeError(msg)
+        if llm is None and target is None:
+            msg = "Provide either 'llm' or 'target'."
             raise TypeError(msg)
 
         self._llm = llm
@@ -180,28 +172,19 @@ class LLMDriver:
         if self._initialized:
             return
 
-        if self._target is not None:
-            # from_target path: target exists, need normalizer + system prompt
-            if self._normalizer is None:
-                self._normalizer = PromptNormalizer()
-            self._target.set_system_prompt(
-                system_prompt=self._build_system_prompt(),
-                conversation_id=self._conversation_id,
-            )
-        else:
-            # LLMConfig path: create everything from scratch
+        if self._target is None:
             if self._llm is None:
-                msg = (
-                    "LLMDriver: no LLM config and no target — use "
-                    "from_target() or provide an LLMConfig."
-                )
+                msg = "LLMDriver: no LLM config and no target."
                 raise DriverError(msg)
             self._target = create_prompt_target(self._llm)
+
+        if self._normalizer is None:
             self._normalizer = PromptNormalizer()
-            self._target.set_system_prompt(
-                system_prompt=self._build_system_prompt(),
-                conversation_id=self._conversation_id,
-            )
+
+        self._target.set_system_prompt(
+            system_prompt=self._build_system_prompt(),
+            conversation_id=self._conversation_id,
+        )
 
         self._initialized = True
 
@@ -215,16 +198,15 @@ class LLMDriver:
         Sends the latest agent-side turn data to the driving LLM and
         returns its plain-text response as the next prompt.
 
-        Raises:
-            DriverError: If the LLM call fails or returns an empty
-                response.
-
         Args:
             history: All agent-side turns so far (empty on first call).
 
         Returns:
-            The next decision. Never returns None — termination is
-            handled externally by the evaluator or max_turns.
+            The next prompt decision.
+
+        Raises:
+            DriverError: If the LLM call fails or returns an empty
+                response.
         """
         self._ensure_initialized()
         self._assert_conversations_consistent(history)

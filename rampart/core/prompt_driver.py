@@ -4,7 +4,6 @@
 """PromptDriver protocol and PromptDecision.
 
 Drivers generate the prompts sent to the agent during an execution.
-The protocol is stateless from the caller's perspective.
 """
 
 from __future__ import annotations
@@ -42,9 +41,11 @@ class PromptDriver(Protocol):
     session, evaluation, or result production — those belong to
     the execution strategy.
 
-    Drivers are stateless from the protocol's perspective: they
-    receive conversation history and return the next decision. This
-    makes them safe to reuse across tests.
+    The protocol signature is stateless — drivers receive
+    conversation history and return the next decision. However,
+    some implementations may hold internal state. Refer to
+    specific driver implementations for reuse and lifecycle
+    details.
 
     Returns None when there are no more prompts to send.
     """

@@ -33,9 +33,12 @@ class ExecutionEvent(Enum):
     """Lifecycle events fired during a BaseExecution run.
 
     ON_PRE_EXECUTE:  Fired before _execute_async is called.
-    ON_POST_EXECUTE: Fired after _execute_async returns a Result.
-    ON_ERROR:        Fired if _execute_async raises. The exception
-                     is re-raised after all handlers have been notified.
+    ON_POST_EXECUTE: Fired after _execute_async returns a Result
+                     (including error results).
+    ON_ERROR:        Fired when _execute_async raises an unexpected
+                     exception (not InfrastructureError/DriverError).
+                     The exception is converted to an ERROR result
+                     after handlers are notified.
     """
 
     ON_PRE_EXECUTE = "on_pre_execute"
@@ -174,7 +177,8 @@ class BaseExecution(ABC):
     """ABC for all execution strategies.
 
     Owns the execution lifecycle: ON_PRE_EXECUTE → _execute_async →
-    ON_POST_EXECUTE (or ON_ERROR). Subclasses implement only
+    ON_POST_EXECUTE (ON_ERROR fires for unexpected exceptions).
+    Subclasses implement only
     _execute_async — the skeleton is fixed here.
 
     Cross-cutting concerns (result collection, timing, infrastructure
@@ -215,20 +219,19 @@ class BaseExecution(ABC):
         Fires lifecycle events and delegates to _execute_async for
         strategy-specific logic.
 
-        InfrastructureError from _execute_async is caught here and
-        converted to a Result with SafetyStatus.ERROR.
+        InfrastructureError and DriverError from _execute_async are
+        caught here and converted to a Result with SafetyStatus.ERROR.
 
-        Other exceptions propagate after ON_ERROR fires.
+        All other exceptions are also caught and converted to an
+        ERROR result to prevent a single test from crashing the
+        suite. Unexpected exceptions are logged at ERROR level to
+        ensure they are investigated.
 
         Args:
             adapter (AgentAdapter): The agent to test.
 
         Returns:
             Result: Safety verdict with evidence and diagnostics.
-
-        Raises:
-            Exception: Any non-InfrastructureError exception from
-                _execute_async, after notifying handlers via ON_ERROR.
         """
         start = time.monotonic()
         await self._fire(
@@ -239,15 +242,31 @@ class BaseExecution(ABC):
 
         try:
             result = await self._execute_async(adapter=adapter)
-        except (InfrastructureError, DriverError) as exc:
+        except Exception as exc:
             error_type = type(exc).__name__
-            logger.warning(
-                "%s during %s execution: %s",
-                error_type,
-                self.strategy_name,
-                exc,
-                exc_info=True,
-            )
+            is_expected = isinstance(exc, (InfrastructureError, DriverError))
+
+            if is_expected:
+                logger.warning(
+                    "%s during %s execution: %s",
+                    error_type,
+                    self.strategy_name,
+                    exc,
+                    exc_info=True,
+                )
+            else:
+                logger.exception(
+                    "Unexpected %s during %s execution",
+                    error_type,
+                    self.strategy_name,
+                )
+                await self._fire(
+                    ExecutionEvent.ON_ERROR,
+                    adapter=adapter,
+                    elapsed=time.monotonic() - start,
+                    error=exc,
+                )
+
             result = Result(
                 safe=False,
                 status=SafetyStatus.ERROR,
@@ -256,15 +275,6 @@ class BaseExecution(ABC):
                 observability_level=adapter.observability_profile,
                 metadata={"error": str(exc), "error_type": error_type},
             )
-        except Exception as exc:
-            elapsed = time.monotonic() - start
-            await self._fire(
-                ExecutionEvent.ON_ERROR,
-                adapter=adapter,
-                elapsed=elapsed,
-                error=exc,
-            )
-            raise
 
         elapsed = time.monotonic() - start
         result.duration_seconds = elapsed

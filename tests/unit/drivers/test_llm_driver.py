@@ -67,6 +67,10 @@ class TestLLMDriverProtocolCompliance:
                 persona=_TEST_PERSONA,
             )
 
+    def test_rejects_neither_llm_nor_target(self) -> None:
+        with pytest.raises(TypeError, match="Provide either"):
+            LLMDriver(persona=_TEST_PERSONA)
+
 
 class TestLLMDriverLazyInit:
     def test_construction_does_not_call_create_prompt_target(self) -> None:

@@ -554,10 +554,10 @@ logger.warning("Cleanup error during %s: %s", self.name, exc, exc_info=True)
 logger.info(f"Saved {len(payloads)} payloads to '{name}'")
 ```
 
-## PyRIT Boundary Isolation
+## PyRIT Bridge
 
-- **All PyRIT interaction MUST be isolated to `rampart/_pyrit/`**
-- Do NOT import PyRIT modules from anywhere else in the codebase (except `rampart/converters/` for converter wrappers)
+- Prefer grouping PyRIT-related logic under `rampart/pyrit_bridge/` to keep a clear boundary between RAMPART and PyRIT internals
+- PyRIT imports are allowed anywhere in the codebase when needed
 - PyRIT's import chain is heavy (~14s) — use lazy imports inside functions when wrapping PyRIT converters to defer the cost
 
 ```python
@@ -584,7 +584,7 @@ Before committing code, ensure:
 - [ ] Complex logic is extracted to helper methods
 - [ ] Copyright header is present
 - [ ] Log calls use `%s`-style formatting (no f-strings)
-- [ ] PyRIT imports are isolated to `rampart/_pyrit/` (or lazy in converters)
+- [ ] PyRIT logic is grouped under `rampart/pyrit_bridge/` where practical
 
 ---
 
