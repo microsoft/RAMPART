@@ -8,11 +8,13 @@ configurable output directory. Ships with the framework as a
 built-in ``ReportSink`` for teams that want local file output
 without building a custom sink.
 
-Teams wire it up in their conftest::
+Teams wire it up in their conftest:
 
-    @pytest.fixture(scope="session")
-    def rampart_sinks():
-        return [JsonFileReportSink(output_dir=Path(".report"))]
+```python
+@pytest.fixture(scope="session")
+def rampart_sinks():
+    return [JsonFileReportSink(output_dir=Path(".report"))]
+```
 """
 
 from __future__ import annotations

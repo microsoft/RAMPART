@@ -358,11 +358,13 @@ def _rampart_sink_bootstrap(  # pyright: ignore[reportUnusedFunction]  # pytest 
     picks it up and registers those sinks for report emission at
     session end.
 
-    Example in a team's conftest.py::
+    Example in a team's conftest.py:
 
-        @pytest.fixture(scope="session")
-        def rampart_sinks():
-            return [JsonFileReportSink(output_dir=Path(".report"))]
+    ```python
+    @pytest.fixture(scope="session")
+    def rampart_sinks():
+        return [JsonFileReportSink(output_dir=Path(".report"))]
+    ```
 
     No test author ever imports or references this fixture.
     """

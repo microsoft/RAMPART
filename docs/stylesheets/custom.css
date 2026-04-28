@@ -1,0 +1,28 @@
+:root,
+[data-md-color-scheme="default"] {
+  --md-primary-fg-color: #2d2d2d;
+  --md-primary-fg-color--light: #3a3a3a;
+  --md-primary-fg-color--dark: #1a1a1a;
+  --md-primary-bg-color: #ffffff;
+  --md-accent-fg-color: #e8a317;
+  --md-typeset-a-color: #d4911a;
+}
+
+[data-md-color-scheme="slate"] {
+  --md-primary-fg-color: #1a1a1a;
+  --md-primary-fg-color--light: #2d2d2d;
+  --md-primary-fg-color--dark: #111111;
+  --md-accent-fg-color: #e8a317;
+  --md-typeset-a-color: #f0b030;
+}
+
+/* Navigation active/hover highlights */
+.md-nav__link--active,
+.md-nav__link:hover {
+  color: #e8a317 !important;
+}
+
+/* Header bar */
+.md-header {
+  background-color: #1a1a1a;
+}

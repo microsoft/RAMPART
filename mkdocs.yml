@@ -1,0 +1,116 @@
+site_name: RAMPART
+site_description: A pytest-native safety testing framework for agentic AI applications
+repo_url: https://github.com/microsoft/RAMPART
+repo_name: microsoft/RAMPART
+
+theme:
+  name: material
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: custom
+      accent: amber
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: custom
+      accent: amber
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.sections
+    - navigation.expand
+    - navigation.indexes
+    - navigation.top
+    - content.code.copy
+    - toc.follow
+  icon:
+    repo: fontawesome/brands/github
+
+extra_css:
+  - stylesheets/custom.css
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.tabbed:
+      alternate_style: true
+  - tables
+  - toc:
+      permalink: true
+  - attr_list
+  - def_list
+
+plugins:
+  - search
+  - mkdocstrings:
+      default_handler: python
+      handlers:
+        python:
+          paths: [.]
+          options:
+            docstring_style: google
+            show_source: true
+            show_root_heading: true
+            show_root_full_path: false
+            show_symbol_type_heading: true
+            show_symbol_type_toc: true
+            members_order: source
+            merge_init_into_class: true
+            show_if_no_docstring: false
+            signature_crossrefs: true
+            separate_signature: true
+            heading_level: 2
+            filters:
+              - "!^_"
+
+nav:
+  - Home: index.md
+  - Getting Started:
+      - getting-started/index.md
+      - Installation: getting-started/installation.md
+      - Quickstart: getting-started/quickstart.md
+      - pytest Integration: getting-started/pytest-integration.md
+  - Concepts:
+      - concepts/index.md
+      - Overview: concepts/overview.md
+      - Attacks: concepts/attacks.md
+      - Probes: concepts/probes.md
+      - PyRIT Integration: concepts/pyrit.md
+  - Attacks:
+      - attacks/index.md
+      - XPIA: attacks/xpia.md
+  - Probes:
+      - probes/index.md
+      - Behavioral: probes/behavioral.md
+  - Guides:
+      - guides/index.md
+      - Authoring Tests: guides/authoring-tests.md
+      - Configuration: guides/configuration.md
+      - Results & Reporting: guides/results-and-reporting.md
+      - CI Integration: guides/ci-integration.md
+  - API Reference:
+      - api/index.md
+      - Core Types: api/core-types.md
+      - Core Protocols: api/core-protocols.md
+      - Attacks: api/attacks.md
+      - Probes: api/probes.md
+      - Evaluators: api/evaluators.md
+      - Drivers: api/drivers.md
+      - Payloads: api/payloads.md
+      - Surfaces: api/surfaces.md
+      - Converters: api/converters.md
+      - Reporting: api/reporting.md
+      - pytest Plugin: api/pytest-plugin.md
+  - Glossary: glossary.md

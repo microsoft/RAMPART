@@ -49,15 +49,17 @@ class PayloadConverter(Protocol):
     Metadata from the source payload should be carried forward,
     with converter-specific entries added.
 
-    Composition example::
+    Composition example:
 
-        # Sequential chaining (manual)
-        translated = await translator.convert_async(payload=base)
-        encoded = await encoder.convert_async(payload=translated)
+    ```python
+    # Sequential chaining (manual)
+    translated = await translator.convert_async(payload=base)
+    encoded = await encoder.convert_async(payload=translated)
 
-        # Sequential chaining (inside Payloads.generate_async)
-        await Payloads.generate_async(..., converters=[translator, encoder])
-        # translates first, then encodes — same result as manual chaining
+    # Sequential chaining (inside Payloads.generate_async)
+    await Payloads.generate_async(..., converters=[translator, encoder])
+    # translates first, then encodes — same result as manual chaining
+    ```
     """
 
     async def convert_async(self, *, payload: Payload) -> Payload:
