@@ -60,6 +60,9 @@ Issues = "https://github.com/microsoft/RAMPART/issues"
 [project.entry-points.pytest11]
 rampart = "rampart.pytest_plugin.plugin"
 
+[tool.setuptools.packages.find]
+exclude = ["site*", "docs*", "tests*", "scripts*"]
+
 [tool.setuptools.package-data]
 rampart = ["drivers/prompts/*.yaml"]
 

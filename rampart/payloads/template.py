@@ -38,7 +38,6 @@ class PayloadTemplate:
     jailbreak prompts, or content safety test inputs.
 
     Example:
-
     ```python
     email_exfil = PayloadTemplate(
         name="email_exfiltration",
