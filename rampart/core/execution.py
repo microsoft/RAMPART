@@ -17,7 +17,6 @@ from dataclasses import dataclass, replace
 from enum import Enum
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
-from rampart.core.errors import DriverError, InfrastructureError
 from rampart.core.result import Result, SafetyStatus
 from rampart.core.types import EvalContext, Request, Response, Turn
 
@@ -35,8 +34,7 @@ class ExecutionEvent(Enum):
     ON_PRE_EXECUTE:  Fired before _execute_async is called.
     ON_POST_EXECUTE: Fired after _execute_async returns a Result
                      (including error results).
-    ON_ERROR:        Fired when _execute_async raises an unexpected
-                     exception (not InfrastructureError/DriverError).
+    ON_ERROR:        Fired when _execute_async raises any exception.
                      The exception is converted to an ERROR result
                      after handlers are notified.
     """
@@ -185,9 +183,9 @@ class BaseExecution(ABC):
     error handling) are handled by the lifecycle skeleton and
     ExecutionEventHandlers.
 
-    Infrastructure resilience is a base-class concern. If
-    _execute_async raises InfrastructureError, the base class catches
-    it and produces a Result with SafetyStatus.ERROR.
+    Infrastructure resilience is a base-class concern. Any
+    exception from _execute_async is caught and produces a
+    Result with SafetyStatus.ERROR.
 
     Args:
         event_handlers (list[ExecutionEventHandler] | None): Additional
@@ -219,13 +217,9 @@ class BaseExecution(ABC):
         Fires lifecycle events and delegates to _execute_async for
         strategy-specific logic.
 
-        InfrastructureError and DriverError from _execute_async are
-        caught here and converted to a Result with SafetyStatus.ERROR.
-
-        All other exceptions are also caught and converted to an
-        ERROR result to prevent a single test from crashing the
-        suite. Unexpected exceptions are logged at ERROR level to
-        ensure they are investigated.
+        All exceptions from _execute_async are caught and converted
+        to a Result with SafetyStatus.ERROR, preventing a single test
+        from crashing the suite.
 
         Args:
             adapter (AgentAdapter): The agent to test.
@@ -244,28 +238,18 @@ class BaseExecution(ABC):
             result = await self._execute_async(adapter=adapter)
         except Exception as exc:
             error_type = type(exc).__name__
-            is_expected = isinstance(exc, (InfrastructureError, DriverError))
+            logger.exception(
+                "%s during %s execution",
+                error_type,
+                self.strategy_name,
+            )
 
-            if is_expected:
-                logger.warning(
-                    "%s during %s execution: %s",
-                    error_type,
-                    self.strategy_name,
-                    exc,
-                    exc_info=True,
-                )
-            else:
-                logger.exception(
-                    "Unexpected %s during %s execution",
-                    error_type,
-                    self.strategy_name,
-                )
-                await self._fire(
-                    ExecutionEvent.ON_ERROR,
-                    adapter=adapter,
-                    elapsed=time.monotonic() - start,
-                    error=exc,
-                )
+            await self._fire(
+                ExecutionEvent.ON_ERROR,
+                adapter=adapter,
+                elapsed=time.monotonic() - start,
+                error=exc,
+            )
 
             result = Result(
                 safe=False,

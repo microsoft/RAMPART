@@ -198,15 +198,15 @@ class TestInfrastructureErrorHandling:
         assert result.metadata["error_type"] == "InfrastructureError"
 
     @pytest.mark.asyncio
-    async def test_fires_post_execute_not_on_error(self) -> None:
+    async def test_fires_on_error_and_post_execute(self) -> None:
         handler = _RecordingHandler()
         execution = _InfraErrorExecution(event_handlers=[handler])
 
         await execution.execute_async(adapter=_StubAdapter())
 
         event_types = [e.event for e in handler.events]
+        assert ExecutionEvent.ON_ERROR in event_types
         assert ExecutionEvent.ON_POST_EXECUTE in event_types
-        assert ExecutionEvent.ON_ERROR not in event_types
 
 
 class TestGenericErrorHandling:
@@ -338,15 +338,15 @@ class TestDriverErrorHandling:
         assert result.metadata["error_type"] == "DriverError"
 
     @pytest.mark.asyncio
-    async def test_fires_post_execute_not_on_error(self) -> None:
+    async def test_fires_on_error_and_post_execute(self) -> None:
         handler = _RecordingHandler()
         execution = _DriverErrorExecution(event_handlers=[handler])
 
         await execution.execute_async(adapter=_StubAdapter())
 
         event_types = [e.event for e in handler.events]
+        assert ExecutionEvent.ON_ERROR in event_types
         assert ExecutionEvent.ON_POST_EXECUTE in event_types
-        assert ExecutionEvent.ON_ERROR not in event_types
 
 
 class TestEvaluateTurnAsync:
