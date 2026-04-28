@@ -42,16 +42,26 @@ Both approaches install RAMPART and all dependencies, including [PyRIT](https://
 
 ## Install from Source
 
+### Using uv
+
+```bash
+uv init rampart-dev-env
+cd rampart-dev-env
+uv add rampart --git https://github.com/microsoft/RAMPART.git
+```
+
+### Using pip
+
 ```bash
 git clone https://github.com/microsoft/RAMPART.git
 cd RAMPART
-uv pip install -e .
+pip install -e .
 ```
 
 For development dependencies (linting, type checking, test tooling):
 
 ```bash
-uv pip install -e ".[dev]"
+pip install -e ".[dev]"
 ```
 
 ---
