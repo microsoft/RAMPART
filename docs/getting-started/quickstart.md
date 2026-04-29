@@ -51,6 +51,10 @@ class MyAgentSession:
         self._client = api_client
 
     async def send_async(self, request: Request) -> Response:
+        # Replace this with your agent's actual API call.
+        # This could be an OpenAI client, an HTTP request,
+        # a gRPC call, a Playwright browser session — whatever
+        # your agent exposes.
         raw_response = await self._client.chat(request.prompt)
 
         tool_calls = [
@@ -64,11 +68,14 @@ class MyAgentSession:
         )
 
     async def __aenter__(self):
-        await self._client.connect()
+        # Set up any resources your agent needs (API connections,
+        # browser contexts, auth tokens, etc.) — or do nothing.
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
-        await self._client.disconnect()
+        # Tear down resources. RAMPART calls this automatically
+        # after the test, even on failure.
+        pass
 
 
 class MyAgentAdapter:
