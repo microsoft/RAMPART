@@ -3,7 +3,6 @@
 
 """Tests for rampart.evaluators.tool_called — ToolCalled evaluator."""
 
-import pytest
 
 from rampart.core.types import (
     EvalContext,
@@ -43,19 +42,16 @@ def _multi_turn_ctx(turns_tool_calls: list[list[ToolCall]]) -> EvalContext:
 
 
 class TestToolCalledDetection:
-    @pytest.mark.asyncio
     async def test_detects_by_name(self) -> None:
         ctx = _ctx_with_tool_calls(ToolCall(name="send_email"))
         result = await ToolCalled("send_email").evaluate_async(context=ctx)
         assert result.outcome is EvalOutcome.DETECTED
 
-    @pytest.mark.asyncio
     async def test_not_detected_wrong_name(self) -> None:
         ctx = _ctx_with_tool_calls(ToolCall(name="read_file"))
         result = await ToolCalled("send_email").evaluate_async(context=ctx)
         assert result.outcome is EvalOutcome.NOT_DETECTED
 
-    @pytest.mark.asyncio
     async def test_not_detected_no_tool_calls(self) -> None:
         ctx = _ctx_with_tool_calls()
         result = await ToolCalled("send_email").evaluate_async(context=ctx)
@@ -63,7 +59,6 @@ class TestToolCalledDetection:
 
 
 class TestToolCalledParameterMatching:
-    @pytest.mark.asyncio
     async def test_exact_parameter_match(self) -> None:
         tc = ToolCall(name="send_email", arguments={"to": "evil@evil.com"})
         ctx = _ctx_with_tool_calls(tc)
@@ -72,7 +67,6 @@ class TestToolCalledParameterMatching:
         )
         assert result.outcome is EvalOutcome.DETECTED
 
-    @pytest.mark.asyncio
     async def test_exact_parameter_mismatch(self) -> None:
         tc = ToolCall(name="send_email", arguments={"to": "friend@company.com"})
         ctx = _ctx_with_tool_calls(tc)
@@ -81,7 +75,6 @@ class TestToolCalledParameterMatching:
         )
         assert result.outcome is EvalOutcome.NOT_DETECTED
 
-    @pytest.mark.asyncio
     async def test_predicate_parameter_match(self) -> None:
         tc = ToolCall(name="send_email", arguments={"to": "evil@evil.com"})
         ctx = _ctx_with_tool_calls(tc)
@@ -91,7 +84,6 @@ class TestToolCalledParameterMatching:
         ).evaluate_async(context=ctx)
         assert result.outcome is EvalOutcome.DETECTED
 
-    @pytest.mark.asyncio
     async def test_predicate_parameter_mismatch(self) -> None:
         tc = ToolCall(name="send_email", arguments={"to": "friend@company.com"})
         ctx = _ctx_with_tool_calls(tc)
@@ -101,7 +93,6 @@ class TestToolCalledParameterMatching:
         ).evaluate_async(context=ctx)
         assert result.outcome is EvalOutcome.NOT_DETECTED
 
-    @pytest.mark.asyncio
     async def test_missing_parameter_returns_none_to_predicate(self) -> None:
         tc = ToolCall(name="send_email", arguments={})
         ctx = _ctx_with_tool_calls(tc)
@@ -113,7 +104,6 @@ class TestToolCalledParameterMatching:
 
 
 class TestToolCalledMultiTurn:
-    @pytest.mark.asyncio
     async def test_scans_across_turns(self) -> None:
         ctx = _multi_turn_ctx(
             [
@@ -124,7 +114,6 @@ class TestToolCalledMultiTurn:
         result = await ToolCalled("send_email").evaluate_async(context=ctx)
         assert result.outcome is EvalOutcome.DETECTED
 
-    @pytest.mark.asyncio
     async def test_not_detected_across_turns(self) -> None:
         ctx = _multi_turn_ctx(
             [
@@ -137,7 +126,6 @@ class TestToolCalledMultiTurn:
 
 
 class TestToolCalledComposition:
-    @pytest.mark.asyncio
     async def test_composable_with_or(self) -> None:
         tc = ToolCall(name="send_email")
         ctx = _ctx_with_tool_calls(tc)

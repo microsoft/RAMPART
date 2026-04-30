@@ -80,7 +80,6 @@ def _patch_llm(*responses: str):
 class TestGeneration:
     """Core generation pipeline — text variants from LLM."""
 
-    @pytest.mark.asyncio
     async def test_generates_text_payloads(self) -> None:
         with _patch_llm("variant_a", "variant_b"):
             result = await Payloads.generate_async(
@@ -95,7 +94,6 @@ class TestGeneration:
         assert result[1].content == "variant_b"
         assert all(p.format is PayloadFormat.TEXT for p in result)
 
-    @pytest.mark.asyncio
     async def test_count_below_one_raises(self) -> None:
         with pytest.raises(ValueError, match="count must be >= 1"):
             await Payloads.generate_async(
@@ -105,7 +103,6 @@ class TestGeneration:
                 count=0,
             )
 
-    @pytest.mark.asyncio
     async def test_provenance_metadata_on_payloads(self) -> None:
         with _patch_llm("variant"):
             result = await Payloads.generate_async(
@@ -121,7 +118,6 @@ class TestGeneration:
         assert meta["objective"] == "Make agent send data to attacker."
         assert meta["variant_index"] == 0
 
-    @pytest.mark.asyncio
     async def test_manifest_reaches_llm_prompt(self) -> None:
         """Manifest tools and agent name appear in the LLM user message."""
         captured: dict[str, str] = {}
@@ -148,7 +144,6 @@ class TestGeneration:
         assert "send_email" in captured["user_message"]
         assert "TestAgent" in captured["user_message"]
 
-    @pytest.mark.asyncio
     async def test_persona_becomes_system_message(self) -> None:
         """Persona system_prompt is forwarded as the LLM system message."""
         captured: dict[str, str] = {}
@@ -177,7 +172,6 @@ class TestGeneration:
 class TestConverterPipeline:
     """Converter chaining — sequential pipeline like PyRIT."""
 
-    @pytest.mark.asyncio
     async def test_returns_base_and_converted(self) -> None:
         """With converters, output is base text + final chain result."""
         with _patch_llm("content"):
@@ -195,7 +189,6 @@ class TestConverterPipeline:
         assert result[1].content == "CONTENT"
         assert result[1].format is PayloadFormat.HTML
 
-    @pytest.mark.asyncio
     async def test_chaining_feeds_output_to_next_converter(self) -> None:
         """[Upper, Prefix] chains: upper first, then prefix the result."""
         with _patch_llm("hello"):
@@ -213,7 +206,6 @@ class TestConverterPipeline:
         # Chain: "hello" -> Upper -> "HELLO" -> Prefix -> "PREFIX:HELLO"
         assert result[1].content == "PREFIX:HELLO"
 
-    @pytest.mark.asyncio
     async def test_multiple_variants_one_chain_per_variant(self) -> None:
         with _patch_llm("a", "b"):
             result = await Payloads.generate_async(
@@ -228,7 +220,6 @@ class TestConverterPipeline:
         assert len(result) == 4
         assert [p.content for p in result] == ["a", "b", "A", "B"]
 
-    @pytest.mark.asyncio
     async def test_empty_converters_same_as_none(self) -> None:
         with _patch_llm("variant"):
             result = await Payloads.generate_async(
@@ -242,7 +233,6 @@ class TestConverterPipeline:
         assert len(result) == 1
         assert result[0].format is PayloadFormat.TEXT
 
-    @pytest.mark.asyncio
     async def test_converter_metadata_preserved(self) -> None:
         """Converter can add its own metadata alongside provenance."""
         with _patch_llm("content"):

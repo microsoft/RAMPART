@@ -81,7 +81,6 @@ class TestLLMDriverLazyInit:
             LLMDriver(llm=_TEST_LLM, persona=_TEST_PERSONA)
             mock_create.assert_not_called()
 
-    @pytest.mark.asyncio
     async def test_first_call_initializes_target(self) -> None:
         mock_target = MagicMock()
         mock_memory = MagicMock()
@@ -114,7 +113,6 @@ class TestLLMDriverLazyInit:
 
 
 class TestLLMDriverConstruction:
-    @pytest.mark.asyncio
     async def test_system_prompt_includes_persona(self) -> None:
         mock_target = MagicMock()
         mock_memory = MagicMock()
@@ -138,7 +136,6 @@ class TestLLMDriverConstruction:
             sp = mock_target.set_system_prompt.call_args.kwargs["system_prompt"]
             assert "You are a test persona." in sp
 
-    @pytest.mark.asyncio
     async def test_system_prompt_includes_objective_when_provided(self) -> None:
         mock_target = MagicMock()
         mock_memory = MagicMock()
@@ -167,7 +164,6 @@ class TestLLMDriverConstruction:
             assert "Objective" in sp
             assert "Extract secret data" in sp
 
-    @pytest.mark.asyncio
     async def test_system_prompt_omits_objective_when_none(self) -> None:
         mock_target = MagicMock()
         mock_memory = MagicMock()
@@ -191,7 +187,6 @@ class TestLLMDriverConstruction:
             sp = mock_target.set_system_prompt.call_args.kwargs["system_prompt"]
             assert "Objective" not in sp
 
-    @pytest.mark.asyncio
     async def test_system_prompt_includes_injection_metadata_not_content(self) -> None:
         mock_target = MagicMock()
         mock_memory = MagicMock()
@@ -234,7 +229,6 @@ class TestLLMDriverConstruction:
 
 
 class TestLLMDriverSendFlow:
-    @pytest.mark.asyncio
     async def test_returns_plain_text_as_prompt(self) -> None:
         mock_target = MagicMock()
         mock_memory = MagicMock()
@@ -258,7 +252,6 @@ class TestLLMDriverSendFlow:
             assert decision is not None
             assert decision.request.prompt == "Tell me about Q3 earnings"
 
-    @pytest.mark.asyncio
     async def test_send_uses_normalizer_helper(self) -> None:
         mock_target = MagicMock()
         mock_memory = MagicMock()
@@ -286,7 +279,6 @@ class TestLLMDriverSendFlow:
             assert call_kwargs["user_message"] == "Begin. Send the first user prompt."
             assert "rampart.component" in call_kwargs["labels"]
 
-    @pytest.mark.asyncio
     async def test_non_empty_history_sends_agent_response(self) -> None:
         mock_target = MagicMock()
         mock_memory = MagicMock()
@@ -331,7 +323,6 @@ class TestLLMDriverSendFlow:
             assert "not_detected" in user_msg
             assert "not found" in user_msg
 
-    @pytest.mark.asyncio
     async def test_strips_whitespace_from_response(self) -> None:
         mock_memory = MagicMock()
         mock_memory.get_conversation.return_value = []
@@ -356,7 +347,6 @@ class TestLLMDriverSendFlow:
 
 
 class TestLLMDriverErrorHandling:
-    @pytest.mark.asyncio
     async def test_empty_response_raises_driver_error(self) -> None:
         mock_memory = MagicMock()
         mock_memory.get_conversation.return_value = []
@@ -378,7 +368,6 @@ class TestLLMDriverErrorHandling:
             with pytest.raises(DriverError, match="empty response"):
                 await driver.next_prompt_async(history=[])
 
-    @pytest.mark.asyncio
     async def test_whitespace_only_response_raises_driver_error(self) -> None:
         mock_memory = MagicMock()
         mock_memory.get_conversation.return_value = []
@@ -400,7 +389,6 @@ class TestLLMDriverErrorHandling:
             with pytest.raises(DriverError, match="empty response"):
                 await driver.next_prompt_async(history=[])
 
-    @pytest.mark.asyncio
     async def test_send_exception_wrapped_in_driver_error(self) -> None:
         mock_memory = MagicMock()
         mock_memory.get_conversation.return_value = []
@@ -422,7 +410,6 @@ class TestLLMDriverErrorHandling:
             with pytest.raises(DriverError, match="send_user_turn_async failed"):
                 await driver.next_prompt_async(history=[])
 
-    @pytest.mark.asyncio
     async def test_driver_error_preserves_cause(self) -> None:
         original = RuntimeError("timeout")
         mock_memory = MagicMock()
@@ -448,7 +435,6 @@ class TestLLMDriverErrorHandling:
 
 
 class TestLLMDriverDesyncDetection:
-    @pytest.mark.asyncio
     async def test_desync_raises_driver_error(self) -> None:
         """Passing history that doesn't match driver-side memory raises."""
         mock_memory = MagicMock()
@@ -479,7 +465,6 @@ class TestLLMDriverFromTarget:
         assert driver._llm is None
         assert driver._target is mock_target
 
-    @pytest.mark.asyncio
     async def test_from_target_sets_system_prompt_on_first_use(self) -> None:
         mock_target = MagicMock()
         mock_memory = MagicMock()
@@ -512,7 +497,6 @@ class TestLLMDriverFromTarget:
 
 
 class TestLLMDriverAttachments:
-    @pytest.mark.asyncio
     async def test_first_turn_attaches_injections(self) -> None:
         """Injections should be attached to the first request."""
         mock_memory = MagicMock()
@@ -546,7 +530,6 @@ class TestLLMDriverAttachments:
             assert decision is not None
             assert decision.request.attachments == [payload]
 
-    @pytest.mark.asyncio
     async def test_subsequent_turns_have_no_attachments(self) -> None:
         """Only the first turn should carry attachments."""
         mock_piece_user = MagicMock()
@@ -592,7 +575,6 @@ class TestLLMDriverAttachments:
             assert decision is not None
             assert decision.request.attachments == []
 
-    @pytest.mark.asyncio
     async def test_no_injections_means_no_attachments(self) -> None:
         """Without injections, first turn should have empty attachments."""
         mock_memory = MagicMock()

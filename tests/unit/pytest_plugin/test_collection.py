@@ -7,8 +7,6 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-import pytest
-
 from rampart.core.execution import ExecutionEvent, ExecutionEventData
 from rampart.core.result import Result, SafetyStatus
 from rampart.pytest_plugin._collection import (
@@ -71,7 +69,6 @@ class TestResultCollector:
 class TestResultCollectionHandler:
     """ResultCollectionHandler writes to active collector on ON_POST_EXECUTE."""
 
-    @pytest.mark.asyncio
     async def test_records_on_post_execute_async(self) -> None:
         collector = ResultCollector()
         token = _active_collector.set(collector)
@@ -90,7 +87,6 @@ class TestResultCollectionHandler:
         finally:
             _active_collector.reset(token)
 
-    @pytest.mark.asyncio
     async def test_ignores_pre_execute_async(self) -> None:
         collector = ResultCollector()
         token = _active_collector.set(collector)
@@ -104,7 +100,6 @@ class TestResultCollectionHandler:
         finally:
             _active_collector.reset(token)
 
-    @pytest.mark.asyncio
     async def test_ignores_on_error_async(self) -> None:
         collector = ResultCollector()
         token = _active_collector.set(collector)
@@ -118,7 +113,6 @@ class TestResultCollectionHandler:
         finally:
             _active_collector.reset(token)
 
-    @pytest.mark.asyncio
     async def test_noop_when_no_collector_active_async(self) -> None:
         handler = ResultCollectionHandler()
         result = _make_result()
@@ -129,7 +123,6 @@ class TestResultCollectionHandler:
 
         await handler.on_event(event_data=event_data)
 
-    @pytest.mark.asyncio
     async def test_noop_when_result_is_none_async(self) -> None:
         collector = ResultCollector()
         token = _active_collector.set(collector)

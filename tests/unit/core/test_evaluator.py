@@ -3,7 +3,6 @@
 
 """Tests for rampart.core.evaluator — Evaluator protocol, BaseEvaluator, composition."""
 
-import pytest
 
 from rampart.core.evaluator import BaseEvaluator, Evaluator
 from rampart.core.types import (
@@ -55,7 +54,6 @@ class TestEvaluatorProtocol:
 
 
 class TestOrComposition:
-    @pytest.mark.asyncio
     async def test_left_detected_short_circuits(self) -> None:
         left = _StubEvaluator(outcome=EvalOutcome.DETECTED)
         right = _StubEvaluator(outcome=EvalOutcome.NOT_DETECTED)
@@ -67,7 +65,6 @@ class TestOrComposition:
         assert left.call_count == 1
         assert right.call_count == 0
 
-    @pytest.mark.asyncio
     async def test_right_detected(self) -> None:
         left = _StubEvaluator(outcome=EvalOutcome.NOT_DETECTED)
         right = _StubEvaluator(outcome=EvalOutcome.DETECTED)
@@ -79,7 +76,6 @@ class TestOrComposition:
         assert left.call_count == 1
         assert right.call_count == 1
 
-    @pytest.mark.asyncio
     async def test_neither_detected(self) -> None:
         left = _StubEvaluator(outcome=EvalOutcome.NOT_DETECTED)
         right = _StubEvaluator(outcome=EvalOutcome.NOT_DETECTED)
@@ -89,7 +85,6 @@ class TestOrComposition:
 
         assert result.outcome is EvalOutcome.NOT_DETECTED
 
-    @pytest.mark.asyncio
     async def test_undetermined_propagates(self) -> None:
         left = _StubEvaluator(outcome=EvalOutcome.NOT_DETECTED)
         right = _StubEvaluator(outcome=EvalOutcome.UNDETERMINED)
@@ -101,7 +96,6 @@ class TestOrComposition:
 
 
 class TestAndComposition:
-    @pytest.mark.asyncio
     async def test_left_not_detected_short_circuits(self) -> None:
         left = _StubEvaluator(outcome=EvalOutcome.NOT_DETECTED)
         right = _StubEvaluator(outcome=EvalOutcome.DETECTED)
@@ -113,7 +107,6 @@ class TestAndComposition:
         assert left.call_count == 1
         assert right.call_count == 0
 
-    @pytest.mark.asyncio
     async def test_left_undetermined_short_circuits(self) -> None:
         left = _StubEvaluator(outcome=EvalOutcome.UNDETERMINED)
         right = _StubEvaluator(outcome=EvalOutcome.DETECTED)
@@ -124,7 +117,6 @@ class TestAndComposition:
         assert result.outcome is EvalOutcome.UNDETERMINED
         assert right.call_count == 0
 
-    @pytest.mark.asyncio
     async def test_both_detected(self) -> None:
         left = _StubEvaluator(outcome=EvalOutcome.DETECTED, rationale="L")
         right = _StubEvaluator(outcome=EvalOutcome.DETECTED, rationale="R")
@@ -135,7 +127,6 @@ class TestAndComposition:
         assert result.outcome is EvalOutcome.DETECTED
         assert len(result.evidence) == 2
 
-    @pytest.mark.asyncio
     async def test_right_not_detected(self) -> None:
         left = _StubEvaluator(outcome=EvalOutcome.DETECTED)
         right = _StubEvaluator(outcome=EvalOutcome.NOT_DETECTED)
@@ -145,7 +136,6 @@ class TestAndComposition:
 
         assert result.outcome is EvalOutcome.NOT_DETECTED
 
-    @pytest.mark.asyncio
     async def test_right_undetermined(self) -> None:
         left = _StubEvaluator(outcome=EvalOutcome.DETECTED)
         right = _StubEvaluator(outcome=EvalOutcome.UNDETERMINED)
@@ -157,7 +147,6 @@ class TestAndComposition:
 
 
 class TestNotComposition:
-    @pytest.mark.asyncio
     async def test_flips_detected_to_not_detected(self) -> None:
         inner = _StubEvaluator(outcome=EvalOutcome.DETECTED)
         composed = ~inner
@@ -166,7 +155,6 @@ class TestNotComposition:
 
         assert result.outcome is EvalOutcome.NOT_DETECTED
 
-    @pytest.mark.asyncio
     async def test_flips_not_detected_to_detected(self) -> None:
         inner = _StubEvaluator(outcome=EvalOutcome.NOT_DETECTED)
         composed = ~inner
@@ -175,7 +163,6 @@ class TestNotComposition:
 
         assert result.outcome is EvalOutcome.DETECTED
 
-    @pytest.mark.asyncio
     async def test_preserves_undetermined(self) -> None:
         inner = _StubEvaluator(outcome=EvalOutcome.UNDETERMINED)
         composed = ~inner
@@ -184,7 +171,6 @@ class TestNotComposition:
 
         assert result.outcome is EvalOutcome.UNDETERMINED
 
-    @pytest.mark.asyncio
     async def test_preserves_confidence_and_evidence(self) -> None:
         inner = _StubEvaluator(outcome=EvalOutcome.DETECTED)
         composed = ~inner
@@ -196,7 +182,6 @@ class TestNotComposition:
 
 
 class TestCompositionChaining:
-    @pytest.mark.asyncio
     async def test_or_and_not_chain(self) -> None:
         a = _StubEvaluator(outcome=EvalOutcome.NOT_DETECTED)
         b = _StubEvaluator(outcome=EvalOutcome.DETECTED)
@@ -208,7 +193,6 @@ class TestCompositionChaining:
 
         assert result.outcome is EvalOutcome.NOT_DETECTED
 
-    @pytest.mark.asyncio
     async def test_composed_evaluators_are_composable(self) -> None:
         a = _StubEvaluator(outcome=EvalOutcome.DETECTED)
         b = _StubEvaluator(outcome=EvalOutcome.DETECTED)

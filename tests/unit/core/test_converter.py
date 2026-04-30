@@ -5,8 +5,6 @@
 
 from pathlib import Path
 
-import pytest
-
 from rampart.core.converter import PayloadConverter
 from rampart.core.types import Payload, PayloadFormat
 
@@ -42,7 +40,6 @@ class TestPayloadConverterProtocol:
     def test_html_converter_satisfies_protocol(self) -> None:
         assert isinstance(_HtmlWrapConverter(), PayloadConverter)
 
-    @pytest.mark.asyncio
     async def test_uppercase_converter_transforms_content(self) -> None:
         converter = _UpperCaseConverter()
         payload = Payload(content="hello world", id="t1")
@@ -50,7 +47,6 @@ class TestPayloadConverterProtocol:
         assert result.content == "HELLO WORLD"
         assert result.id == "t1"
 
-    @pytest.mark.asyncio
     async def test_html_converter_changes_format(self) -> None:
         converter = _HtmlWrapConverter()
         payload = Payload(content="evil content", id="t2")
@@ -58,14 +54,12 @@ class TestPayloadConverterProtocol:
         assert result.content == "<p>evil content</p>"
         assert result.format is PayloadFormat.HTML
 
-    @pytest.mark.asyncio
     async def test_converter_preserves_id(self) -> None:
         converter = _UpperCaseConverter()
         payload = Payload(content="test", id="stable_id")
         result = await converter.convert_async(payload=payload)
         assert result.id == "stable_id"
 
-    @pytest.mark.asyncio
     async def test_converter_adds_metadata(self) -> None:
         converter = _UpperCaseConverter()
         payload = Payload(
@@ -77,7 +71,6 @@ class TestPayloadConverterProtocol:
         assert result.metadata["template"] == "email_exfiltration"
         assert result.metadata["converter"] == "UpperCaseConverter"
 
-    @pytest.mark.asyncio
     async def test_converters_compose_sequentially(self) -> None:
         upper = _UpperCaseConverter()
         html = _HtmlWrapConverter()
@@ -87,7 +80,6 @@ class TestPayloadConverterProtocol:
         assert result.content == "<p>EVIL</p>"
         assert result.format is PayloadFormat.HTML
 
-    @pytest.mark.asyncio
     async def test_format_converter_preserves_content(self, tmp_path: Path) -> None:
         fake_file = tmp_path / "fake.png"
         fake_file.write_bytes(b"\x89PNG")

@@ -5,8 +5,6 @@
 
 from __future__ import annotations
 
-import pytest
-
 from rampart.core.prompt_driver import PromptDriver
 from rampart.core.types import Request, Response, Turn
 from rampart.drivers.static import StaticDriver
@@ -20,7 +18,6 @@ def _turn(prompt: str) -> Turn:
 class TestStaticDriverSequence:
     """StaticDriver returns prompts in order based on history length."""
 
-    @pytest.mark.asyncio
     async def test_returns_prompts_in_order_async(self) -> None:
         driver = StaticDriver(prompts=["first", "second", "third"])
 
@@ -38,14 +35,12 @@ class TestStaticDriverSequence:
         assert d2 is not None
         assert d2.request.prompt == "third"
 
-    @pytest.mark.asyncio
     async def test_returns_none_when_exhausted_async(self) -> None:
         driver = StaticDriver(prompts=["only"])
 
         result = await driver.next_prompt_async(history=[_turn("only")])
         assert result is None
 
-    @pytest.mark.asyncio
     async def test_reasoning_is_empty_async(self) -> None:
         driver = StaticDriver(prompts=["hello"])
 
@@ -58,7 +53,6 @@ class TestStaticDriverSequence:
 class TestStaticDriverStateless:
     """Same StaticDriver instance behaves correctly for different histories."""
 
-    @pytest.mark.asyncio
     async def test_same_instance_different_histories_async(self) -> None:
         driver = StaticDriver(prompts=["a", "b", "c"])
 

@@ -23,7 +23,6 @@ class TestSmoke:
     """Core framework smoke tests."""
 
     @pytest.mark.harm(HarmCategory.DATA_EXFILTRATION)
-    @pytest.mark.asyncio
     async def test_evaluator_detects_tool_call_async(self) -> None:
         """Evaluator unit test against hand-crafted Response."""
         response = Response(
@@ -44,7 +43,6 @@ class TestSmoke:
         assert result.detected
 
     @pytest.mark.harm(HarmCategory.OVER_PERMISSIVE_ACTION)
-    @pytest.mark.asyncio
     async def test_probe_against_mock_adapter_async(self) -> None:
         """Probe test via Probes.behavior against MockAdapter."""
         adapter = MockAdapter(

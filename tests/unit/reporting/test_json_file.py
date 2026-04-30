@@ -9,8 +9,6 @@ import json
 from pathlib import Path
 from typing import Any
 
-import pytest
-
 from rampart.core.result import HarmCategory, Result, SafetyStatus
 from rampart.core.types import (
     EvalOutcome,
@@ -208,7 +206,6 @@ class TestSerializeResult:
 class TestEmitAsync:
     """emit_async writes a valid JSON file."""
 
-    @pytest.mark.asyncio
     async def test_emitted_file_contains_metadata(self, tmp_path: Path) -> None:
         sink = JsonFileReportSink(output_dir=tmp_path)
         result = _result_with_turns(

@@ -68,7 +68,6 @@ class _DetectsToolCall(BaseEvaluator):
 class TestProbePolarity:
     """Probe polarity: DETECTED -> SAFE, NOT_DETECTED -> UNSAFE."""
 
-    @pytest.mark.asyncio
     async def test_detected_means_safe_async(self) -> None:
         adapter = _adapter(responses=[Response(text="ok")])
 
@@ -80,7 +79,6 @@ class TestProbePolarity:
         assert result.safe is True
         assert result.status == SafetyStatus.SAFE
 
-    @pytest.mark.asyncio
     async def test_not_detected_means_unsafe_async(self) -> None:
         adapter = _adapter(responses=[Response(text="nope")])
 
@@ -96,7 +94,6 @@ class TestProbePolarity:
 class TestProbeStrategyName:
     """strategy_name is 'probe'."""
 
-    @pytest.mark.asyncio
     async def test_strategy_name_async(self) -> None:
         adapter = _adapter(responses=[Response(text="ok")])
 
@@ -111,7 +108,6 @@ class TestProbeStrategyName:
 class TestProbePromptCoercion:
     """Probes.behavior accepts str, list[str], and PromptDriver."""
 
-    @pytest.mark.asyncio
     async def test_str_prompt_async(self) -> None:
         adapter = _adapter(responses=[Response(text="ok")])
 
@@ -124,7 +120,6 @@ class TestProbePromptCoercion:
         assert len(result.turns) == 1
         assert result.turns[0].request.prompt == "hello"
 
-    @pytest.mark.asyncio
     async def test_list_prompt_async(self) -> None:
         adapter = _adapter(responses=[Response(text="ok")])
 
@@ -137,7 +132,6 @@ class TestProbePromptCoercion:
         assert result.turns[0].request.prompt == "first"
         assert result.turns[1].request.prompt == "second"
 
-    @pytest.mark.asyncio
     async def test_prompt_driver_async(self) -> None:
         prompt_driver = StaticDriver(prompts=["driven"])
         adapter = _adapter(responses=[Response(text="ok")])
@@ -177,7 +171,6 @@ class TestProbeParameterValidation:
 class TestProbeInfrastructureError:
     """InfrastructureError becomes an ERROR result."""
 
-    @pytest.mark.asyncio
     async def test_infra_error_produces_error_result_async(self) -> None:
         class FailingAdapter:
             manifest = AppManifest(name="broken")
@@ -199,7 +192,6 @@ class TestProbeInfrastructureError:
 class TestProbeEndToEnd:
     """Probe flow works end-to-end with MockAdapter."""
 
-    @pytest.mark.asyncio
     async def test_tool_call_detected_async(self) -> None:
         adapter = _adapter(
             responses=[
@@ -218,7 +210,6 @@ class TestProbeEndToEnd:
         assert result.safe is True
         assert result.status == SafetyStatus.SAFE
 
-    @pytest.mark.asyncio
     async def test_tool_call_not_detected_async(self) -> None:
         adapter = _adapter(
             responses=[
@@ -234,7 +225,6 @@ class TestProbeEndToEnd:
         assert result.safe is False
         assert result.status == SafetyStatus.UNSAFE
 
-    @pytest.mark.asyncio
     async def test_assert_pattern_async(self) -> None:
         adapter = _adapter(
             responses=[
@@ -256,7 +246,6 @@ class TestProbeEndToEnd:
 class TestProbeMaxTurns:
     """Max turns resolves normally via resolve_as_probe."""
 
-    @pytest.mark.asyncio
     async def test_max_turns_resolves_normally_async(self) -> None:
         adapter = _adapter(responses=[Response(text="ok")])
 

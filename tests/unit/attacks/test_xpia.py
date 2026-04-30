@@ -5,8 +5,6 @@ from __future__ import annotations
 
 from unittest.mock import AsyncMock
 
-import pytest
-
 from rampart.attacks import Attacks
 from rampart.core.errors import InfrastructureError
 from rampart.core.manifest import AppManifest
@@ -72,7 +70,6 @@ def _adapter(
 class TestXPIADetection:
     """Attack semantics: DETECTED->UNSAFE, NOT_DETECTED->SAFE."""
 
-    @pytest.mark.asyncio
     async def test_detected_returns_unsafe_with_evidence_in_summary(self) -> None:
         result = await Attacks.xpia(
             inject=_mock_handle(),
@@ -87,7 +84,6 @@ class TestXPIADetection:
         assert result.status is SafetyStatus.UNSAFE
         assert "exfil_call_found" in result.summary
 
-    @pytest.mark.asyncio
     async def test_not_detected_returns_safe(self) -> None:
         result = await Attacks.xpia(
             inject=_mock_handle(),
@@ -98,7 +94,6 @@ class TestXPIADetection:
         assert result.safe is True
         assert result.status is SafetyStatus.SAFE
 
-    @pytest.mark.asyncio
     async def test_undetermined_returns_undetermined(self) -> None:
         result = await Attacks.xpia(
             inject=_mock_handle(),
@@ -116,7 +111,6 @@ class TestXPIADetection:
 class TestXPIAEarlyStop:
     """Per-turn evaluation stops the conversation on first detection."""
 
-    @pytest.mark.asyncio
     async def test_stops_after_first_detection(self) -> None:
         evaluator = AsyncMock()
         evaluator.evaluate_async.side_effect = [
@@ -133,7 +127,6 @@ class TestXPIAEarlyStop:
         assert result.status is SafetyStatus.UNSAFE
         assert len(result.turns) == 2
 
-    @pytest.mark.asyncio
     async def test_completes_all_turns_when_not_detected(self) -> None:
         result = await Attacks.xpia(
             inject=_mock_handle(),
@@ -148,7 +141,6 @@ class TestXPIAEarlyStop:
 class TestXPIAMaxTurns:
     """Max-turns resolves normally via resolve_as_attack."""
 
-    @pytest.mark.asyncio
     async def test_max_turns_resolves_normally(self) -> None:
         result = await Attacks.xpia(
             inject=_mock_handle(),
@@ -164,7 +156,6 @@ class TestXPIAMaxTurns:
 class TestXPIACleanup:
     """Injection handles are always activated and cleaned up."""
 
-    @pytest.mark.asyncio
     async def test_handle_entered_and_exited(self) -> None:
         handle = _mock_handle()
 
@@ -178,7 +169,6 @@ class TestXPIACleanup:
         handle.__aexit__.assert_awaited_once()
         handle.wait_until_ready.assert_awaited_once()
 
-    @pytest.mark.asyncio
     async def test_multiple_handles_all_cleaned(self) -> None:
         h1 = _mock_handle(surface_name="SP")
         h2 = _mock_handle(surface_name="Exchange")
@@ -194,7 +184,6 @@ class TestXPIACleanup:
             h.__aexit__.assert_awaited_once()
             h.wait_until_ready.assert_awaited_once()
 
-    @pytest.mark.asyncio
     async def test_cleanup_on_evaluator_exception(self) -> None:
         """Handles are cleaned up even if the evaluator raises."""
         handle = _mock_handle()
@@ -215,7 +204,6 @@ class TestXPIACleanup:
 class TestXPIAInfrastructureError:
     """InfrastructureError produces ERROR result (base class concern)."""
 
-    @pytest.mark.asyncio
     async def test_handle_activation_failure(self) -> None:
         handle = _mock_handle()
         handle.__aenter__.side_effect = InfrastructureError("SharePoint 503")
@@ -229,7 +217,6 @@ class TestXPIAInfrastructureError:
         assert result.status is SafetyStatus.ERROR
         assert "SharePoint 503" in result.summary
 
-    @pytest.mark.asyncio
     async def test_session_creation_failure(self) -> None:
         adapter = AsyncMock()
         adapter.create_session_async.side_effect = InfrastructureError(
@@ -251,7 +238,6 @@ class TestXPIAInfrastructureError:
 class TestXPIAObservabilityAdjustment:
     """SAFE is downgraded to UNDETERMINED when observability is insufficient."""
 
-    @pytest.mark.asyncio
     async def test_response_only_no_tools_downgrades_to_undetermined(self) -> None:
         result = await Attacks.xpia(
             inject=_mock_handle(),
@@ -264,7 +250,6 @@ class TestXPIAObservabilityAdjustment:
         assert result.safe is False
         assert result.status is SafetyStatus.UNDETERMINED
 
-    @pytest.mark.asyncio
     async def test_response_only_with_tool_calls_stays_safe(self) -> None:
         result = await Attacks.xpia(
             inject=_mock_handle(),
@@ -280,7 +265,6 @@ class TestXPIAObservabilityAdjustment:
         assert result.safe is True
         assert result.status is SafetyStatus.SAFE
 
-    @pytest.mark.asyncio
     async def test_non_response_only_levels_are_not_downgraded(self) -> None:
         result = await Attacks.xpia(
             inject=_mock_handle(),
@@ -297,7 +281,6 @@ class TestXPIAObservabilityAdjustment:
 class TestXPIAInjectionRecords:
     """Result carries injection records for reproduction."""
 
-    @pytest.mark.asyncio
     async def test_single_handle_recorded(self) -> None:
         result = await Attacks.xpia(
             inject=_mock_handle(surface_name="SharePoint", payload_id="px-42"),
@@ -309,7 +292,6 @@ class TestXPIAInjectionRecords:
         assert result.injections[0].payload_id == "px-42"
         assert result.injections[0].surface_name == "SharePoint"
 
-    @pytest.mark.asyncio
     async def test_multi_handle_records(self) -> None:
         result = await Attacks.xpia(
             inject=[
@@ -328,7 +310,6 @@ class TestXPIAInjectionRecords:
 class TestXPIAAttachments:
     """Inline attachments flow through to turns via Request."""
 
-    @pytest.mark.asyncio
     async def test_attachments_recorded_in_turns(self) -> None:
         attachment = Payload(content="malicious doc", id="att-1")
 
@@ -344,7 +325,6 @@ class TestXPIAAttachments:
 class TestResponseMetadataPropagation:
     """Response.metadata from the adapter flows into Result.metadata."""
 
-    @pytest.mark.asyncio
     async def test_single_turn_metadata_promoted_to_top_level(self) -> None:
         adapter = _adapter(
             responses=[Response(text="ok", metadata={"conversation_id": "c-01"})],
@@ -357,7 +337,6 @@ class TestResponseMetadataPropagation:
 
         assert result.metadata == {"conversation_id": "c-01"}
 
-    @pytest.mark.asyncio
     async def test_empty_response_metadata_produces_empty_result_metadata(self) -> None:
         result = await Attacks.xpia(
             inject=_mock_handle(),
@@ -367,7 +346,6 @@ class TestResponseMetadataPropagation:
 
         assert result.metadata == {}
 
-    @pytest.mark.asyncio
     async def test_multi_turn_metadata_keyed_by_turn_number(self) -> None:
         adapter = _adapter(
             responses=[

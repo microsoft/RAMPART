@@ -5,8 +5,6 @@
 
 from __future__ import annotations
 
-import pytest
-
 from rampart.core.prompt_driver import PromptDecision
 from rampart.core.types import Request, Response, Turn
 from rampart.drivers._utils import coerce_driver
@@ -16,7 +14,6 @@ from rampart.drivers.static import StaticDriver
 class TestCoerceString:
     """coerce_driver accepts a str as a single-prompt driver."""
 
-    @pytest.mark.asyncio
     async def test_str_produces_single_prompt_driver_async(self) -> None:
         driver = coerce_driver("hello")
 
@@ -35,7 +32,6 @@ class TestCoerceString:
 class TestCoerceList:
     """coerce_driver accepts list[str] as a multi-prompt driver."""
 
-    @pytest.mark.asyncio
     async def test_list_produces_multi_prompt_driver_async(self) -> None:
         driver = coerce_driver(["a", "b"])
 
@@ -47,13 +43,11 @@ class TestCoerceList:
 class TestCoercePassthrough:
     """coerce_driver passes through an existing PromptDriver unchanged."""
 
-    @pytest.mark.asyncio
     async def test_prompt_driver_passthrough_async(self) -> None:
         original = StaticDriver(prompts=["x"])
         result = coerce_driver(original)
         assert result is original
 
-    @pytest.mark.asyncio
     async def test_custom_driver_passthrough_async(self) -> None:
         class Custom:
             async def next_prompt_async(

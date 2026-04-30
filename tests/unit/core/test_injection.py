@@ -6,8 +6,6 @@
 import types
 from typing import Self
 
-import pytest
-
 from rampart.core.injection import InjectionHandle, Surface, sleep_until_ready
 from rampart.core.types import Payload
 
@@ -79,6 +77,5 @@ class TestSurfaceProtocol:
 
 
 class TestSleepUntilReady:
-    @pytest.mark.asyncio
     async def test_completes_without_error_async(self) -> None:
         await sleep_until_ready(0.0)

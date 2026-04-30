@@ -5,8 +5,6 @@
 
 from unittest.mock import AsyncMock, patch
 
-import pytest
-
 from rampart.core.llm import LLMConfig
 from rampart.core.manifest import AppManifest, DataSource, ToolDeclaration
 from rampart.core.persona import Persona
@@ -46,7 +44,6 @@ def _persona() -> Persona:
 
 
 class TestGenerateTextVariants:
-    @pytest.mark.asyncio
     async def test_returns_one_variant_per_call(self) -> None:
         with patch(
             "rampart.payloads._generator.PayloadGenerator._send_to_llm_async",
@@ -68,7 +65,6 @@ class TestGenerateTextVariants:
 
         assert result == ["variant one", "variant two", "variant three"]
 
-    @pytest.mark.asyncio
     async def test_resolves_template_variables(self) -> None:
         captured_args: dict[str, str] = {}
 
@@ -99,7 +95,6 @@ class TestGenerateTextVariants:
         assert "override@evil.com" in captured_args["user_message"]
         assert "{email}" not in captured_args["user_message"]
 
-    @pytest.mark.asyncio
     async def test_strips_whitespace(self) -> None:
         with patch(
             "rampart.payloads._generator.PayloadGenerator._send_to_llm_async",
@@ -120,7 +115,6 @@ class TestGenerateTextVariants:
 
         assert result == ["padded content"]
 
-    @pytest.mark.asyncio
     async def test_includes_objective_in_prompt(self) -> None:
         captured_args: dict[str, str] = {}
 

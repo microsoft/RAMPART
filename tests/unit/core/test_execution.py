@@ -135,7 +135,6 @@ class _BrokenHandler(ExecutionEventHandler):
 
 
 class TestBaseExecutionLifecycle:
-    @pytest.mark.asyncio
     async def test_fires_pre_and_post_execute(self) -> None:
         handler = _RecordingHandler()
         execution = _SuccessExecution(event_handlers=[handler])
@@ -149,7 +148,6 @@ class TestBaseExecutionLifecycle:
         assert handler.events[1].event is ExecutionEvent.ON_POST_EXECUTE
         assert handler.events[1].result is result
 
-    @pytest.mark.asyncio
     async def test_post_execute_has_elapsed_time(self) -> None:
         handler = _RecordingHandler()
         execution = _SuccessExecution(event_handlers=[handler])
@@ -161,7 +159,6 @@ class TestBaseExecutionLifecycle:
 
 
 class TestInfrastructureErrorHandling:
-    @pytest.mark.asyncio
     async def test_produces_error_result(self) -> None:
         execution = _InfraErrorExecution()
         adapter = _StubAdapter()
@@ -172,7 +169,6 @@ class TestInfrastructureErrorHandling:
         assert result.status is SafetyStatus.ERROR
         assert "SharePoint returned 503" in result.summary
 
-    @pytest.mark.asyncio
     async def test_error_result_has_strategy(self) -> None:
         execution = _InfraErrorExecution()
 
@@ -180,7 +176,6 @@ class TestInfrastructureErrorHandling:
 
         assert result.strategy == "infra_error"
 
-    @pytest.mark.asyncio
     async def test_error_result_has_observability_level(self) -> None:
         execution = _InfraErrorExecution()
 
@@ -188,7 +183,6 @@ class TestInfrastructureErrorHandling:
 
         assert result.observability_level is ObservabilityLevel.TOOL_ONLY
 
-    @pytest.mark.asyncio
     async def test_error_result_has_metadata(self) -> None:
         execution = _InfraErrorExecution()
 
@@ -197,7 +191,6 @@ class TestInfrastructureErrorHandling:
         assert result.metadata["error"] == "SharePoint returned 503"
         assert result.metadata["error_type"] == "InfrastructureError"
 
-    @pytest.mark.asyncio
     async def test_fires_on_error_and_post_execute(self) -> None:
         handler = _RecordingHandler()
         execution = _InfraErrorExecution(event_handlers=[handler])
@@ -210,7 +203,6 @@ class TestInfrastructureErrorHandling:
 
 
 class TestGenericErrorHandling:
-    @pytest.mark.asyncio
     async def test_produces_error_result(self) -> None:
         execution = _GenericErrorExecution()
 
@@ -220,7 +212,6 @@ class TestGenericErrorHandling:
         assert result.status is SafetyStatus.ERROR
         assert "unexpected failure" in result.summary
 
-    @pytest.mark.asyncio
     async def test_error_result_has_strategy(self) -> None:
         execution = _GenericErrorExecution()
 
@@ -228,7 +219,6 @@ class TestGenericErrorHandling:
 
         assert result.strategy == "generic_error"
 
-    @pytest.mark.asyncio
     async def test_error_result_has_metadata(self) -> None:
         execution = _GenericErrorExecution()
 
@@ -237,7 +227,6 @@ class TestGenericErrorHandling:
         assert result.metadata["error"] == "unexpected failure"
         assert result.metadata["error_type"] == "RuntimeError"
 
-    @pytest.mark.asyncio
     async def test_fires_on_error_and_post_execute(self) -> None:
         handler = _RecordingHandler()
         execution = _GenericErrorExecution(event_handlers=[handler])
@@ -248,7 +237,6 @@ class TestGenericErrorHandling:
         assert ExecutionEvent.ON_ERROR in event_types
         assert ExecutionEvent.ON_POST_EXECUTE in event_types
 
-    @pytest.mark.asyncio
     async def test_on_error_contains_exception(self) -> None:
         handler = _RecordingHandler()
         execution = _GenericErrorExecution(event_handlers=[handler])
@@ -262,7 +250,6 @@ class TestGenericErrorHandling:
 
 
 class TestHandlerSafety:
-    @pytest.mark.asyncio
     async def test_broken_handler_does_not_abort_execution(self) -> None:
         broken = _BrokenHandler()
         recorder = _RecordingHandler()
@@ -275,7 +262,6 @@ class TestHandlerSafety:
 
 
 class TestDefaultHandlerFactory:
-    @pytest.mark.asyncio
     async def test_execution_works_without_factory(self) -> None:
         execution = _SuccessExecution()
 
@@ -283,7 +269,6 @@ class TestDefaultHandlerFactory:
 
         assert result.safe is True
 
-    @pytest.mark.asyncio
     async def test_factory_handlers_are_prepended(self) -> None:
         from rampart.core.execution import (
             clear_default_handler_factory,
@@ -309,7 +294,6 @@ class TestDefaultHandlerFactory:
 
 
 class TestDriverErrorHandling:
-    @pytest.mark.asyncio
     async def test_produces_error_result(self) -> None:
         execution = _DriverErrorExecution()
         adapter = _StubAdapter()
@@ -320,7 +304,6 @@ class TestDriverErrorHandling:
         assert result.status is SafetyStatus.ERROR
         assert "LLM returned garbage" in result.summary
 
-    @pytest.mark.asyncio
     async def test_error_result_has_strategy(self) -> None:
         execution = _DriverErrorExecution()
 
@@ -328,7 +311,6 @@ class TestDriverErrorHandling:
 
         assert result.strategy == "driver_error"
 
-    @pytest.mark.asyncio
     async def test_error_result_has_metadata(self) -> None:
         execution = _DriverErrorExecution()
 
@@ -337,7 +319,6 @@ class TestDriverErrorHandling:
         assert result.metadata["error"] == "LLM returned garbage"
         assert result.metadata["error_type"] == "DriverError"
 
-    @pytest.mark.asyncio
     async def test_fires_on_error_and_post_execute(self) -> None:
         handler = _RecordingHandler()
         execution = _DriverErrorExecution(event_handlers=[handler])
@@ -350,7 +331,6 @@ class TestDriverErrorHandling:
 
 
 class TestEvaluateTurnAsync:
-    @pytest.mark.asyncio
     async def test_returns_turn_with_eval_result(self) -> None:
         from unittest.mock import AsyncMock
 
@@ -381,7 +361,6 @@ class TestEvaluateTurnAsync:
         assert turn.response.text == "world"
         assert turn.turn_number == 0
 
-    @pytest.mark.asyncio
     async def test_includes_history_in_context(self) -> None:
         from unittest.mock import AsyncMock
 
@@ -422,7 +401,6 @@ class TestEvaluateTurnAsync:
         assert captured_context.turns[0].request.prompt == "prev"
         assert captured_context.turns[1].request.prompt == "current"
 
-    @pytest.mark.asyncio
     async def test_preserves_driver_reasoning(self) -> None:
         from unittest.mock import AsyncMock
 
