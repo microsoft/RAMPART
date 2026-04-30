@@ -37,7 +37,6 @@ class TestParseConfig:
 ```
 
 ### Async Tests
-- Do NOT add `@pytest.mark.asyncio` — the project uses `asyncio_mode = "auto"` in `pyproject.toml`, so all `async def` tests are collected automatically
 - Async test method names MUST end with `_async`
 - Use `AsyncMock` instead of `MagicMock` when mocking async methods
 
