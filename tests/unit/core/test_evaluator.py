@@ -3,7 +3,6 @@
 
 """Tests for rampart.core.evaluator — Evaluator protocol, BaseEvaluator, composition."""
 
-
 from rampart.core.evaluator import BaseEvaluator, Evaluator
 from rampart.core.types import (
     EvalContext,

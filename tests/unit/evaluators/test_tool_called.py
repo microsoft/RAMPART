@@ -3,7 +3,6 @@
 
 """Tests for rampart.evaluators.tool_called — ToolCalled evaluator."""
 
-
 from rampart.core.types import (
     EvalContext,
     EvalOutcome,

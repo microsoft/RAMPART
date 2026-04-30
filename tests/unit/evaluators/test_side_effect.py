@@ -3,7 +3,6 @@
 
 """Tests for rampart.evaluators.side_effect — SideEffectOccurred evaluator."""
 
-
 from rampart.core.types import (
     EvalContext,
     EvalOutcome,
