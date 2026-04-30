@@ -54,11 +54,4 @@ assert result, result.summary
 
 The factory returns a [`BaseExecution`][rampart.core.execution.BaseExecution] — call `execute_async(adapter=...)` and assert the result.
 
----
 
-## See Also
-
-- [Available Attacks](../attacks/index.md) — Catalog of attack types with usage guides
-- [Probes](probes.md) — The inverse concept: testing for desired behavior
-- [Overview](overview.md) — How attacks fit in the component model
-- [API: Attacks](../api/attacks.md) — Auto-generated API reference

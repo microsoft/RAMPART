@@ -13,7 +13,7 @@ from rampart.core.llm import LLMConfig
 
 llm = LLMConfig(
     model="gpt-4o",
-    endpoint="https://my-openai.openai.azure.com/",
+    endpoint="https://my-resource.openai.azure.com/openai/v1",
     api_key="sk-...",
     deployment="gpt-4o-deploy",
 )
@@ -104,10 +104,4 @@ manifest.get_tool("send_email")       # ToolDeclaration(name="send_email", ...)
 manifest.get_tool("nonexistent")      # None
 ```
 
----
 
-## See Also
-
-- [Quickstart](../getting-started/quickstart.md) — Using configuration in a test
-- [API: Payloads](../api/payloads.md) — Using LLMConfig and Persona for generation
-- [API: Drivers](../api/drivers.md) — Using LLMConfig and Persona with LLMDriver

@@ -81,7 +81,6 @@ nav:
       - getting-started/index.md
       - Installation: getting-started/installation.md
       - Quickstart: getting-started/quickstart.md
-      - pytest Integration: getting-started/pytest-integration.md
   - Concepts:
       - concepts/index.md
       - Overview: concepts/overview.md
@@ -94,12 +93,13 @@ nav:
   - Probes:
       - probes/index.md
       - Behavioral: probes/behavioral.md
-  - Guides:
-      - guides/index.md
-      - Authoring Tests: guides/authoring-tests.md
-      - Configuration: guides/configuration.md
-      - Results & Reporting: guides/results-and-reporting.md
-      - CI Integration: guides/ci-integration.md
+  - Usage:
+      - usage/index.md
+      - Writing Tests: usage/authoring-tests.md
+      - Configuration: usage/configuration.md
+      - pytest Markers & Fixtures: usage/pytest-integration.md
+      - Results & Reporting: usage/results-and-reporting.md
+      - CI Integration: usage/ci-integration.md
   - API Reference:
       - api/index.md
       - Core Types: api/core-types.md

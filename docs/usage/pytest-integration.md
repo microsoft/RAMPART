@@ -157,10 +157,4 @@ Trial group lines show aggregate stats: safe count, pass rate, threshold, and ov
 
 The **Population** line shows totals across all tests in the session, with the attack success rate excluding `ERROR` results from the denominator.
 
----
 
-## See Also
-
-- [Quickstart](quickstart.md) — End-to-end first test
-- [Results & Reporting](../guides/results-and-reporting.md) — Result structure, report sinks
-- [CI Integration](../guides/ci-integration.md) — Using markers and thresholds in CI

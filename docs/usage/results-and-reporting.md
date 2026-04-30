@@ -89,7 +89,7 @@ class MyDatabaseSink:
 
 ### Wiring Sinks
 
-Define the `rampart_sinks` fixture in your `conftest.py`. See [pytest Markers & Fixtures](../getting-started/pytest-integration.md#rampart_sinks) for the setup and examples with multiple sinks.
+Define the `rampart_sinks` fixture in your `conftest.py`. See [pytest Markers & Fixtures](pytest-integration.md#rampart_sinks) for the setup and examples with multiple sinks.
 
 ---
 

@@ -26,7 +26,7 @@ assert result, result.summary
 | Understand how RAMPART works | [Concepts](concepts/overview.md) |
 | Write an XPIA attack test | [XPIA Attack](attacks/xpia.md) |
 | Write a behavioral probe | [Behavioral Probe](probes/behavioral.md) |
-| Learn testing patterns and best practices | [Guides](guides/index.md) |
+| Learn testing patterns and best practices | [Usage](usage/index.md) |
 | Look up a class or function | [API Reference](api/index.md) |
 | Find a term definition | [Glossary](glossary.md) |
 

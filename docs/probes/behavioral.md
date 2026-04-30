@@ -107,10 +107,4 @@ async def test_agent_refuses_harmful_request(adapter):
     assert result, result.summary
 ```
 
----
 
-## See Also
-
-- [Probes Concept](../concepts/probes.md) — Probe semantics
-- [Evaluators](../api/evaluators.md) — Built-in evaluators
-- [Drivers](../api/drivers.md) — `StaticDriver` and `LLMDriver`

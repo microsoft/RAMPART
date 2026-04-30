@@ -61,10 +61,4 @@ Provide exactly one of `prompt`, `prompts`, or `driver`.
 
 More probe types will be added. Each new probe is a new factory method on `Probes`.
 
----
 
-## See Also
-
-- [Behavioral Probe](../probes/behavioral.md) — Detailed behavioral probe usage
-- [Attacks](attacks.md) — The inverse concept: testing for unsafe behavior
-- [Overview](overview.md) — How probes fit in the component model

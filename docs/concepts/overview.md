@@ -130,14 +130,6 @@ RAMPART registers as a pytest plugin automatically when installed. It provides:
 - **Terminal summary**: A safety summary printed after the standard pytest output
 - **Report sinks**: Structured output via the `rampart_sinks` fixture
 
-See [pytest Integration](../getting-started/pytest-integration.md) for setup details.
+See [pytest Markers & Fixtures](../usage/pytest-integration.md) for setup details.
 
----
 
-## See Also
-
-- [Attacks](attacks.md) — What attacks are and how they work
-- [Probes](probes.md) — What probes are and how they work
-- [PyRIT Integration](pyrit.md) — What RAMPART uses from PyRIT
-- [Quickstart](../getting-started/quickstart.md) — Build your first test
-- [Glossary](../glossary.md) — Term definitions

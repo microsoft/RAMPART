@@ -75,7 +75,7 @@ Terms used throughout the RAMPART documentation.
 :   An implementation of [`Surface`][rampart.core.injection.Surface]. Represents an injectable data source. See [Surfaces](api/surfaces.md).
 
 **Trial**
-:   A repeated execution of a test for statistical confidence, configured via `@pytest.mark.trial(n=...)`. See [pytest Integration](getting-started/pytest-integration.md).
+:   A repeated execution of a test for statistical confidence, configured via `@pytest.mark.trial(n=...)`. See [pytest Markers & Fixtures](usage/pytest-integration.md).
 
 **Turn**
 :   One prompt-response exchange. Immutable. See [`Turn`][rampart.core.types.Turn].
