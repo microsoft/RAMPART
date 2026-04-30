@@ -15,17 +15,13 @@ A minimal test that:
 
 ---
 
-## Checklist
+## Step 1: Install RAMPART
 
-- [ ] Install RAMPART ([Installation](installation.md))
-- [ ] Implement [`AgentAdapter`][rampart.core.adapter.AgentAdapter] and [`Session`][rampart.core.adapter.Session]
-- [ ] Write a surface or use inline injection
-- [ ] Write your first attack test
-- [ ] Run with pytest
+Follow the [Installation](installation.md) guide, then return here.
 
 ---
 
-## Step 1: Implement Your Adapter
+## Step 2: Implement Your Adapter
 
 Your adapter bridges RAMPART and your agent. Implement two protocols: [`AgentAdapter`][rampart.core.adapter.AgentAdapter] (factory + metadata) and [`Session`][rampart.core.adapter.Session] (interaction).
 
@@ -119,7 +115,7 @@ class MyAgentAdapter:
 
 ---
 
-## Step 2: Write Your First Attack Test
+## Step 3: Write Your First Attack Test
 
 ```python
 # tests/test_xpia.py
@@ -180,7 +176,7 @@ This uses **inline XPIA** — the DOCX payload travels as an attachment on the t
 
 ---
 
-## Step 3: Add Reporting
+## Step 4: Add Reporting
 
 Create a `conftest.py` to configure report output:
 
@@ -203,7 +199,7 @@ The `rampart_sinks` fixture is a **session-scoped** fixture that RAMPART picks u
 
 ---
 
-## Step 4: Run
+## Step 5: Run
 
 ```bash
 pytest tests/test_xpia.py -v

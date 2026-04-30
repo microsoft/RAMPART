@@ -6,6 +6,16 @@
 
 **RAMPART** is a pytest-native safety testing framework for agentic AI applications. You write tests that attack or probe your agent, and RAMPART orchestrates the interaction, evaluates the outcome, and reports the results.
 
+```python
+result = await Attacks.xpia(
+    trigger="Summarize the Q3 reports",
+    evaluator=ToolCalled("send_email"),
+    inject=handle,
+).execute_async(adapter=my_agent)
+
+assert result, result.summary
+```
+
 ---
 
 ## Quick Navigation
@@ -30,22 +40,3 @@ You provide an **adapter** that connects your agent to the framework. RAMPART pr
 - **Evaluators** — detect conditions in agent responses (tool calls, text patterns, side effects)
 - **pytest integration** — markers for harm categorization and statistical trials, automatic result collection, terminal summaries
 - **Reporting** — structured JSON output for CI dashboards
-
-RAMPART ships with the following **attacks** (more will be added):
-
-- [XPIA](attacks/xpia.md) — Cross-Prompt Injection Attack
-
-RAMPART ships with the following **probes** (more will be added):
-
-- [Behavioral](probes/behavioral.md) — Verify expected agent behavior
-
----
-
-## Project Info
-
-| | |
-|---|---|
-| **Python** | ≥ 3.11 |
-| **License** | MIT |
-| **Dependencies** | [PyRIT](https://github.com/microsoft/PyRIT) v0.13.0, pytest ≥ 9.0 |
-| **Source** | [github.com/microsoft/RAMPART](https://github.com/microsoft/RAMPART) |

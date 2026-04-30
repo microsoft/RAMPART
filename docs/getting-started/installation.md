@@ -113,9 +113,6 @@ dev = [
 asyncio_mode = "auto"
 ```
 
-!!! note
-    `asyncio_mode = "auto"` is recommended. It lets pytest-asyncio handle `async def test_*` functions automatically, so you don't need to decorate every test with `@pytest.mark.asyncio`. Without it, you must add that decorator to each async test individually.
-
 ---
 
 ## See Also
