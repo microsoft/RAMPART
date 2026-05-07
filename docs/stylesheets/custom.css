@@ -26,3 +26,15 @@
 .md-header {
   background-color: #1a1a1a;
 }
+
+/* Make embedded diagrams (SVG/PNG) scale with the content column instead of
+   honoring their intrinsic width/height attributes, which causes them to be
+   squeezed in narrow columns and overflow in wide ones. */
+.md-typeset img,
+.md-typeset svg {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+}

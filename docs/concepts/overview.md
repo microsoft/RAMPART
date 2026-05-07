@@ -27,26 +27,17 @@ RAMPART ships with the following probes; more will be added:
 
 ---
 
+## Architecture at a Glance
+
+RAMPART sits between your **consumer package** (the thin integration layer in your product team's repo) and the **agent under test**, building on PyRIT primitives underneath. The diagram below shows how the layers fit together and where your code plugs in:
+
+![RAMPART layered architecture: PyRIT (L1), RAMPART (L2), Consumer Package (L3), Agent Under Test (L4)](../images/rampart-architecture-dark.svg){ loading=lazy }
+
+*RAMPART's four layers — from PyRIT primitives up to the agent under test.*
+
 ## Component Model
 
-Every RAMPART test involves these components:
-
-```mermaid
-flowchart LR
-    subgraph Your Code
-        A[AgentAdapter] --> S[Session]
-        SF[Surface]
-    end
-    subgraph RAMPART
-        F[Attacks / Probes] --> E[Execution]
-        D[PromptDriver] --> E
-        EV[Evaluator] --> E
-        E --> R[Result]
-        R --> RP[ReportSink]
-    end
-    E -- "send_async()" --> S
-    E -- "inject()" --> SF
-```
+Zooming in on the runtime path, every RAMPART test wires together the same handful of components:
 
 | Component | You provide | RAMPART provides |
 |-----------|-------------|-----------------|
@@ -61,7 +52,13 @@ flowchart LR
 
 ## Execution Lifecycle
 
-Every execution follows a common lifecycle owned by [`BaseExecution`][rampart.core.execution.BaseExecution]:
+A single test run flows from your pytest test, through a RAMPART attack or probe, into your `AgentAdapter`, and out to the agent system — then back again as a `Result`:
+
+![RAMPART test execution flow: Test → Attacks/Probes → AgentAdapter → Agent System, with Pass/Fail returned](../images/rampart-execution-flow-dark.svg){ loading=lazy }
+
+*Request / response cycle for a single test run.*
+
+Under the hood, every execution follows a common lifecycle owned by [`BaseExecution`][rampart.core.execution.BaseExecution], which drives the per-turn loop between the strategy, your adapter, and the evaluator:
 
 ```mermaid
 sequenceDiagram
