@@ -1,0 +1,228 @@
+# Releasing RAMPART
+
+This section is for maintainers only. If you don't know who the maintainers are but you need to reach them, please file an issue or (if it needs to remain private) contact the email address listed in `pyproject.toml`.
+
+Follow the instructions in the order provided.
+
+## 1. Release Readiness
+
+Before starting the release process, verify the codebase is in a healthy state.
+
+- **Check for pending changes.** Ask other RAMPART maintainers whether they have any in-flight changes that should land before the release.
+- **Verify CI pipelines.** Confirm that all unit tests, lint, type checks, and coverage gates are green on `main`. If anything is failing, fix it before proceeding.
+- **Verify the PyRIT pin.** RAMPART pins PyRIT to a specific version in `pyproject.toml`. Confirm the pinned version is the one you intend to ship against — see [PyRIT Dependency](#pyrit-dependency).
+
+## 2. Decide the Next Version
+
+RAMPART follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`):
+
+| Component | Increment when |
+|-----------|---------------|
+| **MAJOR** | Breaking changes to the public API |
+| **MINOR** | New features, new attack/probe types, backward-compatible additions |
+| **PATCH** | Bug fixes, documentation corrections, dependency updates |
+
+!!! note "Pre-1.0 stability"
+    While RAMPART is below `1.0`, minor version bumps may include breaking changes. The API is stabilizing but not yet frozen. The first stable release will be `1.0.0`.
+
+In line with PyPA [versioning guidance](https://packaging.python.org/en/latest/discussions/versioning/), `main` may carry a `.dev0` suffix between releases (e.g., `0.2.0.dev0`). Release commits drop the suffix; the post-release bump on `main` reintroduces it for the next version.
+
+## 3. Remove Deprecated Functionality
+
+If you are incrementing the minor version, search the codebase for the new minor version (no leading `v`) to find occurrences where functionality was deprecated and announced for removal in this version. Typically, functionality is deprecated and stays for two minor versions before being removed.
+
+If you find functionality to remove, merge the removal PR to `main` before proceeding.
+
+## 4. Update the Version
+
+Set the version in `pyproject.toml` to the version established in step 2.
+
+```toml
+[project]
+version = "x.y.z"
+```
+
+
+
+## 5. Publish the Release Branch to GitHub
+
+Commit your changes to a release branch and push the tag:
+
+```bash
+git checkout -b releases/vx.y.z
+git commit -am "release vx.y.z"
+git push origin releases/vx.y.z
+git tag -a vx.y.z -m "vx.y.z release"
+git push --tags
+```
+
+
+## 6. Build the Package
+
+Install `build` if it is not already available, then build the wheel and sdist:
+
+```bash
+uv pip install build
+uv run python -m build
+```
+
+You should see output similar to:
+
+```
+Successfully built rampart-x.y.z.tar.gz and rampart-x.y.z-py3-none-any.whl
+```
+
+## 7. Test the Built Package
+
+This step ensures the new package works out of the box.
+
+Create a clean environment and install the built wheel:
+
+```bash
+uv venv --python 3.11
+uv pip install dist/rampart-x.y.z-py3-none-any.whl
+```
+
+Verify the install:
+
+```bash
+uv pip show rampart
+```
+
+Confirm the version matches the release and the package is installed under the environment's `site-packages`. Then run the following smoke checks **outside the repository root** so you don't accidentally test the editable source instead of the installed wheel:
+
+1. **Public API imports.** Confirm the top-level symbols resolve without error:
+
+    ```bash
+    uv run python -c "from rampart import Result, SafetyStatus, AppManifest, Response, ToolCall"
+    uv run python -c "from rampart.attacks import Attacks; from rampart.probes import Probes; from rampart.evaluators import ToolCalled"
+    ```
+
+2. **Pytest plugin registration.** RAMPART ships a pytest plugin via the `pytest11` entry point. Confirm pytest discovers it:
+
+    ```bash
+    uv run pytest --version  # should list "rampart" in the plugin list
+    ```
+
+3. **End-to-end smoke test.** Run `tests/integration/test_smoke.py` against the installed wheel. It exercises an evaluator and a probe through `MockAdapter` and requires no external services:
+
+    ```bash
+    uv run pytest path/to/RAMPART/tests/integration/test_smoke.py -v
+    ```
+
+If you need to make changes to fix issues found during testing, cherry-pick from `main` after the fix lands:
+
+```bash
+git checkout main && git pull
+git log main  # find the commit hash to cherry-pick
+git checkout releases/vx.y.z
+git cherry-pick <commit-hash>
+git push origin releases/vx.y.z
+git tag -a vx.y.z -m "vx.y.z release" --force
+git push --tags --force
+```
+
+Rebuild the package after any cherry-pick and re-test.
+
+## 8. Publish to PyPI
+
+Create a PyPI account if you don't have one and ask another maintainer to add you to the `msft-rampart` project. Before publishing, have an API token scoped to the project ready (create one in your PyPI project settings).
+
+```bash
+uv pip install twine
+uv run twine upload dist/*
+```
+
+If successful, the URL `https://pypi.org/project/msft-rampart/x.y.z/` will return the new release.
+
+## 9. Update `main`
+
+After the release is on PyPI, open a PR to `main` containing only:
+
+- A version bump in `pyproject.toml` to the next development version (e.g., `x.y.(z+1).dev0` or `x.(y+1).0.dev0`, depending on the next planned release).
+- Replace any references to the previous release version in the codebase with the new released version (without `.dev0`) where applicable (e.g., installation docs that pin to the latest tag).
+
+Open this PR from a branch separate from your `releases/vx.y.z` branch.
+
+## 10. Create the GitHub Release
+
+Go to the [releases page](https://github.com/microsoft/RAMPART/releases), select **Draft a new release**, and choose the tag you pushed in step 5. Click **Generate release notes** to pre-populate the description.
+
+Structure the description as:
+
+- **What's changed** — a curated short list of user-facing changes (new features, bug fixes, breaking changes).
+- **Full list of changes** — the auto-generated full changelog.
+
+Maintenance changes, CI updates, and documentation fixes generally belong only in the full list. Verify the **New contributors** section is accurate. Mark the release as **Latest** and publish.
+
+## PyRIT Dependency
+
+RAMPART pins PyRIT to a specific version in `pyproject.toml`:
+
+```toml
+dependencies = [
+    ...
+    "pyrit==<version>",
+    ...
+]
+```
+
+When updating the PyRIT dependency, use the helper script:
+
+```bash
+./scripts/bump_pyrit_version.sh <new-version>
+```
+
+Re-run the full test suite after bumping — PyRIT changes are a common source of regressions.
+
+## Appendix: Patch Releases (Cherry-Pick Process)
+
+A patch release (e.g., `0.2.0` → `0.2.1`) ships a targeted fix — typically a security patch or a critical bug fix — without including other in-flight changes from `main`.
+
+### When to use a patch release
+
+- A security vulnerability fix needs to be shipped urgently.
+- A critical bug was found in the latest release that blocks users.
+- The fix is already merged to `main`, but `main` contains other changes that aren't ready for release.
+
+### Abbreviated steps
+
+1. **Create a release branch from the previous tag**, not from `main`:
+
+    ```bash
+    git fetch origin
+    git checkout -b releases/vx.y.z vx.y.(z-1)
+    ```
+
+2. **Cherry-pick the fix** from `main`:
+
+    ```bash
+    git cherry-pick <commit-sha>
+    ```
+
+    Resolve any conflicts manually. Patch-sized fixes typically apply cleanly.
+
+3. **Bump the version** in `pyproject.toml` to the new patch version. Also update any version-pinned links in `README.md`.
+
+    ```bash
+    git commit -am "Bump version to x.y.z"
+    ```
+
+4. **Push and tag**:
+
+    ```bash
+    git push origin releases/vx.y.z
+    git tag -a vx.y.z -m "vx.y.z release"
+    git push --tags
+    ```
+
+5. **Follow the regular release process from step 6 onward**: build, test, publish to PyPI, update `main`, and create the GitHub release. Patch release notes should clearly state the reason for the patch (e.g., "Security fix for…" or "Critical bug fix for…").
+
+### Key differences from a regular release
+
+| Aspect | Regular release | Patch release |
+|---|---|---|
+| Branch base | `main` | Previous release tag |
+| Changes included | Everything on `main` | Only cherry-picked fix(es) |
+| Deprecated code removal | Yes (if minor bump) | No |
+| Release notes | Full changelog with curated summary | Short, focused on the reason for the patch |

@@ -35,6 +35,8 @@ extra_css:
 
 markdown_extensions:
   - admonition
+  - attr_list
+  - md_in_html
   - pymdownx.details
   - pymdownx.superfences:
       custom_fences:
@@ -44,12 +46,14 @@ markdown_extensions:
   - pymdownx.highlight:
       anchor_linenums: true
   - pymdownx.inlinehilite
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
   - pymdownx.tabbed:
       alternate_style: true
   - tables
   - toc:
       permalink: true
-  - attr_list
   - def_list
 
 plugins:
@@ -100,6 +104,15 @@ nav:
       - pytest Markers & Fixtures: usage/pytest-integration.md
       - Results & Reporting: usage/results-and-reporting.md
       - CI Integration: usage/ci-integration.md
+  - Contributing:
+      - contributing/index.md
+      - Development Setup: contributing/development-setup.md
+      - Code Style & Linting: contributing/code-style.md
+      - Testing Standards: contributing/testing.md
+      - Architecture: contributing/architecture.md
+      - Extending RAMPART: contributing/extending-rampart.md
+      - Pull Request Process: contributing/pull-requests.md
+      - Release Process: contributing/release-process.md
   - API Reference:
       - api/index.md
       - Core Types: api/core-types.md
