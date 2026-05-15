@@ -4,17 +4,6 @@ This guide walks through the process of extending RAMPART with new attacks, prob
 
 Before reading this page, make sure you're familiar with the [execution lifecycle](../concepts/overview.md) and the [architecture](architecture.md).
 
-## Contents
-
-- [Shared conventions](#shared-conventions)
-- [Attack](#attack)
-- [Probe](#probe)
-- [Evaluator](#evaluator)
-- [Prompt Driver](#prompt-driver)
-- [Attack Surface](#attack-surface)
-- [Summary Checklist](#summary-checklist)
-
-
 ## Shared conventions
 
 These apply to every component type below:
