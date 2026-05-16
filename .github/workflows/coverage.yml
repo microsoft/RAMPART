@@ -36,7 +36,7 @@ jobs:
           enable-cache: true
 
       - name: Install dependencies
-        run: uv sync --frozen
+        run: uv sync --all-extras --frozen
 
       - name: Run tests with coverage
         id: tests

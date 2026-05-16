@@ -36,7 +36,7 @@ jobs:
           enable-cache: true
 
       - name: Install dependencies
-        run: uv sync --frozen
+        run: uv sync --all-extras --frozen
 
       - name: Ruff check
         run: uv run ruff check .
@@ -76,7 +76,7 @@ jobs:
           cache-suffix: py${{ matrix.python-version }}
 
       - name: Install dependencies
-        run: uv sync --frozen
+        run: uv sync --all-extras --frozen
 
       - name: Run tests
         run: uv run pytest tests/unit
