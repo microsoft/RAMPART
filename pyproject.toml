@@ -27,11 +27,11 @@ classifiers = [
 ]
 dependencies = [
     "azure-identity>=1.25.3",
-    "azure-kusto-data>=6.0.3",
-    "azure-kusto-ingest>=6.0.3",
+    "azure-kusto-data>=6.0.4",
+    "azure-kusto-ingest>=6.0.4",
     "jsonschema>=4.26.0",
-    "msgraph-sdk>=1.55.0",
-    "playwright>=1.58.0",
+    "msgraph-sdk>=1.57.0",
+    "playwright>=1.59.0",
     "pyrit==0.13.0",
     "pytest>=9.0.3",
     "pytest-asyncio>=1.3.0",
@@ -41,10 +41,10 @@ dependencies = [
 [dependency-groups]
 dev = [
     "pre-commit>=4.5.1",
-    "pyright>=1.1.390",
+    "pyright>=1.1.409",
     "pytest-cov>=6.1.0",
     "pytest-xdist[psutil]>=3.8.0",
-    "ruff>=0.15.10",
+    "ruff>=0.15.13",
 ]
 docs = [
     "mkdocs>=1.6",
