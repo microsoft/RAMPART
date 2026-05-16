@@ -61,7 +61,31 @@ pip install -e .
 For development dependencies (linting, type checking, test tooling):
 
 ```bash
-pip install -e ".[dev]"
+# uv (recommended — installs the dev group by default)
+uv sync
+
+# pip
+pip install -e . --group dev
+```
+
+---
+
+## Optional Extras
+
+RAMPART's core install is intentionally small. Features that pull in heavy provider SDKs are exposed as optional extras:
+
+| Extra | Pulls in | When you need it |
+|-------|----------|------------------|
+| `onedrive` | `msgraph-sdk`, `azure-identity` | Using the built-in [`OneDriveSurface`][rampart.surfaces.onedrive.OneDriveSurface] to plant XPIA payloads in OneDrive. |
+
+Install one or more extras with the standard bracket syntax:
+
+```bash
+pip install "rampart[onedrive]"
+# or from source:
+pip install -e ".[onedrive]"
+# or with uv:
+uv add "rampart[onedrive]"
 ```
 
 ---

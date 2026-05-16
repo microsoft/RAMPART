@@ -26,17 +26,18 @@ classifiers = [
     "Topic :: Software Development :: Testing",
 ]
 dependencies = [
-    "azure-identity>=1.25.3",
-    "azure-kusto-data>=6.0.3",
-    "azure-kusto-ingest>=6.0.3",
-    "jsonschema>=4.26.0",
-    "msgraph-sdk>=1.55.0",
-    "playwright>=1.58.0",
+    "jinja2>=3.1.6",
     "pyrit==0.13.0",
     "pytest>=9.0.3",
     "pytest-asyncio>=1.3.0",
     "pyyaml>=6.0.3",
 ]
+
+[project.optional-dependencies]
+onedrive = [
+    "msgraph-sdk>=1.57.0",
+    "azure-identity>=1.25.3"
+ ]
 
 [dependency-groups]
 dev = [
