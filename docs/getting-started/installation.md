@@ -23,7 +23,7 @@ Or, if you already have a project:
 
 ```bash
 uv venv
-uv pip install rampart
+uv pip install git+https://github.com/microsoft/RAMPART.git
 ```
 
 ### Using pip
@@ -33,7 +33,7 @@ python -m venv .venv
 source .venv/bin/activate   # Linux/macOS
 .venv\Scripts\activate      # Windows
 
-pip install rampart
+pip install git+https://github.com/microsoft/RAMPART.git
 ```
 
 Both approaches install RAMPART and all dependencies, including [PyRIT](https://github.com/microsoft/PyRIT) v0.13.0.

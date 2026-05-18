@@ -35,14 +35,25 @@ If you find functionality to remove, merge the removal PR to `main` before proce
 
 ## 4. Update the Version
 
+### pyproject.toml
 Set the version in `pyproject.toml` to the version established in step 2.
 
 ```toml
 [project]
+name = "RAMPART"
 version = "x.y.z"
 ```
 
+### Update README File
+The README file is published to PyPI and also needs to be updated so the links work properly. _Note: There may not be any links to update, but it is good practice to check in case our README changes._
 
+Replace all “main” links like “doc/index.md” with “raw” links that have the correct version number, i.e., “https://raw.githubusercontent.com/microsoft/RAMPART/releases/vx.y.z/docs/index.md”.
+
+For images, update using the “raw” link, e.g., “https://raw.githubusercontent.com/microsoft/RAMPART/releases/vx.y.z/docs/images/RAMPART.png”.
+
+For directories, update using the “tree” link, e.g., “https://github.com/microsoft/RAMPART/tree/releases/vx.y.z/docs/usage"
+
+This is required for the release branch because PyPI does not pick up other files besides the README, which results in local links breaking.
 
 ## 5. Publish the Release Branch to GitHub
 

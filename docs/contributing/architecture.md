@@ -6,7 +6,7 @@ This page supplements the [Concepts Overview](../concepts/overview.md) with cont
 
 ## Package Layout
 
-The `rampart/` source tree is organized by concern: foundational types live in `core/`, while each extension point gets its own subpackage (`attacks/`, `probes/`, `evaluators/`, `drivers/`, `converters/`, `surfaces/`, `payloads/`, `reporting/`). The `pyrit_bridge/` package isolates all PyRIT interaction (see [PyRIT Isolation](#pyrit-isolation) below), and `pytest_plugin/` provides the pytest integration.
+The `rampart/` source tree is organized by concern: foundational types live in `core/`, while each extension point gets its own subpackage (`attacks/`, `probes/`, `evaluators/`, `drivers/`, `converters/`, `surfaces/`, `payloads/`, `reporting/`). The `pyrit_bridge/` package groups common PyRIT integration code (see [PyRIT Bridge](#pyrit-bridge) below), and `pytest_plugin/` provides the pytest integration.
 
 - For the component model and how the pieces fit together at runtime, see the [Concepts Overview](../concepts/overview.md).
 - For the public symbols exported from each package, see the [API Reference index](../api/index.md).
@@ -57,7 +57,7 @@ This allows the same evaluator (e.g., `ToolCalled`) to be used in both attack an
 
 Subclasses implement only `_execute_async` and `strategy_name`. They should **not** catch `InfrastructureError` — the base class handles it.
 
-### PyRIT Isolation
+### PyRIT Bridge
 
 PyRIT is RAMPART's upstream dependency for converters and prompt generation. Its import chain is heavy, so:
 

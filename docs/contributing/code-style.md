@@ -134,7 +134,11 @@ Use Google-style docstrings with `Args:`, `Returns:`, and `Raises:` sections. Do
 
 ### PyRIT Bridge
 
-PyRIT-related logic should be grouped under `rampart/pyrit_bridge/`. PyRIT's import chain is heavy, so use lazy imports inside functions when wrapping PyRIT converters:
+Common PyRIT integration logic should be grouped under `rampart/pyrit_bridge/`.
+Two rules apply:
+
+1. Do not expose PyRIT-specific types in RAMPART's public APIs. Translate to/from RAMPART types at the bridge boundary so consumers don't have to depend on PyRIT directly.
+2. Defer heavy PyRIT imports with lazy imports inside functions. PyRIT's import chain is heavy, so importing it at module top-level slows down RAMPART's startup. Use a local import where the PyRIT type is actually needed:
 
 ```python
 def _get_converter(self) -> WordDocConverter:
