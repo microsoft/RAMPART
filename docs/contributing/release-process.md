@@ -3,6 +3,7 @@
 This section is for maintainers only. If you don't know who the maintainers are but you need to reach them, please file an issue or (if it needs to remain private) contact the email address listed in `pyproject.toml`.
 
 Follow the instructions in the order provided.
+> Note: Releases are immutable, please follow these steps carefully!
 
 ## 1. Release Readiness
 
@@ -24,8 +25,6 @@ RAMPART follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`)
 
 !!! note "Pre-1.0 stability"
     While RAMPART is below `1.0`, minor version bumps may include breaking changes. The API is stabilizing but not yet frozen. The first stable release will be `1.0.0`.
-
-In line with PyPA [versioning guidance](https://packaging.python.org/en/latest/discussions/versioning/), `main` may carry a `.dev0` suffix between releases (e.g., `0.2.0.dev0`). Release commits drop the suffix; the post-release bump on `main` reintroduces it for the next version.
 
 ## 3. Remove Deprecated Functionality
 
@@ -137,20 +136,20 @@ Rebuild the package after any cherry-pick and re-test.
 
 ## 8. Publish to PyPI
 
-Create a PyPI account if you don't have one and ask another maintainer to add you to the `msft-rampart` project. Before publishing, have an API token scoped to the project ready (create one in your PyPI project settings).
+Create a PyPI account if you don't have one and ask another maintainer to add you to the `rampart` project. Before publishing, have an API token scoped to the project ready (create one in your PyPI project settings).
 
 ```bash
 uv pip install twine
 uv run twine upload dist/*
 ```
 
-If successful, the URL `https://pypi.org/project/msft-rampart/x.y.z/` will return the new release.
+If successful, the URL `https://pypi.org/project/rampart/x.y.z/` will return the new release.
 
 ## 9. Update `main`
 
 After the release is on PyPI, open a PR to `main` containing only:
 
-- A version bump in `pyproject.toml` to the next development version (e.g., `x.y.(z+1).dev0` or `x.(y+1).0.dev0`, depending on the next planned release).
+- In line with PyPA [versioning guidance](https://packaging.python.org/en/latest/discussions/versioning/), bump the version in `pyproject.toml` to the next development version (e.g., `x.y.(z+1).dev0` or `x.(y+1).0.dev0`, depending on the next planned release).
 - Replace any references to the previous release version in the codebase with the new released version (without `.dev0`) where applicable (e.g., installation docs that pin to the latest tag).
 
 Open this PR from a branch separate from your `releases/vx.y.z` branch.
@@ -166,7 +165,9 @@ Structure the description as:
 
 Maintenance changes, CI updates, and documentation fixes generally belong only in the full list. Verify the **New contributors** section is accurate. Mark the release as **Latest** and publish.
 
-## PyRIT Dependency
+## Appendix
+
+### PyRIT Dependency
 
 RAMPART pins PyRIT to a specific version in `pyproject.toml`:
 
@@ -186,17 +187,19 @@ When updating the PyRIT dependency, use the helper script:
 
 Re-run the full test suite after bumping — PyRIT changes are a common source of regressions.
 
-## Appendix: Patch Releases (Cherry-Pick Process)
+---
+
+### Patch Releases (Cherry-Pick Process)
 
 A patch release (e.g., `0.2.0` → `0.2.1`) ships a targeted fix — typically a security patch or a critical bug fix — without including other in-flight changes from `main`.
 
-### When to use a patch release
+#### When to use a patch release
 
 - A security vulnerability fix needs to be shipped urgently.
 - A critical bug was found in the latest release that blocks users.
 - The fix is already merged to `main`, but `main` contains other changes that aren't ready for release.
 
-### Abbreviated steps
+#### Abbreviated steps
 
 1. **Create a release branch from the previous tag**, not from `main`:
 
@@ -229,7 +232,7 @@ A patch release (e.g., `0.2.0` → `0.2.1`) ships a targeted fix — typically a
 
 5. **Follow the regular release process from step 6 onward**: build, test, publish to PyPI, update `main`, and create the GitHub release. Patch release notes should clearly state the reason for the patch (e.g., "Security fix for…" or "Critical bug fix for…").
 
-### Key differences from a regular release
+#### Key differences from a regular release
 
 | Aspect | Regular release | Patch release |
 |---|---|---|

@@ -40,9 +40,9 @@ from rampart.core import (
     PromptDriver,
     Result,
     Turn,
+    evaluate_turn_async,
     resolve_as_attack,
 )
-from rampart.core.execution import evaluate_turn_async
 
 
 class MyAttackExecution(BaseExecution):
