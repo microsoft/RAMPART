@@ -1,5 +1,6 @@
 site_name: RAMPART
 site_description: A pytest-native safety testing framework for agentic AI applications
+site_url: https://microsoft.github.io/RAMPART/
 repo_url: https://github.com/microsoft/RAMPART
 repo_name: microsoft/RAMPART
 
