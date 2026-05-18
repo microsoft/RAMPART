@@ -29,7 +29,7 @@ RAMPART ships with the following probes; more will be added:
 
 ## Architecture at a Glance
 
-RAMPART sits between your **consumer package** (the thin integration layer in your product team's repo) and the **agent under test**, building on PyRIT primitives underneath. The diagram below shows how the layers fit together and where your code plugs in:
+RAMPART integrates within your **consumer package** (the thin integration layer in your product team's repo) and the **agent under test**, building on PyRIT primitives underneath. The diagram below shows how the layers fit together and where your code plugs in:
 
 ![RAMPART layered architecture: PyRIT (L1), RAMPART (L2), Consumer Package (L3), Agent Under Test (L4)](../images/rampart-architecture-dark.svg){ loading=lazy }
 
