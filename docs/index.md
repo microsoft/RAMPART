@@ -1,6 +1,8 @@
-<div style="text-align: center; margin-bottom: 1.5em;">
-  <img src="images/RAMPART.png" alt="RAMPART" style="max-width: 400px;" />
-</div>
+---
+description: RAMPART is a pytest-native safety testing framework for agentic AI applications. Write attack and probe tests, orchestrate the interaction, and report results in CI.
+---
+
+![RAMPART](images/RAMPART.svg){ .hero-logo }
 
 # RAMPART Documentation
 

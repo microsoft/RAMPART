@@ -1,6 +1,11 @@
+---
+description: API reference for RAMPART, auto-generated from source docstrings. Covers core types, protocols, attacks, probes, evaluators, drivers, payloads, surfaces, converters, reporting, and the pytest plugin.
+---
+
 # API Reference
 
 API reference organized by RAMPART's package layout. Each page documents the public symbols in one module, auto-generated from source docstrings.
+
 
 | Page | Contents |
 |------|----------|

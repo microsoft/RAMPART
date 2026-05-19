@@ -28,13 +28,21 @@ uv pip install git+https://github.com/microsoft/RAMPART.git
 
 ### Using pip
 
-```bash
-python -m venv .venv
-source .venv/bin/activate   # Linux/macOS
-.venv\Scripts\activate      # Windows
+=== "Linux / macOS"
 
-pip install git+https://github.com/microsoft/RAMPART.git
-```
+    ```bash
+    python -m venv .venv
+    source .venv/bin/activate
+    pip install git+https://github.com/microsoft/RAMPART.git
+    ```
+
+=== "Windows (PowerShell)"
+
+    ```powershell
+    python -m venv .venv
+    .venv\Scripts\Activate.ps1
+    pip install git+https://github.com/microsoft/RAMPART.git
+    ```
 
 Both approaches install RAMPART and all dependencies, including [PyRIT](https://github.com/microsoft/PyRIT) v0.13.0.
 

@@ -3,9 +3,37 @@ site_description: A pytest-native safety testing framework for agentic AI applic
 site_url: https://microsoft.github.io/RAMPART/
 repo_url: https://github.com/microsoft/RAMPART
 repo_name: microsoft/RAMPART
+edit_uri_template: blob/main/docs/{path}
+
+copyright: Copyright &copy; 2026 Microsoft Corporation
+
+validation:
+  omitted_files: warn
+  absolute_links: warn
+  unrecognized_links: info
+  anchors: warn
+  nav:
+    not_found: warn
+    omitted_files: warn
+    absolute_links: warn
+
+not_in_nav: |
+  404.md
+
+exclude_docs: |
+  _includes/
+  _overrides/
+
+extra:
+  generator: false
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/microsoft/RAMPART
+      name: RAMPART on GitHub
 
 theme:
   name: material
+  custom_dir: docs/_overrides
   palette:
     - media: "(prefers-color-scheme: light)"
       scheme: default
@@ -22,43 +50,74 @@ theme:
         icon: material/brightness-4
         name: Switch to light mode
   features:
-    - navigation.sections
-    - navigation.expand
-    - navigation.indexes
-    - navigation.top
+    - announce.dismiss
+    - content.action.edit
+    - content.code.annotate
     - content.code.copy
+    - content.code.select
+    - content.tabs.link
+    - content.tooltips
+    - navigation.footer
+    - navigation.indexes
+    - navigation.instant
+    - navigation.instant.progress
+    - navigation.path
+    - navigation.sections
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.top
+    - navigation.tracking
+    - search.highlight
+    - search.share
+    - search.suggest
     - toc.follow
   icon:
     repo: fontawesome/brands/github
+  logo: images/RAMPART.svg
+  favicon: images/RAMPART.svg
 
 extra_css:
   - stylesheets/custom.css
 
 markdown_extensions:
+  - abbr
   - admonition
   - attr_list
+  - def_list
+  - footnotes
   - md_in_html
+  - tables
   - pymdownx.details
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - pymdownx.highlight:
+      anchor_linenums: true
+      auto_title: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.snippets:
+      base_path: [!relative $config_dir]
+      check_paths: true
+      auto_append:
+        - docs/_includes/abbreviations.md
   - pymdownx.superfences:
       custom_fences:
         - name: mermaid
           class: mermaid
           format: !!python/name:pymdownx.superfences.fence_code_format
-  - pymdownx.highlight:
-      anchor_linenums: true
-  - pymdownx.inlinehilite
-  - pymdownx.emoji:
-      emoji_index: !!python/name:material.extensions.emoji.twemoji
-      emoji_generator: !!python/name:material.extensions.emoji.to_svg
   - pymdownx.tabbed:
       alternate_style: true
-  - tables
+  - pymdownx.tasklist:
+      custom_checkbox: true
   - toc:
       permalink: true
-  - def_list
 
 plugins:
   - search
+  - privacy
+  - git-revision-date-localized:
+      type: timeago
   - mkdocstrings:
       default_handler: python
       handlers:

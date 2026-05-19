@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/images/RAMPART.png" alt="RAMPART Logo" width="400"/>
+  <img src="docs/images/RAMPART.svg" alt="RAMPART Logo" width="300"/>
 </p>
 
 <h1 align="center">RAMPART</h1>

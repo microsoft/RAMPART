@@ -9,9 +9,9 @@ Follow the instructions in the order provided.
 
 Before starting the release process, verify the codebase is in a healthy state.
 
-- **Check for pending changes.** Ask other RAMPART maintainers whether they have any in-flight changes that should land before the release.
-- **Verify CI pipelines.** Confirm that all unit tests, lint, type checks, and coverage gates are green on `main`. If anything is failing, fix it before proceeding.
-- **Verify the PyRIT pin.** RAMPART pins PyRIT to a specific version in `pyproject.toml`. Confirm the pinned version is the one you intend to ship against — see [PyRIT Dependency](#pyrit-dependency).
+- [ ] **Check for pending changes.** Ask other RAMPART maintainers whether they have any in-flight changes that should land before the release.
+- [ ] **Verify CI pipelines.** Confirm that all unit tests, lint, type checks, and coverage gates are green on `main`. If anything is failing, fix it before proceeding.
+- [ ] **Verify the PyRIT pin.** RAMPART pins PyRIT to a specific version in `pyproject.toml`. Confirm the pinned version is the one you intend to ship against — see [PyRIT Dependency](#pyrit-dependency).
 
 ## 2. Decide the Next Version
 

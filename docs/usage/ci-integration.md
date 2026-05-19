@@ -61,7 +61,25 @@ The JSON file contains aggregate statistics and per-result data that CI dashboar
 
 ## Environment Variables
 
-RAMPART itself does not read environment variables. Your adapter and test configuration typically do:
+RAMPART itself does not read environment variables. Your adapter and test configuration typically do. Setting them locally for ad-hoc runs:
+
+=== "Linux / macOS"
+
+    ```bash
+    export AGENT_API_KEY="..."
+    export AGENT_ENDPOINT="https://..."
+    pytest tests/
+    ```
+
+=== "Windows (PowerShell)"
+
+    ```powershell
+    $env:AGENT_API_KEY = "..."
+    $env:AGENT_ENDPOINT = "https://..."
+    pytest tests/
+    ```
+
+Then consume them in your adapter and configuration:
 
 ```python
 import os

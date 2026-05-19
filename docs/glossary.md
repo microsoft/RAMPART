@@ -1,3 +1,7 @@
+---
+description: Definitions for terms used throughout the RAMPART documentation — adapter, attack, probe, evaluator, surface, payload, and more.
+---
+
 # Glossary
 
 Terms used throughout the RAMPART documentation.

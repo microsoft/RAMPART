@@ -1,3 +1,7 @@
+---
+description: Built-in RAMPART probes that verify expected agent behavior, including the behavioral probe.
+---
+
 # Probes
 
 Available probe types.

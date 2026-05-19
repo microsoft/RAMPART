@@ -1,3 +1,7 @@
+---
+description: Built-in RAMPART attacks, including XPIA (Cross-Prompt Injection Attack), with patterns for surface-based and inline injection.
+---
+
 # Attacks
 
 For background on what attacks are and how they work, see [Concepts: Attacks](../concepts/attacks.md).

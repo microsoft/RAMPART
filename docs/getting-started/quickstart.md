@@ -14,7 +14,7 @@ Follow the [Installation](installation.md) guide, then return here.
 
 Your adapter bridges RAMPART and your agent. Implement two protocols: [`AgentAdapter`][rampart.core.adapter.AgentAdapter] (factory + metadata) and [`Session`][rampart.core.adapter.Session] (interaction).
 
-```python
+```python linenums="1"
 # my_agent/adapter.py
 
 from rampart import (
@@ -32,7 +32,7 @@ class MyAgentSession:
     def __init__(self, api_client):
         self._client = api_client
 
-    async def send_async(self, request: Request) -> Response:
+    async def send_async(self, request: Request) -> Response:  # (1)!
         # Replace this with your agent's actual API call.
         # This could be an OpenAI client, an HTTP request,
         # a gRPC call, a Playwright browser session — whatever
@@ -41,16 +41,16 @@ class MyAgentSession:
 
         return Response(
             text=raw_response["text"],
-            tool_calls=[
+            tool_calls=[  # (2)!
                 ToolCall(name=tc["name"], arguments=tc["args"])
                 for tc in raw_response.get("tool_calls", [])
             ],
         )
 
-    async def __aenter__(self):
+    async def __aenter__(self):  # (3)!
         return self
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
+    async def __aexit__(self, exc_type, exc_val, exc_tb):  # (4)!
         pass
 
 
@@ -60,19 +60,25 @@ class MyAgentAdapter:
     def __init__(self, api_client):
         self._client = api_client
 
-    async def create_session_async(self) -> MyAgentSession:
+    async def create_session_async(self) -> MyAgentSession:  # (5)!
         return MyAgentSession(api_client=self._client)
 
     @property
-    def manifest(self) -> AppManifest:
+    def manifest(self) -> AppManifest:  # (6)!
         return AppManifest(name="My Agent")
 
     @property
-    def observability_profile(self) -> ObservabilityLevel:
+    def observability_profile(self) -> ObservabilityLevel:  # (7)!
         return ObservabilityLevel.TOOL_ONLY
 ```
 
-The adapter needs three things: `create_session_async()` to create sessions, `manifest` to identify your agent, and `observability_profile` to declare what the adapter can observe. See [Writing Tests](../usage/authoring-tests.md) for the full details on manifests, tool declarations, and observability levels.
+1. **Send a request, return a response.** Populate `tool_calls` and `side_effects` with everything you can observe. Empty lists mean "no observations," not "nothing happened."
+2. **Tool calls go here.** The evaluator [`ToolCalled`][rampart.evaluators.tool_called.ToolCalled] only fires if these are reported, so don't skip them when your agent supports tools.
+3. **Set up session-level state.** API connections, browser contexts, anything that lives for one interaction.
+4. **Clean up.** Must be idempotent and must not raise — RAMPART always calls this, even after errors.
+5. **Create a fresh session per execution.** RAMPART manages the lifecycle; you just hand over a new `Session`.
+6. **Identify the agent.** Add `tools=[...]` and `data_sources=[...]` here once you wire those up.
+7. **Declare what you can observe.** Affects which evaluators are reliable — see [Writing Tests](../usage/authoring-tests.md).
 
 ---
 

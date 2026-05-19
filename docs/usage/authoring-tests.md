@@ -12,11 +12,11 @@ Every RAMPART test needs an adapter that connects your agent to the framework.
 
 A [`Session`][rampart.core.adapter.Session] is an async context manager that sends requests and returns responses:
 
-```python
+```python linenums="1"
 from rampart import Request, Response, ToolCall
 
 class MySession:
-    async def send_async(self, request: Request) -> Response:
+    async def send_async(self, request: Request) -> Response:  # (1)!
         raw = await self._client.chat(request.prompt)
         return Response(
             text=raw["text"],
@@ -26,18 +26,16 @@ class MySession:
             ],
         )
 
-    async def __aenter__(self):
+    async def __aenter__(self):  # (2)!
         return self
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
+    async def __aexit__(self, exc_type, exc_val, exc_tb):  # (3)!
         pass
 ```
 
-**Key responsibilities:**
-
-- **`send_async`**: Populate `Response.tool_calls` and `Response.side_effects` with everything you can observe. Empty lists mean "no observations," not "nothing happened."
-- **`__aenter__`**: Set up session-level state (API connections, browser contexts).
-- **`__aexit__`**: Clean up. Must be idempotent and must not raise.
+1. Populate `Response.tool_calls` and `Response.side_effects` with everything you can observe. Empty lists mean "no observations," not "nothing happened."
+2. Set up session-level state (API connections, browser contexts).
+3. Clean up. Must be idempotent and must not raise.
 
 ### AgentAdapter Protocol
 
@@ -174,35 +172,38 @@ class MyFileSurface:
             path=self._target_path,
             payload=payload,
         )
-
-
-class _FileInjection:
-    def __init__(self, *, client, path: str, payload: Payload):
-        self._client = client
-        self._path = path
-        self._payload = payload
-        self._original_content: str | None = None
-
-    @property
-    def payload_id(self) -> str | None:
-        return self._payload.id
-
-    @property
-    def surface_name(self) -> str:
-        return "file_system"
-
-    async def wait_until_ready(self) -> None:
-        pass  # or: await asyncio.sleep(10.0) for indexing delay
-
-    async def __aenter__(self):
-        self._original_content = await self._client.read(self._path)
-        await self._client.write(self._path, self._payload.content)
-        return self
-
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
-        if self._original_content is not None:
-            await self._client.write(self._path, self._original_content)
 ```
+
+??? note "`_FileInjection` reference implementation"
+
+    ```python linenums="1"
+    class _FileInjection:
+        def __init__(self, *, client, path: str, payload: Payload):
+            self._client = client
+            self._path = path
+            self._payload = payload
+            self._original_content: str | None = None
+
+        @property
+        def payload_id(self) -> str | None:
+            return self._payload.id
+
+        @property
+        def surface_name(self) -> str:
+            return "file_system"
+
+        async def wait_until_ready(self) -> None:
+            pass  # or: await asyncio.sleep(10.0) for indexing delay
+
+        async def __aenter__(self):
+            self._original_content = await self._client.read(self._path)
+            await self._client.write(self._path, self._payload.content)
+            return self
+
+        async def __aexit__(self, exc_type, exc_val, exc_tb):
+            if self._original_content is not None:
+                await self._client.write(self._path, self._original_content)
+    ```
 
 !!! warning
     `__aexit__` must not raise. If cleanup can fail, catch and log the exception.

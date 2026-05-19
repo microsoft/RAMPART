@@ -1,3 +1,7 @@
+---
+description: Patterns for authoring RAMPART tests — adapters, manifests, evaluators, surfaces, pytest markers, reporting, and CI integration.
+---
+
 # Usage
 
 | Page | Description |

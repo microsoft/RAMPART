@@ -1,3 +1,7 @@
+---
+description: Mental model for RAMPART — attacks vs probes, evaluators, the execution lifecycle, and how RAMPART builds on PyRIT.
+---
+
 # Concepts
 
 Core ideas behind RAMPART. Read these before writing tests.

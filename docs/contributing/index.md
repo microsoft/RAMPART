@@ -1,3 +1,7 @@
+---
+description: How to contribute to RAMPART — development setup, code style, testing standards, architecture, extension points, and the release process.
+---
+
 # Contributing to RAMPART
 
 We welcome contributions and suggestions! Whether you're fixing a bug, adding a new attack type, improving documentation, or filing an issue, your help is appreciated.

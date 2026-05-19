@@ -38,3 +38,7 @@
   margin-left: auto;
   margin-right: auto;
 }
+
+.md-typeset img.hero-logo {
+  max-width: 50%;
+}
