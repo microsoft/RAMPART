@@ -27,6 +27,7 @@ assert result, result.summary
 | If you want to… | Start here |
 |---|---|
 | Install RAMPART and run your first test | [Getting Started](getting-started/index.md) |
+| Explore runnable, end-to-end demos | [RAMPART Examples](https://github.com/microsoft/rampart-examples) |
 | Understand how RAMPART works | [Concepts](concepts/overview.md) |
 | Write an XPIA attack test | [XPIA Attack](attacks/xpia.md) |
 | Write a behavioral probe | [Behavioral Probe](probes/behavioral.md) |

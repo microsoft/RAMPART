@@ -2,6 +2,9 @@
 
 This guide walks you through writing your first RAMPART safety test — from adapter to a passing test run.
 
+!!! tip "Prefer to read working code?"
+    [`microsoft/rampart-examples`](https://github.com/microsoft/rampart-examples) hosts self-contained demos with a complete adapter, manifest, surface, and red → fix → green test walkthrough you can clone and run.
+
 ---
 
 ## Step 1: Install RAMPART
@@ -176,3 +179,4 @@ JSON reports are written to `.report/`.
 - [Writing Tests](../usage/authoring-tests.md) — Adapters, manifests, evaluators, surfaces in depth
 - [pytest Markers & Fixtures](../usage/pytest-integration.md) — `@harm`, `@trial`, `rampart_sinks`
 - [Configuration](../usage/configuration.md) — LLMConfig, Persona, AppManifest
+- [RAMPART Examples](https://github.com/microsoft/rampart-examples) — Runnable demos showing complete adapter + test setups
