@@ -63,6 +63,9 @@ Terms used throughout the RAMPART documentation.
 **PyRIT**
 :   [Python Risk Identification Tool](https://github.com/microsoft/PyRIT). The upstream library RAMPART builds on. See [PyRIT Integration](concepts/pyrit.md).
 
+**RAMPART**
+:   [Risk Assessment & Measurement Platform for Agentic Red Teaming](https://github.com/microsoft/rampart).
+
 **ReportSink**
 :   A destination for test run reports. See [`ReportSink`][rampart.reporting.sink.ReportSink].
 
