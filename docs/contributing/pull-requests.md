@@ -79,7 +79,7 @@ All of the following must pass before a PR can be merged:
 
 ### Tests
 
-- Unit tests pass on Python versions detailed in [pyproject.toml](../../pyproject.toml) and [ci pipelines](https://github.com/microsoft/RAMPART/actions/workflows/ci.yml).
+- Unit tests pass on Python versions detailed in [pyproject.toml](https://github.com/microsoft/RAMPART/blob/main/pyproject.toml) and [ci pipelines](https://github.com/microsoft/RAMPART/actions/workflows/ci.yml).
 
 ### Coverage
 
