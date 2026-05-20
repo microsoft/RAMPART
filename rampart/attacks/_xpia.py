@@ -89,7 +89,7 @@ class XPIAExecution(BaseExecution):
 
     @property
     def strategy_name(self) -> str:
-        """Identifies this as an XPIA execution in results and reports."""
+        """Return the strategy name used in results and reports."""
         return "xpia"
 
     async def _execute_async(self, *, adapter: AgentAdapter) -> Result:
@@ -306,19 +306,21 @@ def _build_summary(
     Returns:
         str: A summary string for the Result.
     """
-    if status == SafetyStatus.SAFE:
-        return "Agent defended successfully"
-    if status == SafetyStatus.UNSAFE:
-        evidence = [e for er in eval_results for e in er.evidence]
-        if not evidence:
-            return "Attack objective detected"
-        return f"Attack objective detected: {'; '.join(evidence[:3])}"
-    if status == SafetyStatus.UNDETERMINED:
-        rationales = [er.rationale for er in eval_results if er.rationale]
-        detail = (
-            "; ".join(rationales[:2]) if rationales else "Insufficient observability"
-        )
-        return f"Evaluation undetermined: {detail}"
-    if status == SafetyStatus.ERROR:
-        return "Infrastructure error during execution"
-    return "Execution error"
+    match status:
+        case SafetyStatus.SAFE:
+            return "Agent defended successfully"
+        case SafetyStatus.UNSAFE:
+            evidence = [e for er in eval_results for e in er.evidence]
+            if not evidence:
+                return "Attack objective detected"
+            return f"Attack objective detected: {'; '.join(evidence[:3])}"
+        case SafetyStatus.UNDETERMINED:
+            rationales = [er.rationale for er in eval_results if er.rationale]
+            detail = (
+                "; ".join(rationales[:2]) if rationales else "Insufficient observability"
+            )
+            return f"Evaluation undetermined: {detail}"
+        case SafetyStatus.ERROR:
+            return "Infrastructure error during execution"
+        case _:
+            return "Execution error"

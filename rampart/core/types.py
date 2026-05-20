@@ -75,16 +75,25 @@ class PayloadFormat(Enum):
     @property
     def extension(self) -> str:
         """File extension including the leading dot (e.g., '.png')."""
-        return {
-            PayloadFormat.TEXT: ".txt",
-            PayloadFormat.HTML: ".html",
-            PayloadFormat.MARKDOWN: ".md",
-            PayloadFormat.IMAGE: ".png",
-            PayloadFormat.PDF: ".pdf",
-            PayloadFormat.DOCX: ".docx",
-            PayloadFormat.XLSX: ".xlsx",
-            PayloadFormat.AUDIO: ".wav",
-        }.get(self, ".bin")
+        match self:
+            case PayloadFormat.TEXT:
+                return ".txt"
+            case PayloadFormat.HTML:
+                return ".html"
+            case PayloadFormat.MARKDOWN:
+                return ".md"
+            case PayloadFormat.IMAGE:
+                return ".png"
+            case PayloadFormat.PDF:
+                return ".pdf"
+            case PayloadFormat.DOCX:
+                return ".docx"
+            case PayloadFormat.XLSX:
+                return ".xlsx"
+            case PayloadFormat.AUDIO:
+                return ".wav"
+            case _:
+                return ".bin"
 
 
 @dataclass(kw_only=True)
@@ -115,10 +124,16 @@ class Payload:
     id: str = field(default_factory=lambda: uuid.uuid4().hex[:12])
     format: PayloadFormat = PayloadFormat.TEXT
     artifact: Path | None = None
-    metadata: dict[str, Any] = field(default_factory=dict[str, Any])
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
-        """Validate content-format-artifact consistency."""
+        """Validate content-format-artifact consistency.
+
+        Raises:
+            TypeError: If a binary format is missing an artifact, or a
+                text format supplies one.
+            FileNotFoundError: If the artifact path does not exist on disk.
+        """
         if self.format.is_binary and self.artifact is None:
             msg = (
                 f"Binary format {self.format.value} requires an "
@@ -165,7 +180,7 @@ class ToolCall:
     """
 
     name: str
-    arguments: dict[str, Any] = field(default_factory=dict[str, Any])
+    arguments: dict[str, Any] = field(default_factory=dict)
     result: str | None = None
     timestamp: datetime | None = None
 
@@ -184,7 +199,7 @@ class SideEffect:
     """
 
     kind: str
-    details: dict[str, Any] = field(default_factory=dict[str, Any])
+    details: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(kw_only=True)
@@ -201,9 +216,9 @@ class Response:
     """
 
     text: str
-    tool_calls: list[ToolCall] = field(default_factory=list[ToolCall])
-    side_effects: list[SideEffect] = field(default_factory=list[SideEffect])
-    metadata: dict[str, Any] = field(default_factory=dict[str, Any])
+    tool_calls: list[ToolCall] = field(default_factory=list)
+    side_effects: list[SideEffect] = field(default_factory=list)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(kw_only=True)
@@ -221,10 +236,14 @@ class Request:
     """
 
     prompt: str | None = None
-    attachments: list[Payload] = field(default_factory=list[Payload])
+    attachments: list[Payload] = field(default_factory=list)
 
     def __post_init__(self) -> None:
-        """Validate that the request carries some content."""
+        """Validate that the request carries some content.
+
+        Raises:
+            ValueError: If both prompt and attachments are absent.
+        """
         if self.prompt is None and not self.attachments:
             msg = "Request must include at least a prompt or attachments."
             raise ValueError(
@@ -286,7 +305,7 @@ class EvalResult:
 
     outcome: EvalOutcome
     confidence: float = 1.0
-    evidence: list[str] = field(default_factory=list[str])
+    evidence: list[str] = field(default_factory=list)
     rationale: str = ""
 
     @property
@@ -316,11 +335,15 @@ class EvalContext:
 
     turns: list[Turn]
     manifest: AppManifest | None = None
-    metadata: dict[str, Any] = field(default_factory=dict[str, Any])
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     @property
     def current_turn(self) -> Turn:
-        """The most recent turn. Raises ValueError if no turns exist."""
+        """The most recent turn.
+
+        Raises:
+            ValueError: If no turns have been added to the context.
+        """
         if not self.turns:
             msg = "No turns in context."
             raise ValueError(msg)

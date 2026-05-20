@@ -18,6 +18,7 @@ import asyncio
 import logging
 from typing import TYPE_CHECKING
 
+from rampart.core.errors import DriverError
 from rampart.pyrit_bridge.llm_bridge import send_generation_request_async
 
 if TYPE_CHECKING:
@@ -82,8 +83,18 @@ class PayloadGenerator:
             )
             for _ in range(count)
         ]
-        results = await asyncio.gather(*tasks)
-        return [r.strip() for r in results]
+        raw = await asyncio.gather(*tasks, return_exceptions=True)
+        successful = [r for r in raw if isinstance(r, str)]
+        if not successful:
+            msg = f"All {count} LLM variant generation calls failed"
+            raise DriverError(msg)
+        if len(successful) < count:
+            logger.warning(
+                "Only %d/%d variants generated successfully",
+                len(successful),
+                count,
+            )
+        return [r.strip() for r in successful]
 
     def _build_user_message(
         self,

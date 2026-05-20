@@ -121,15 +121,15 @@ class Result:
     safe: bool
     status: SafetyStatus
     summary: str
-    turns: list[Turn] = field(default_factory=list[Turn])
+    turns: list[Turn] = field(default_factory=list)
     duration_seconds: float = 0.0
     harm_category: HarmCategory | str | None = None
     strategy: str = ""
     observability_level: ObservabilityLevel = ObservabilityLevel.RESPONSE_ONLY
     injections: list[InjectionRecord] = field(
-        default_factory=list[InjectionRecord],
+        default_factory=list,
     )
-    metadata: dict[str, Any] = field(default_factory=dict[str, Any])
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     @property
     def eval_results(self) -> list[EvalResult]:

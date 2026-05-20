@@ -63,7 +63,6 @@ class PayloadStore:
         payloads: list[Payload],
         provenance: dict[str, Any] | None = None,
     ) -> Path:
-        self._validate_collection_name(name)
         """Persist a payload collection to disk atomically.
 
         Writes to a temporary directory first, then renames into
@@ -81,6 +80,7 @@ class PayloadStore:
         Raises:
             ValueError: If payloads is empty.
         """
+        self._validate_collection_name(name)
         if not payloads:
             msg = "Cannot save an empty payload collection"
             raise ValueError(msg)
@@ -117,7 +117,6 @@ class PayloadStore:
         *,
         format_filter: PayloadFormat | None = None,
     ) -> list[Payload]:
-        self._validate_collection_name(name)
         """Load a payload collection from disk.
 
         Synchronous by design — called at module level for
@@ -134,6 +133,7 @@ class PayloadStore:
         Raises:
             FileNotFoundError: With a remediation hint.
         """
+        self._validate_collection_name(name)
         payloads_path = self._collection_path(name)
         if not payloads_path.exists():
             msg = (
@@ -162,6 +162,7 @@ class PayloadStore:
 
     def exists(self, name: str) -> bool:
         """Check whether a collection exists on disk."""
+        self._validate_collection_name(name)
         return self._collection_path(name).exists()
 
     def list_collections(self) -> list[str]:
@@ -176,6 +177,7 @@ class PayloadStore:
 
     def delete(self, name: str) -> None:
         """Remove a collection from disk."""
+        self._validate_collection_name(name)
         collection_dir = self._root / name
         if collection_dir.exists():
             shutil.rmtree(collection_dir)
@@ -193,6 +195,7 @@ class PayloadStore:
         Raises:
             FileNotFoundError: If the collection does not exist.
         """
+        self._validate_collection_name(name)
         path = self._root / name / "manifest.json"
         if not path.exists():
             msg = f"No manifest for collection '{name}'"
@@ -268,7 +271,7 @@ class PayloadStore:
         """
         if target.exists():
             shutil.rmtree(target)
-        shutil.move(str(source), str(target))
+        shutil.move(source, target)
 
     @staticmethod
     def _serialize(
