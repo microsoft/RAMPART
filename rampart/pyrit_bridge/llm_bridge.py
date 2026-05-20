@@ -144,19 +144,14 @@ async def send_user_turn_async(
     Returns:
         The model's text response.
     """
-    request = MessagePiece(
-        role="user",
-        original_value=user_message,
-        conversation_id=conversation_id,
-    ).to_message()
-    response = await normalizer.send_prompt_async(
-        message=request,
+    return await _send_via_normalizer(
+        normalizer=normalizer,
         target=target,
         conversation_id=conversation_id,
+        user_message=user_message,
         labels=labels,
         attack_identifier=attack_identifier,
     )
-    return response.get_value()
 
 
 async def send_generation_request_async(
@@ -168,8 +163,6 @@ async def send_generation_request_async(
     """Send a prompt to an LLM via PyRIT and return the text response.
 
     Used by ``PayloadGenerator`` for adversarial text generation.
-    This is the only function that translates between RAMPART's
-    string-based prompt interface and PyRIT's message types.
 
     Creates a fresh conversation per call — sets the system prompt,
     sends the user message, and extracts the text response.
@@ -201,3 +194,107 @@ async def send_generation_request_async(
 
     responses = await target.send_prompt_async(message=request)
     return responses[0].get_value()
+
+
+async def send_judge_request_async(
+    *,
+    normalizer: PromptNormalizer,
+    target: PromptChatTarget,
+    system_prompt: str,
+    user_message: str,
+    response_format: str | None = "json",
+    labels: dict[str, str] | None = None,
+    attack_identifier: ComponentIdentifier | None = None,
+) -> str:
+    """Send a one-shot judge request and return the response text.
+
+    Creates a fresh conversation per call: sets the system prompt,
+    sends the user message via ``PromptNormalizer`` (so the
+    interaction lands in ``CentralMemory`` with the given labels),
+    and returns the model's text response.
+
+    Args:
+        normalizer (PromptNormalizer): Normalizer instance.
+        target (PromptChatTarget): Configured PromptChatTarget.
+        system_prompt (str): System message content (judge identity,
+            detection objective, output schema, and security
+            boundary, fully assembled by the caller).
+        user_message (str): User message content (the transcript
+            being judged).
+        response_format (str | None): If ``"json"``, requests JSON
+            mode via ``prompt_metadata["response_format"]``. Pass
+            ``None`` to skip the hint.
+        labels (dict[str, str] | None): Optional memory labels for
+            observability.
+        attack_identifier (ComponentIdentifier | None): Optional
+            component identifier for tracing.
+
+    Returns:
+        str: The LLM's text response.
+    """
+    conversation_id = str(uuid4())
+
+    target.set_system_prompt(
+        system_prompt=system_prompt,
+        conversation_id=conversation_id,
+    )
+
+    prompt_metadata: dict[str, str | int] | None = (
+        {"response_format": response_format} if response_format else None
+    )
+    return await _send_via_normalizer(
+        normalizer=normalizer,
+        target=target,
+        conversation_id=conversation_id,
+        user_message=user_message,
+        labels=labels,
+        attack_identifier=attack_identifier,
+        prompt_metadata=prompt_metadata,
+    )
+
+
+async def _send_via_normalizer(
+    *,
+    normalizer: PromptNormalizer,
+    target: PromptChatTarget,
+    conversation_id: str,
+    user_message: str,
+    labels: dict[str, str] | None = None,
+    attack_identifier: ComponentIdentifier | None = None,
+    prompt_metadata: dict[str, str | int] | None = None,
+) -> str:
+    """Build a user message, send via normalizer, and return the text.
+
+    Shared implementation for ``send_user_turn_async`` (multi-turn) and
+    ``send_judge_request_async`` (one-shot).  Both need the same
+    MessagePiece → send_prompt_async → get_value pipeline; this
+    helper owns that pipeline so it only exists in one place.
+
+    Args:
+        normalizer: PromptNormalizer instance.
+        target: The configured PromptChatTarget.
+        conversation_id: Conversation identifier (caller-owned or
+            freshly generated).
+        user_message: The user turn content.
+        labels: Optional memory labels.
+        attack_identifier: Optional component identifier for tracing.
+        prompt_metadata: Optional metadata passed to the model (e.g.
+            ``{"response_format": "json"}`` for JSON mode).
+
+    Returns:
+        The model's text response.
+    """
+    request = MessagePiece(
+        role="user",
+        original_value=user_message,
+        conversation_id=conversation_id,
+        prompt_metadata=prompt_metadata,
+    ).to_message()
+    response = await normalizer.send_prompt_async(
+        message=request,
+        target=target,
+        conversation_id=conversation_id,
+        labels=labels,
+        attack_identifier=attack_identifier,
+    )
+    return response.get_value()

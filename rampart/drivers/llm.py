@@ -32,12 +32,11 @@ import uuid
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-import yaml
-from jinja2 import Template
 from pyrit.exceptions import EmptyResponseException
 from pyrit.memory import CentralMemory
 from pyrit.prompt_normalizer import PromptNormalizer
 
+from rampart.common.templates import load_prompt_template
 from rampart.core.errors import DriverError
 from rampart.core.prompt_driver import PromptDecision
 from rampart.core.types import Payload, Request, Turn
@@ -52,17 +51,10 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 _PROMPTS_DIR = Path(__file__).resolve().parent / "prompts"
-
-
-def _load_prompt_template(name: str) -> Template:
-    """Load a YAML prompt template from the prompts directory as a Jinja2 Template."""
-    path = _PROMPTS_DIR / name
-    with path.open() as f:
-        data = yaml.safe_load(f)
-    return Template(data["value"])
-
-
-_SYSTEM_PROMPT_TEMPLATE = _load_prompt_template("llm_driver_system_prompt.yaml")
+_SYSTEM_PROMPT_TEMPLATE = load_prompt_template(
+    _PROMPTS_DIR,
+    "llm_driver_system_prompt.yaml",
+)
 
 
 class LLMDriver:

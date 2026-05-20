@@ -8,3 +8,6 @@ Built-in evaluators. All extend `BaseEvaluator` and support composition via `|`,
         - ToolCalled
         - ResponseContains
         - SideEffectOccurred
+        - LLMJudge
+        - TranscriptScope
+        - NEUTRAL_EVALUATOR

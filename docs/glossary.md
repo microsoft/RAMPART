@@ -30,6 +30,9 @@ Terms used throughout the RAMPART documentation.
 **Evaluator**
 :   Detects a condition in agent behavior. Polarity-free — answers "did X happen?" See [Evaluators](api/evaluators.md).
 
+**EvaluatorError**
+:   Raised by an evaluator for configuration or setup failures (bad endpoint, auth failure). Subclass of `InfrastructureError`; routes through `BaseExecution` to `Result(status=ERROR)`. See [`EvaluatorError`][rampart.core.errors.EvaluatorError].
+
 **Execution**
 :   A configured test strategy ready to run. Created by [`Attacks`][rampart.attacks.Attacks] or [`Probes`][rampart.probes.Probes] factory methods. Call `execute_async(adapter=...)` to produce a [`Result`][rampart.core.result.Result].
 
@@ -44,6 +47,9 @@ Terms used throughout the RAMPART documentation.
 
 **LLMConfig**
 :   Immutable configuration for an LLM endpoint. See [`LLMConfig`][rampart.core.llm.LLMConfig].
+
+**LLMJudge**
+:   An [`Evaluator`][rampart.core.evaluator.Evaluator] backed by an LLM. Detects diffuse, language-level conditions that pattern-based evaluators can't express (e.g., "did the agent disclose ticket contents?"). Composes with deterministic evaluators via `|` / `&` / `~`. See [`LLMJudge`][rampart.evaluators.llm_judge.LLMJudge].
 
 **Manifest**
 :   An [`AppManifest`][rampart.core.manifest.AppManifest] describing your agent's tools, data sources, and capabilities.
