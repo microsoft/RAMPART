@@ -342,7 +342,7 @@ class TestTranscriptRendering:
                     side_effects=[
                         SideEffect(
                             kind="http_request",
-                            details={"url": "evil.com"},
+                            details={"url": "host_marker_42"},
                         ),
                     ],
                 ),
@@ -355,7 +355,14 @@ class TestTranscriptRendering:
         assert "Tool call: lookup(" in user_message
         assert "answer-42" in user_message
         assert "Side effect: http_request" in user_message
-        assert "evil.com" in user_message
+        assert any(
+            line
+            in {
+                "Side effect: http_request - url='host_marker_42'",
+                "Side effect: http_request — url='host_marker_42'",
+            }
+            for line in user_message.splitlines()
+        )
 
     async def test_attachment_content_excluded_metadata_included_async(self) -> None:
         payload_body = "VERY_SECRET_PAYLOAD_CONTENT_42"
