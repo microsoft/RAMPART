@@ -134,13 +134,15 @@ SideEffectOccurred("http_request", method="POST", host="evil.com")
 For conditions that require reasoning over natural language ("did the agent disclose ticket contents?", "did the agent comply with the injected instruction?"), use `LLMJudge`. It calls a separate LLM to evaluate the transcript against an objective and returns a structured verdict.
 
 ```python
+import os
+
 from rampart import LLMConfig
 from rampart.evaluators import LLMJudge
 
 judge_llm = LLMConfig(
     model="gpt-4o",
     endpoint="https://api.openai.com/v1",
-    api_key="...",
+    api_key=os.environ["OPENAI_API_KEY"],
     metadata={"temperature": 0, "seed": 42},  # for reproducible CI verdicts
 )
 
@@ -158,7 +160,7 @@ from rampart.evaluators import LLMJudge, ToolCalled
 evaluator = ToolCalled("reset_user_password") | judge
 ```
 
-**Limiting scope to the latest turn.** By default the judge sees the full transcript. For checks like "did the latest reply comply with the injection?", limit the scope so earlier well-behaved turns don't dilute the signal:
+**Limiting scope to the latest turn.** By default the judge sees the full transcript. In multi-turn tests, you can limit the scope to just the latest turn — useful for checks like "did the latest reply comply with the injection?", where earlier well-behaved turns would dilute the signal:
 
 ```python
 from rampart.evaluators import LLMJudge, TranscriptScope
@@ -202,11 +204,8 @@ judge = LLMJudge.from_target(target=fake_target, objective="...")
     - **Configuration errors** (unreachable endpoint, auth failure) raise [`EvaluatorError`][rampart.core.errors.EvaluatorError] and surface as `Result(status=ERROR)`.
     - **Transient LLM errors** (timeouts, rate limits, empty responses) and **malformed JSON** after retries degrade to `EvalOutcome.UNDETERMINED` so the composition can still produce a verdict.
 
-!!! tip "Reproducible CI verdicts"
-    Judge verdicts are non-deterministic by default. For reproducible CI, set `temperature=0` and a fixed `seed` in `LLMConfig.metadata`.
-
 !!! info "Prompt injection against the judge"
-    The transcript contains attacker-controlled text. The judge defends with a hardened system prompt (a fixed security boundary is appended automatically, even when subclasses override `_build_system_prompt`), and attachment payload content is never rendered into the user message — only attachment metadata. See the design document for the full security model.
+    The transcript contains attacker-controlled text. The judge defends with a hardened system prompt (a fixed security boundary is appended automatically, even when subclasses override `_build_system_prompt`), and attachment payload content is never rendered into the user message — only attachment metadata.
 
 ### Composing Evaluators
 

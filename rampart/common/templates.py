@@ -21,7 +21,7 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 
-def load_prompt_template(prompts_dir: Path, name: str) -> Template:
+def load_prompt_template(path: Path) -> Template:
     """Load and compile a YAML prompt template as a Jinja2 ``Template``.
 
     The YAML file is expected to contain at least a ``value`` key whose
@@ -30,20 +30,17 @@ def load_prompt_template(prompts_dir: Path, name: str) -> Template:
     loader — they exist for human documentation.
 
     Args:
-        prompts_dir: Absolute path to the directory that holds the
-            YAML template file.
-        name: Filename of the template inside *prompts_dir*
-            (e.g. ``"llm_judge.yaml"``).
+        path: Absolute path to the YAML template file
+            (e.g. ``.../prompts/llm_judge.yaml``).
 
     Returns:
         Template: A compiled Jinja2 ``Template`` ready for ``.render()``.
 
     Raises:
-        FileNotFoundError: If *prompts_dir / name* does not exist.
+        FileNotFoundError: If *path* does not exist.
         KeyError: If the YAML file does not contain a ``value`` key.
         yaml.YAMLError: If the file is not valid YAML.
     """
-    path = prompts_dir / name
     with path.open() as f:
         data = yaml.safe_load(f)
     return Template(data["value"])

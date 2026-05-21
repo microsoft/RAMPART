@@ -30,6 +30,9 @@ llm = LLMConfig(
 !!! note
     When `api_key` is `None`, RAMPART authenticates via Azure Identity (managed identity, Azure CLI credential). This is recommended for CI.
 
+!!! tip "Reproducibility in CI"
+    LLM responses are non-deterministic by default. For stable CI pass/fail, set `temperature=0` and a fixed `seed` in `metadata` on every `LLMConfig` in your test — judge, driver, and any payload generation. Leaving a driver unpinned is sometimes desirable for fuzzing-style coverage, but a pinned judge is almost always what you want so the verdict on whatever attack was generated is itself stable.
+
 ---
 
 ## Persona

@@ -282,6 +282,22 @@ class TestConfidenceClamping:
         result, _ = await _evaluate(responses=[raw])
         assert result.outcome is EvalOutcome.UNDETERMINED
 
+    async def test_nan_confidence_degrades_async(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        # Defense against json.loads accepting NaN — without the finite-check
+        # in _validate_confidence, NaN would propagate through min/max and
+        # produce a poisoned EvalResult.confidence. The retry path should
+        # engage and ultimately degrade to UNDETERMINED.
+        monkeypatch.setenv("RETRY_MAX_NUM_ATTEMPTS", "2")
+        raw = (
+            '{"outcome": "detected", "confidence": NaN, '
+            '"rationale": "r", "evidence": []}'
+        )
+        result, _ = await _evaluate(responses=[raw])
+        assert result.outcome is EvalOutcome.UNDETERMINED
+
 
 def _two_turn_ctx() -> EvalContext:
     return _make_ctx(
@@ -508,6 +524,19 @@ class TestJudgeVerdictUnit:
                 "rationale": "r",
                 "evidence": [],
             },
+        )
+        with pytest.raises(InvalidJsonException):
+            _JudgeVerdict.from_json(raw)
+
+    @pytest.mark.parametrize("literal", ["NaN", "Infinity", "-Infinity"])
+    def test_from_json_rejects_non_finite_confidence(self, literal: str) -> None:
+        # json.loads accepts NaN/Infinity/-Infinity by default. Without an
+        # explicit finite-check, NaN would propagate through min/max and
+        # silently poison EvalResult.confidence.
+        raw = (
+            '{"outcome": "detected", "confidence": '
+            + literal
+            + ', "rationale": "r", "evidence": []}'
         )
         with pytest.raises(InvalidJsonException):
             _JudgeVerdict.from_json(raw)

@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
@@ -59,7 +60,7 @@ class TranscriptScope(Enum):
 
 
 _PROMPTS_DIR = Path(__file__).resolve().parent / "prompts"
-_SYSTEM_PROMPT_TEMPLATE = load_prompt_template(_PROMPTS_DIR, "llm_judge.yaml")
+_SYSTEM_PROMPT_TEMPLATE = load_prompt_template(_PROMPTS_DIR / "llm_judge.yaml")
 
 _ALLOWED_OUTCOMES: frozenset[str] = frozenset(
     {"detected", "not_detected", "undetermined"},
@@ -194,12 +195,19 @@ def _validate_confidence(value: Any) -> float:  # noqa: ANN401
         float: The validated confidence clamped to the inclusive range.
 
     Raises:
-        InvalidJsonException: If the value is a ``bool`` or not numeric.
+        InvalidJsonException: If the value is a ``bool``, not numeric, or
+            not finite (``NaN``, ``Infinity``, ``-Infinity``). Non-finite
+            values are rejected at the parse boundary so they trigger a
+            retry rather than silently poisoning downstream comparisons.
     """
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         msg = f"Judge response 'confidence' must be numeric; got {value!r}."
         raise InvalidJsonException(message=msg)
-    return max(0.0, min(1.0, float(value)))
+    f = float(value)
+    if not math.isfinite(f):
+        msg = f"Judge response 'confidence' must be finite; got {value!r}."
+        raise InvalidJsonException(message=msg)
+    return max(0.0, min(1.0, f))
 
 
 def _validate_rationale(value: Any) -> str:  # noqa: ANN401
