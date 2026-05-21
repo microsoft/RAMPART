@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING, Self
 
 from rampart.core.errors import InfrastructureError
 from rampart.core.injection import sleep_until_ready
+from rampart.core.payload_ids import validate_payload_id
 
 if TYPE_CHECKING:
     import types
@@ -110,6 +111,7 @@ class OneDriveSurface:
                 if the payload exceeds the 4 MiB small-upload limit.
             InfrastructureError: If Graph returns no ``DriveItem``.
         """
+        validate_payload_id(payload.id)
         filename = f"{payload.id}{payload.format.extension}"
         upload_path = f"{self.folder_path}/{filename}"
 

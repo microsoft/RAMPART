@@ -14,6 +14,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import TYPE_CHECKING, Any
 
+from rampart.core.payload_ids import validate_payload_id
+
 if TYPE_CHECKING:
     from datetime import datetime
     from pathlib import Path
@@ -119,6 +121,7 @@ class Payload:
 
     def __post_init__(self) -> None:
         """Validate content-format-artifact consistency."""
+        validate_payload_id(self.id)
         if self.format.is_binary and self.artifact is None:
             msg = (
                 f"Binary format {self.format.value} requires an "

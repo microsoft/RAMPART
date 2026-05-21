@@ -31,9 +31,11 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
+from rampart.core.payload_ids import validate_payload_id
 from rampart.core.types import Payload, PayloadFormat
 
 logger = logging.getLogger(__name__)
+_MIN_ARTIFACT_PATH_PARTS = 2
 
 
 class PayloadStore:
@@ -326,10 +328,53 @@ class PayloadStore:
         Returns:
             str: Relative artifact path (e.g., 'artifacts/abc123.pdf').
         """
+        validate_payload_id(payload_id)
         artifacts_dir.mkdir(parents=True, exist_ok=True)
         filename = f"{payload_id}{extension}"
-        shutil.copy2(source, artifacts_dir / filename)
+        destination = artifacts_dir / filename
+        PayloadStore._ensure_within_directory(
+            path=destination,
+            directory=artifacts_dir,
+            description="artifact destination",
+        )
+        shutil.copy2(source, destination)
         return f"artifacts/{filename}"
+
+    @staticmethod
+    def _ensure_within_directory(
+        *,
+        path: Path,
+        directory: Path,
+        description: str,
+    ) -> None:
+        """Raise if a resolved path escapes a required directory."""
+        resolved_path = path.resolve(strict=False)
+        resolved_directory = directory.resolve(strict=False)
+        if not resolved_path.is_relative_to(resolved_directory):
+            msg = f"Invalid {description}: {path!s} escapes {directory!s}"
+            raise ValueError(msg)
+
+    @staticmethod
+    def _resolve_artifact_path(*, collection_dir: Path, artifact: str) -> Path:
+        """Resolve a serialized artifact path inside collection artifacts/."""
+        artifact_path = Path(artifact)
+        if artifact_path.is_absolute() or ".." in artifact_path.parts:
+            msg = f"Invalid artifact path: {artifact!r}. Must stay under artifacts/."
+            raise ValueError(msg)
+        if (
+            len(artifact_path.parts) < _MIN_ARTIFACT_PATH_PARTS
+            or artifact_path.parts[0] != "artifacts"
+        ):
+            msg = f"Invalid artifact path: {artifact!r}. Must be under artifacts/."
+            raise ValueError(msg)
+
+        resolved = collection_dir / artifact_path
+        PayloadStore._ensure_within_directory(
+            path=resolved,
+            directory=collection_dir / "artifacts",
+            description="artifact path",
+        )
+        return resolved
 
     @staticmethod
     def _deserialize(
@@ -354,7 +399,10 @@ class PayloadStore:
 
         artifact: Path | None = None
         if "artifact" in data:
-            artifact_path = collection_dir / data["artifact"]
+            artifact_path = PayloadStore._resolve_artifact_path(
+                collection_dir=collection_dir,
+                artifact=data["artifact"],
+            )
             if not artifact_path.exists():
                 msg = f"Missing artifact: {artifact_path}"
                 raise FileNotFoundError(msg)
