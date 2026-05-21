@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import shutil
 import tempfile
 from pathlib import Path
@@ -34,6 +35,7 @@ from typing import Any
 from rampart.core.types import Payload, PayloadFormat
 
 logger = logging.getLogger(__name__)
+_COLLECTION_NAME_PATTERN = re.compile(r"^[A-Za-z0-9._-]{1,128}$")
 
 
 class PayloadStore:
@@ -162,6 +164,7 @@ class PayloadStore:
 
     def exists(self, name: str) -> bool:
         """Check whether a collection exists on disk."""
+        self._validate_collection_name(name)
         return self._collection_path(name).exists()
 
     def list_collections(self) -> list[str]:
@@ -176,6 +179,7 @@ class PayloadStore:
 
     def delete(self, name: str) -> None:
         """Remove a collection from disk."""
+        self._validate_collection_name(name)
         collection_dir = self._root / name
         if collection_dir.exists():
             shutil.rmtree(collection_dir)
@@ -193,6 +197,7 @@ class PayloadStore:
         Raises:
             FileNotFoundError: If the collection does not exist.
         """
+        self._validate_collection_name(name)
         path = self._root / name / "manifest.json"
         if not path.exists():
             msg = f"No manifest for collection '{name}'"
@@ -205,8 +210,11 @@ class PayloadStore:
     @staticmethod
     def _validate_collection_name(name: str) -> None:
         """Reject names that would escape the store root."""
-        if not name or "/" in name or "\\" in name or name in (".", ".."):
-            msg = f"Invalid collection name: {name!r}. Must be a simple directory name."
+        if not _COLLECTION_NAME_PATTERN.fullmatch(name) or name in (".", ".."):
+            msg = (
+                f"Invalid collection name: {name!r}. Must be a filename-safe "
+                "identifier using letters, numbers, dots, underscores, or hyphens."
+            )
             raise ValueError(
                 msg,
             )

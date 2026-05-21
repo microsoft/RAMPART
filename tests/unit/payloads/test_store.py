@@ -136,6 +136,36 @@ class TestPayloadStoreCollectionManagement:
         with pytest.raises(FileNotFoundError, match="No manifest"):
             store.manifest("ghost")
 
+    def test_exists_rejects_collection_path_traversal(
+        self,
+        store: PayloadStore,
+    ) -> None:
+        with pytest.raises(ValueError, match="Invalid collection name"):
+            store.exists("../outside")
+
+    def test_delete_rejects_collection_path_traversal(self, tmp_path: Path) -> None:
+        root = tmp_path / "store"
+        root.mkdir()
+        sentinel = tmp_path / "sentinel.txt"
+        sentinel.write_text("do not delete")
+        store = PayloadStore(root=root)
+
+        with pytest.raises(ValueError, match="Invalid collection name"):
+            store.delete("..")
+
+        assert sentinel.exists()
+        assert root.exists()
+
+    def test_manifest_rejects_collection_path_traversal(self, tmp_path: Path) -> None:
+        root = tmp_path / "store"
+        root.mkdir()
+        outside_manifest = tmp_path / "manifest.json"
+        outside_manifest.write_text('{"collection": "outside"}')
+        store = PayloadStore(root=root)
+
+        with pytest.raises(ValueError, match="Invalid collection name"):
+            store.manifest("..")
+
 
 class TestPayloadStorePathPayload:
     def test_path_based_payload_roundtrip(
