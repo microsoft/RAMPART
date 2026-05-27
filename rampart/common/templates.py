@@ -41,6 +41,6 @@ def load_prompt_template(path: Path) -> Template:
         KeyError: If the YAML file does not contain a ``value`` key.
         yaml.YAMLError: If the file is not valid YAML.
     """
-    with path.open() as f:
+    with path.open(encoding="utf-8") as f:
         data = yaml.safe_load(f)
     return Template(data["value"])
