@@ -46,9 +46,9 @@ version = "x.y.z"
 ### Update README File
 The README file is published to PyPI and also needs to be updated so the links work properly. _Note: There may not be any links to update, but it is good practice to check in case our README changes._
 
-Replace all “main” links like “doc/index.md” with “raw” links that have the correct version number, i.e., “https://raw.githubusercontent.com/microsoft/RAMPART/releases/vx.y.z/docs/index.md”.
+Keep README image links relative when they point to files in this repository, e.g., `docs/images/RAMPART.svg`. During package builds, `scripts/hatch_build.py` generates the PyPI README metadata and rewrites those image paths to raw GitHub URLs with the release version.
 
-For images, update using the “raw” link, e.g., “https://raw.githubusercontent.com/microsoft/RAMPART/releases/vx.y.z/docs/images/RAMPART.png”.
+Replace any other “main” links like “doc/index.md” with “raw” links that have the correct version number, i.e., “https://raw.githubusercontent.com/microsoft/RAMPART/releases/vx.y.z/docs/index.md”.
 
 For directories, update using the “tree” link, e.g., “https://github.com/microsoft/RAMPART/tree/releases/vx.y.z/docs/usage"
 

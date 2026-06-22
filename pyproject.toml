@@ -1,12 +1,12 @@
 [build-system]
-requires = ["setuptools"]
-build-backend = "setuptools.build_meta"
+requires = ["hatchling>=1.30.1"]
+build-backend = "hatchling.build"
 
 [project]
 name = "RAMPART"
 version = "0.1.1.dev0"
 description = "A pytest-native safety testing framework for agentic AI applications"
-readme = "README.md"
+dynamic = ["readme"]
 license = "MIT"
 requires-python = ">=3.11"
 authors = [
@@ -43,6 +43,7 @@ onedrive = [
 
 [dependency-groups]
 dev = [
+    "hatchling>=1.30.1",
     "pre-commit>=4.5.1",
     "pytest-cov>=6.1.0",
     "pytest-xdist[psutil]>=3.8.0",
@@ -64,14 +65,11 @@ Issues = "https://github.com/microsoft/RAMPART/issues"
 [project.entry-points.pytest11]
 rampart = "rampart.pytest_plugin.plugin"
 
-[tool.setuptools.packages.find]
-exclude = ["site*", "docs*", "tests*", "scripts*"]
+[tool.hatch.metadata.hooks.custom]
+path = "scripts/hatch_build.py"
 
-[tool.setuptools.package-data]
-rampart = [
-    "drivers/prompts/*.yaml",
-    "evaluators/prompts/*.yaml",
-]
+[tool.hatch.build.targets.wheel]
+packages = ["rampart"]
 
 [tool.coverage.run]
 source = ["rampart"]
@@ -105,6 +103,9 @@ extend-ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
+"scripts/hatch_build.py" = [
+    "INP001",                                  # Top-level build hook
+]
 "tests/**" = [
     "S101",                                    # assert is pytest's API
     "D100", "D101", "D102", "D104", "D107",    # no docstrings needed
@@ -143,7 +144,7 @@ max-args = 10
 python-version = "3.11"
 
 [tool.ty.src]
-include = ["rampart", "tests"]
+include = ["rampart", "tests", "scripts"]
 
 [tool.uv.sources]
 pyrit = { git = "https://github.com/microsoft/PyRIT", rev = "6dc8b94139757390286bbce7d53c1f7e58e66e29" } # v0.13.0
