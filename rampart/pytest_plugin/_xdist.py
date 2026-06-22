@@ -24,6 +24,7 @@ import math
 from datetime import datetime
 from typing import TYPE_CHECKING, Any, cast
 
+from rampart.common.deprecation import emit_deprecation_warning
 from rampart.common.text import strip_ansi as _strip_ansi_impl
 from rampart.core.result import (
     HarmCategory,
@@ -1175,6 +1176,12 @@ def _resolve_sink_candidate(
         func = candidate
     else:
         func = _unwrap_fixture_function(candidate)
+        if func is not None:
+            emit_deprecation_warning(
+                old_item="The rampart_sinks fixture",
+                new_item="the pytest_rampart_sinks hook",
+                removed_in="0.3.0",
+            )
     if func is None:
         logger.warning(
             "rampart_sinks in %s is %s, which controller-side discovery "

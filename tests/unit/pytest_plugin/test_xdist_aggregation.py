@@ -45,6 +45,20 @@ def rampart_sinks():
 """
 
 
+_LIST_CONFTEST = """\
+from pathlib import Path
+
+from rampart.reporting import JsonFileReportSink
+
+
+_OUT_DIR = Path("rampart_reports").absolute()
+_OUT_DIR.mkdir(parents=True, exist_ok=True)
+Path("rampart_report_dir.txt").write_text(str(_OUT_DIR))
+
+rampart_sinks = [JsonFileReportSink(output_dir=_OUT_DIR)]
+"""
+
+
 def _load_reports(pytester: Pytester) -> list[dict[str, Any]]:
     marker = pytester.path / "rampart_report_dir.txt"
     if not marker.exists():
@@ -63,8 +77,7 @@ def _load_reports(pytester: Pytester) -> list[dict[str, Any]]:
     ]
 
 
-def _setup_simple_tests(pytester: Pytester) -> None:
-    pytester.makeconftest(_CONFTEST)
+def _make_test_files(pytester: Pytester) -> None:
     pytester.makepyfile(  # pyright: ignore[reportUnknownMemberType]
         test_a="""
         import pytest
@@ -107,6 +120,16 @@ def _setup_simple_tests(pytester: Pytester) -> None:
             ))
         """,
     )
+
+
+def _setup_simple_tests(pytester: Pytester) -> None:
+    pytester.makeconftest(_CONFTEST)
+    _make_test_files(pytester)
+
+
+def _setup_list_form_tests(pytester: Pytester) -> None:
+    pytester.makeconftest(_LIST_CONFTEST)
+    _make_test_files(pytester)
 
 
 class TestSingleProcessBaseline:
@@ -509,3 +532,39 @@ class TestCloneIdDeterminism:
         # deterministic clone IDs so that workers can match them.
         if serial_ids and parallel_ids:
             assert serial_ids == parallel_ids
+
+
+class TestSinkFixtureDeprecation:
+    """Deprecation-warning contract for the ``rampart_sinks`` fixture.
+
+    The fixture warns wherever it is resolved (single-process and the xdist
+    controller); the module-level list form is not a fixture and must not warn.
+    """
+
+    _DEPRECATION_LINE = "*rampart_sinks fixture is deprecated*"
+
+    def test_single_process_fixture_warns(self, pytester: Pytester) -> None:
+        _setup_simple_tests(pytester)
+        result = pytester.runpytest("-p", "no:cacheprovider")
+        result.assert_outcomes(passed=4)
+        result.stdout.fnmatch_lines([self._DEPRECATION_LINE])
+
+    def test_controller_fixture_warns_under_xdist(
+        self,
+        pytester: Pytester,
+    ) -> None:
+        _setup_simple_tests(pytester)
+        result = pytester.runpytest("-p", "no:cacheprovider", "-n", "2")
+        result.assert_outcomes(passed=4)
+        result.stdout.fnmatch_lines([self._DEPRECATION_LINE])
+
+    def test_controller_list_form_does_not_warn_under_xdist(
+        self,
+        pytester: Pytester,
+    ) -> None:
+        _setup_list_form_tests(pytester)
+        result = pytester.runpytest("-p", "no:cacheprovider", "-n", "2")
+        result.assert_outcomes(passed=4)
+        reports = _load_reports(pytester)
+        assert len(reports) == 1
+        result.stdout.no_fnmatch_line(self._DEPRECATION_LINE)

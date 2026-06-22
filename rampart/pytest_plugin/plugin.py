@@ -27,6 +27,7 @@ from typing import TYPE_CHECKING, Any, cast
 
 import pytest
 
+from rampart.common.deprecation import emit_deprecation_warning
 from rampart.common.text import strip_ansi
 from rampart.core.execution import (
     ExecutionEventHandler,
@@ -556,6 +557,12 @@ def _rampart_sink_bootstrap(  # pytest discovers this via autouse=True
         user_sinks = request.getfixturevalue("rampart_sinks")
     except pytest.FixtureLookupError:
         return
+
+    emit_deprecation_warning(
+        old_item="The rampart_sinks fixture",
+        new_item="the pytest_rampart_sinks hook",
+        removed_in="0.3.0",
+    )
 
     if not isinstance(user_sinks, list):
         logger.warning(

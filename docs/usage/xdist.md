@@ -126,6 +126,11 @@ def pytest_rampart_sinks(config):
 
 ### Precedence vs the `rampart_sinks` fixture
 
+!!! warning "Deprecated"
+    The `rampart_sinks` fixture is deprecated and will be removed in `0.3.0`.
+    Prefer the `pytest_rampart_sinks` hook above. Resolving the fixture emits a
+    `DeprecationWarning` in both single-process and controller discovery.
+
 The legacy `rampart_sinks` fixture is still supported as a **single-process
 fallback**. The rule is:
 

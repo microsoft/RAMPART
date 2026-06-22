@@ -77,6 +77,12 @@ async def test_with_threshold(adapter):
 
 ### `rampart_sinks`
 
+!!! warning "Deprecated"
+    The `rampart_sinks` fixture is deprecated and will be removed in `0.3.0`.
+    Use the [`pytest_rampart_sinks` hook](#pytest_rampart_sinks-hook) instead — it
+    behaves identically in single-process and `pytest-xdist` runs and accepts the
+    active `pytest.Config`. Defining the fixture now emits a `DeprecationWarning`.
+
 Define this **session-scoped** fixture in your `conftest.py` to configure report output:
 
 ```python
