@@ -54,9 +54,9 @@ The README file is published to PyPI and also needs to be updated so the links w
 
 Keep README image links relative when they point to files in this repository, e.g., `docs/images/RAMPART.svg`. During package builds, `scripts/hatch_build.py` generates the PyPI README metadata and rewrites those image paths to raw GitHub URLs with the release version.
 
-Replace any other “main” links like “doc/index.md” with “raw” links that have the correct version number, i.e., “https://raw.githubusercontent.com/microsoft/RAMPART/releases/vx.y.z/docs/index.md”.
+Replace any other "main" links like "doc/index.md" with "raw" links that have the correct version number, i.e., "https://raw.githubusercontent.com/microsoft/RAMPART/releases/vx.y.z/docs/index.md".
 
-For directories, update using the “tree” link, e.g., “https://github.com/microsoft/RAMPART/tree/releases/vx.y.z/docs/usage"
+For directories, update using the "tree" link, e.g., "https://github.com/microsoft/RAMPART/tree/releases/vx.y.z/docs/usage"
 
 This is required for the release branch because PyPI does not pick up other files besides the README, which results in local links breaking.
 
