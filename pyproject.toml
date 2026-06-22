@@ -1,12 +1,11 @@
 [build-system]
-requires = ["hatchling>=1.30.1"]
+requires = ["hatchling>=1.30.1", "hatch-vcs>=0.5.0"]
 build-backend = "hatchling.build"
 
 [project]
 name = "RAMPART"
-version = "0.1.1.dev0"
 description = "A pytest-native safety testing framework for agentic AI applications"
-dynamic = ["readme"]
+dynamic = ["readme", "version"]
 license = "MIT"
 requires-python = ">=3.11"
 authors = [
@@ -43,6 +42,7 @@ onedrive = [
 
 [dependency-groups]
 dev = [
+    "hatch-vcs>=0.5.0",
     "hatchling>=1.30.1",
     "pre-commit>=4.5.1",
     "pytest-cov>=6.1.0",
@@ -67,6 +67,12 @@ rampart = "rampart.pytest_plugin.plugin"
 
 [tool.hatch.metadata.hooks.custom]
 path = "scripts/hatch_build.py"
+
+[tool.hatch.version]
+source = "vcs"
+
+[tool.hatch.version.raw-options]
+local_scheme = "no-local-version"
 
 [tool.hatch.build.targets.wheel]
 packages = ["rampart"]

@@ -34,14 +34,20 @@ If you find functionality to remove, merge the removal PR to `main` before proce
 
 ## 4. Update the Version
 
-### pyproject.toml
-Set the version in `pyproject.toml` to the version established in step 2.
+### Git tag
+RAMPART derives package versions from Git tags using Hatch VCS and setuptools-scm. No `pyproject.toml` version bump is required for a release. The release version is determined by the `vx.y.z` tag pushed in step 5.
 
 ```toml
-[project]
-name = "RAMPART"
-version = "x.y.z"
+[tool.hatch.version]
+source = "vcs"
+
+[tool.hatch.version.raw-options]
+local_scheme = "no-local-version"
 ```
+
+The `no-local-version` setting omits local version suffixes such as `+g<sha>` because PyPI does not support them for upstream releases. See the [setuptools-scm local scheme documentation](https://setuptools-scm.readthedocs.io/en/latest/extending/#setuptools_scmlocal_scheme) for details.
+
+For development builds on `main`, the release tag must be reachable from `main` history for Hatch VCS to infer the next development version from that tag. If the release branch contains commits beyond `main`, merge or cherry-pick those release commits back to `main` after publishing.
 
 ### Update README File
 The README file is published to PyPI and also needs to be updated so the links work properly. _Note: There may not be any links to update, but it is good practice to check in case our README changes._
@@ -149,7 +155,7 @@ If successful, the URL `https://pypi.org/project/rampart/x.y.z/` will return the
 
 After the release is on PyPI, open a PR to `main` containing only:
 
-- In line with PyPA [versioning guidance](https://packaging.python.org/en/latest/discussions/versioning/), bump the version in `pyproject.toml` to the next development version (e.g., `x.y.(z+1).dev0` or `x.(y+1).0.dev0`, depending on the next planned release).
+- Any follow-up documentation or metadata updates needed after the release. Do not bump the package version in `pyproject.toml`; once `main` has commits after the release tag, Hatch VCS will infer the next development version automatically.
 - Replace any references to the previous release version in the codebase with the new released version (without `.dev0`) where applicable (e.g., installation docs that pin to the latest tag).
 
 Open this PR from a branch separate from your `releases/vx.y.z` branch.
@@ -216,10 +222,10 @@ A patch release (e.g., `0.2.0` → `0.2.1`) ships a targeted fix — typically a
 
     Resolve any conflicts manually. Patch-sized fixes typically apply cleanly.
 
-3. **Bump the version** in `pyproject.toml` to the new patch version. Also update any version-pinned links in `README.md`.
+3. **Update release-specific references** as needed. Do not bump the package version in `pyproject.toml`; the patch version comes from the `vx.y.z` tag. Also update any version-pinned links in `README.md`.
 
     ```bash
-    git commit -am "Bump version to x.y.z"
+    git commit -am "Prepare x.y.z release"
     ```
 
 4. **Push and tag**:
