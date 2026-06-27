@@ -5,7 +5,7 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any, cast
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -30,6 +30,9 @@ from rampart.pytest_plugin.plugin import (
     pytest_unconfigure,
 )
 from rampart.reporting.sink import ReportSink
+
+if TYPE_CHECKING:
+    from _pytest.terminal import TerminalReporter
 
 
 class _StashStub:
@@ -199,7 +202,7 @@ class TestRampartSession:
         assert group.unsafe == 2
         assert group.errors == 1
         assert group.threshold == 0.3
-        assert group.pass_rate == pytest.approx(0.4)  # pyright: ignore[reportUnknownMemberType]
+        assert group.pass_rate == pytest.approx(0.4)
         assert not group.passed  # UNSAFE present → always fails
 
     def test_record_trial_group_all_errors(self) -> None:
@@ -289,7 +292,10 @@ class TestTrialCloning:
 
         items: list[Any] = [item]
         config = MagicMock()
-        pytest_collection_modifyitems(config=config, items=items)
+        pytest_collection_modifyitems(
+            config=cast("pytest.Config", config),
+            items=items,
+        )
 
         assert len(items) == 3
         calls = mock_from_parent.call_args_list
@@ -302,7 +308,10 @@ class TestTrialCloning:
         config = MagicMock()
 
         with pytest.raises(pytest.UsageError, match="must be >= 1"):
-            pytest_collection_modifyitems(config=config, items=items)
+            pytest_collection_modifyitems(
+                config=cast("pytest.Config", config),
+                items=items,
+            )
 
     def test_non_trial_items_unchanged(self, monkeypatch: pytest.MonkeyPatch) -> None:
         plain = _make_plain_item()
@@ -314,7 +323,10 @@ class TestTrialCloning:
 
         items: list[Any] = [plain, trial]
         config = MagicMock()
-        pytest_collection_modifyitems(config=config, items=items)
+        pytest_collection_modifyitems(
+            config=cast("pytest.Config", config),
+            items=items,
+        )
 
         assert items[0] is plain
         assert len(items) == 3
@@ -327,7 +339,10 @@ class TestTrialCloning:
         config = MagicMock()
 
         with pytest.raises(pytest.UsageError, match="no parent"):
-            pytest_collection_modifyitems(config=config, items=items)
+            pytest_collection_modifyitems(
+                config=cast("pytest.Config", config),
+                items=items,
+            )
 
 
 class TestResolveTrialN:
@@ -415,7 +430,10 @@ class TestWriteResultLine:
             summary="ok",
             observability_level=ObservabilityLevel.RESPONSE_ONLY,
         )
-        _write_result_line(terminalreporter=reporter, result=result)
+        _write_result_line(
+            terminalreporter=cast("TerminalReporter", reporter),
+            result=result,
+        )
         reporter.write_line.assert_called_once_with("  PASS  ok (response_only)")
 
     def test_unsafe_result_includes_observability(self) -> None:
@@ -426,7 +444,10 @@ class TestWriteResultLine:
             summary="bad",
             observability_level=ObservabilityLevel.TOOL_AND_SIDE_EFFECTS,
         )
-        _write_result_line(terminalreporter=reporter, result=result)
+        _write_result_line(
+            terminalreporter=cast("TerminalReporter", reporter),
+            result=result,
+        )
         reporter.write_line.assert_called_once_with(
             "  FAIL  bad (tool_and_side_effects)",
         )
@@ -440,7 +461,7 @@ class TestWriteResultLine:
             observability_level=ObservabilityLevel.TOOL_ONLY,
         )
         _write_result_line(
-            terminalreporter=reporter,
+            terminalreporter=cast("TerminalReporter", reporter),
             result=result,
             test_name="test_exfil",
         )
@@ -455,7 +476,10 @@ class TestWriteResultLine:
             status=SafetyStatus.SAFE,
             summary="\x1b[31mevil\x1b[0m",
         )
-        _write_result_line(terminalreporter=reporter, result=result)
+        _write_result_line(
+            terminalreporter=cast("TerminalReporter", reporter),
+            result=result,
+        )
         line = reporter.write_line.call_args[0][0]
         assert "evil" in line
         assert "\x1b" not in line
@@ -493,7 +517,11 @@ class TestTerminalSummary:
         reporter = MagicMock()
         config = MagicMock()
         config.stash = _StashStub()
-        pytest_terminal_summary(terminalreporter=reporter, exitstatus=0, config=config)
+        pytest_terminal_summary(
+            terminalreporter=cast("TerminalReporter", reporter),
+            exitstatus=0,
+            config=cast("pytest.Config", config),
+        )
         reporter.write_sep.assert_not_called()
 
     def test_noop_when_no_results(self) -> None:
@@ -503,7 +531,11 @@ class TestTerminalSummary:
         from rampart.pytest_plugin.plugin import _rampart_key
 
         config.stash[_rampart_key] = RampartSession()
-        pytest_terminal_summary(terminalreporter=reporter, exitstatus=0, config=config)
+        pytest_terminal_summary(
+            terminalreporter=cast("TerminalReporter", reporter),
+            exitstatus=0,
+            config=cast("pytest.Config", config),
+        )
         reporter.write_sep.assert_not_called()
 
     def test_writes_incomplete_warning_even_without_results(self) -> None:
@@ -534,7 +566,11 @@ class TestTerminalSummary:
         from rampart.pytest_plugin.plugin import _rampart_key
 
         config.stash[_rampart_key] = self._make_session_with_results()
-        pytest_terminal_summary(terminalreporter=reporter, exitstatus=0, config=config)
+        pytest_terminal_summary(
+            terminalreporter=cast("TerminalReporter", reporter),
+            exitstatus=0,
+            config=cast("pytest.Config", config),
+        )
         reporter.write_sep.assert_called_once_with("=", "RAMPART Safety Summary")
 
     def test_writes_population_stats(self) -> None:
@@ -544,7 +580,11 @@ class TestTerminalSummary:
         from rampart.pytest_plugin.plugin import _rampart_key
 
         config.stash[_rampart_key] = self._make_session_with_results()
-        pytest_terminal_summary(terminalreporter=reporter, exitstatus=0, config=config)
+        pytest_terminal_summary(
+            terminalreporter=cast("TerminalReporter", reporter),
+            exitstatus=0,
+            config=cast("pytest.Config", config),
+        )
         # Check that the Population line was written
         population_calls = [
             c for c in reporter.write_line.call_args_list if "Population:" in str(c)
@@ -598,7 +638,7 @@ class TestRampartSessionAddSinks:
             pass
 
         with pytest.raises(TypeError, match="Expected ReportSink"):
-            session.add_sinks(sinks=[NotASink()])  # pyright: ignore[reportArgumentType]
+            session.add_sinks(sinks=[NotASink()])  # ty: ignore[invalid-argument-type]
 
     def test_add_sinks_preserves_existing(self) -> None:
         """Config-loaded sinks are not lost when fixture sinks are added."""
@@ -669,7 +709,10 @@ class TestTrialGroupRendering:
         )
 
         reporter = MagicMock()
-        _write_trial_group_lines(terminalreporter=reporter, rampart_session=session)
+        _write_trial_group_lines(
+            terminalreporter=cast("TerminalReporter", reporter),
+            rampart_session=session,
+        )
 
         reporter.write_line.assert_called_once()
         line = reporter.write_line.call_args[0][0]
@@ -680,7 +723,10 @@ class TestTrialGroupRendering:
     def test_no_trial_groups_writes_nothing(self) -> None:
         session = RampartSession()
         reporter = MagicMock()
-        _write_trial_group_lines(terminalreporter=reporter, rampart_session=session)
+        _write_trial_group_lines(
+            terminalreporter=cast("TerminalReporter", reporter),
+            rampart_session=session,
+        )
         reporter.write_line.assert_not_called()
 
 
@@ -754,7 +800,7 @@ class TestSessionFinishIntegration:
         session_mock.config.stash = config_stash
         session_mock.items = []
 
-        pytest_sessionfinish(session=session_mock, exitstatus=0)
+        pytest_sessionfinish(session=cast("pytest.Session", session_mock), exitstatus=0)
 
         report = rs.build_report()
         assert report.duration_seconds >= 4.0

@@ -9,6 +9,7 @@ their agent to the RAMPART framework.
 
 from __future__ import annotations
 
+from contextlib import AbstractAsyncContextManager
 from typing import TYPE_CHECKING, Protocol, Self, runtime_checkable
 
 if TYPE_CHECKING:
@@ -19,7 +20,7 @@ if TYPE_CHECKING:
 
 
 @runtime_checkable
-class Session(Protocol):
+class Session(AbstractAsyncContextManager["Session"], Protocol):
     """A bounded unit of interaction with the agent.
 
     Sessions are async context managers. Entering returns the session
@@ -52,8 +53,9 @@ class Session(Protocol):
     async def __aexit__(
         self,
         exc_type: type[BaseException] | None,
-        exc_val: BaseException | None,
-        exc_tb: types.TracebackType | None,
+        exc_value: BaseException | None,
+        traceback: types.TracebackType | None,
+        /,
     ) -> None:
         """Clean up session resources. Must be idempotent."""
         ...

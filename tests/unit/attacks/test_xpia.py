@@ -7,6 +7,8 @@ from unittest.mock import AsyncMock
 
 from rampart.attacks import Attacks
 from rampart.core.errors import InfrastructureError
+from rampart.core.evaluator import Evaluator
+from rampart.core.injection import InjectionHandle
 from rampart.core.manifest import AppManifest
 from rampart.core.result import SafetyStatus
 from rampart.core.types import (
@@ -29,7 +31,7 @@ def _mock_handle(
     payload_id: str | None = "p-001",
 ) -> AsyncMock:
     """Create an AsyncMock satisfying the InjectionHandle protocol."""
-    h = AsyncMock()
+    h = AsyncMock(spec=InjectionHandle)
     h.surface_name = surface_name
     h.payload_id = payload_id
     h.__aenter__.return_value = h
@@ -44,7 +46,7 @@ def _mock_evaluator(
     rationale: str = "",
 ) -> AsyncMock:
     """Create an AsyncMock evaluator returning a fixed EvalResult."""
-    evaluator = AsyncMock()
+    evaluator = AsyncMock(spec=Evaluator)
     evaluator.evaluate_async.return_value = EvalResult(
         outcome=outcome,
         confidence=confidence,

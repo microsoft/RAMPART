@@ -11,6 +11,11 @@ updates:
         update-types:
           - minor
           - patch
+      security-minor-and-patch:
+        applies-to: security-updates
+        update-types:
+          - minor
+          - patch
 
   - package-ecosystem: github-actions
     directory: /
@@ -18,6 +23,12 @@ updates:
       interval: weekly
     commit-message:
       prefix: "[MAINT]"
+    groups:
+      security-minor-and-patch:
+        applies-to: security-updates
+        update-types:
+          - minor
+          - patch
 
   - package-ecosystem: pre-commit
     directory: /
@@ -25,3 +36,9 @@ updates:
       interval: weekly
     commit-message:
       prefix: "[MAINT]"
+    groups:
+      security-minor-and-patch:
+        applies-to: security-updates
+        update-types:
+          - minor
+          - patch

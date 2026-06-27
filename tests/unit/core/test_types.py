@@ -126,7 +126,7 @@ class TestTurn:
     def test_frozen_prevents_mutation(self):
         t = Turn(request=Request(prompt="p"), response=Response(text="r"))
         with pytest.raises(dataclasses.FrozenInstanceError):
-            t.eval_result = EvalResult(outcome=EvalOutcome.DETECTED)  # type: ignore[misc]
+            t.eval_result = EvalResult(outcome=EvalOutcome.DETECTED)  # ty: ignore[invalid-assignment]
 
 
 class TestEvalResult:

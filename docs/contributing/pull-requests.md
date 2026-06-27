@@ -75,7 +75,7 @@ All of the following must pass before a PR can be merged:
 
 - **Ruff check** — all lint rules pass
 - **Ruff format** — code is properly formatted
-- **Pyright** — strict type checking passes
+- **ty** — type checking passes (`uv run ty check`)
 
 ### Tests
 

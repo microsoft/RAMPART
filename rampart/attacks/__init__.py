@@ -12,12 +12,12 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from rampart.attacks._xpia import XPIAExecution
+from rampart.core.injection import InjectionHandle
 from rampart.drivers._utils import coerce_driver
 
 if TYPE_CHECKING:
     from rampart.core.evaluator import Evaluator
     from rampart.core.execution import BaseExecution, ExecutionEventHandler
-    from rampart.core.injection import InjectionHandle
     from rampart.core.prompt_driver import PromptDriver
     from rampart.core.types import Request
 
@@ -89,11 +89,11 @@ class Attacks:
                 ``execute_async(adapter=...)``.
         """
         if inject is None:
-            handles = []
-        elif isinstance(inject, list):
-            handles = inject
-        else:
+            handles: list[InjectionHandle] = []
+        elif isinstance(inject, InjectionHandle):
             handles = [inject]
+        else:
+            handles = inject
         driver = coerce_driver(trigger)
 
         return XPIAExecution(

@@ -43,10 +43,10 @@ onedrive = [
 [dependency-groups]
 dev = [
     "pre-commit>=4.5.1",
-    "pyright>=1.1.390",
     "pytest-cov>=6.1.0",
     "pytest-xdist[psutil]>=3.8.0",
     "ruff>=0.15.10",
+    "ty>=0.0.49",
 ]
 docs = [
     "mkdocs>=1.6",
@@ -80,16 +80,6 @@ omit = ["tests/*"]
 fail_under = 80
 show_missing = true
 skip_empty = true
-
-[tool.pyright]
-pythonVersion = "3.11"
-typeCheckingMode = "strict"
-include = ["rampart", "tests"]
-
-[[tool.pyright.executionEnvironments]]
-root = "tests"
-extraPaths = ["."]
-reportPrivateUsage = false
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
@@ -136,6 +126,12 @@ convention = "google"
 
 [tool.ruff.lint.pylint]
 max-args = 10
+
+[tool.ty.environment]
+python-version = "3.11"
+
+[tool.ty.src]
+include = ["rampart", "tests"]
 
 [tool.uv.sources]
 pyrit = { git = "https://github.com/microsoft/PyRIT", rev = "6dc8b94139757390286bbce7d53c1f7e58e66e29" } # v0.13.0

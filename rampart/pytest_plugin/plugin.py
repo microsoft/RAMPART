@@ -29,6 +29,7 @@ import pytest
 
 from rampart.common.text import strip_ansi
 from rampart.core.execution import (
+    ExecutionEventHandler,
     clear_default_handler_factory,
     register_default_handler_factory,
 )
@@ -193,6 +194,11 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         ),
         default=None,
     )
+   
+
+def _default_handler_factory() -> list[ExecutionEventHandler]:
+    """Return the default execution handlers for every BaseExecution."""
+    return [ResultCollectionHandler()]
 
 
 def pytest_configure(config: pytest.Config) -> None:
@@ -208,7 +214,7 @@ def pytest_configure(config: pytest.Config) -> None:
     config.addinivalue_line("markers", "harm(*categories): categorize by harm type")
     config.addinivalue_line("markers", "trial(n=, threshold=): statistical repetition")
 
-    register_default_handler_factory(lambda: [ResultCollectionHandler()])
+    register_default_handler_factory(_default_handler_factory)
 
     config.stash[_rampart_key] = RampartSession()
     config.stash[_session_start_key] = time.monotonic()
@@ -291,9 +297,10 @@ def _create_trial_clones(
         if fixtureinfo is not None:
             from_parent_kwargs["fixtureinfo"] = fixtureinfo
 
-        clone = type(item).from_parent(parent=parent, **from_parent_kwargs)  # pyright: ignore[reportUnknownMemberType]
-        clone._rampart_trial_index = i  # pyright: ignore[reportAttributeAccessIssue]  # noqa: SLF001
-        clone._rampart_trial_base = item.nodeid  # pyright: ignore[reportAttributeAccessIssue] # noqa: SLF001
+        clone = type(item).from_parent(parent=parent, **from_parent_kwargs)
+        # pytest.Item supports arbitrary user attributes for cross-hook state.
+        clone._rampart_trial_index = i  # ty: ignore[unresolved-attribute]  # noqa: SLF001
+        clone._rampart_trial_base = item.nodeid  # ty: ignore[unresolved-attribute]  # noqa: SLF001
 
         _copy_markers_to_clone(source=item, clone=clone)
         clone.add_marker(
@@ -409,7 +416,7 @@ def _absorb_results(
 
 
 @pytest.fixture(autouse=True)
-def _rampart_collect(  # pyright: ignore[reportUnusedFunction]  # pytest discovers this via autouse=True
+def _rampart_collect(  # pytest discovers this via autouse=True
     request: pytest.FixtureRequest,
 ) -> Generator[None, None, None]:
     """Installed automatically on every test. Invisible to test authors.
@@ -427,7 +434,7 @@ def _rampart_collect(  # pyright: ignore[reportUnusedFunction]  # pytest discove
     No test author ever imports or references this fixture.
     """
     collector = ResultCollector()
-    node = cast("pytest.Item", request.node)  # pyright: ignore[reportUnknownMemberType]
+    node = cast("pytest.Item", request.node)
     rampart_session = request.config.stash.get(_rampart_key, None)
     token = activate_collector(collector)
     yield
@@ -505,7 +512,7 @@ def _resolve_hook_sinks(*, config: pytest.Config) -> list[ReportSink]:
 
 
 @pytest.fixture(scope="session", autouse=True)
-def _rampart_sink_bootstrap(  # pyright: ignore[reportUnusedFunction]  # pytest discovers this via autouse=True
+def _rampart_sink_bootstrap(  # pytest discovers this via autouse=True
     request: pytest.FixtureRequest,
 ) -> None:
     """Merge team-provided sinks into the RAMPART session.

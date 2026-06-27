@@ -18,7 +18,7 @@ Check out our [GitHub issues](https://github.com/microsoft/RAMPART/issues) with 
 
 -   :material-format-paint:{ .lg .middle } **[Code Style & Linting](code-style.md)**
 
-    Ruff, Pyright, pre-commit hooks, and naming conventions.
+    Ruff, ty, pre-commit hooks, and naming conventions.
 
 -   :material-test-tube:{ .lg .middle } **[Testing Standards](testing.md)**
 

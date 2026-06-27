@@ -276,8 +276,9 @@ class TestDefaultHandlerFactory:
         )
 
         factory_handler = _RecordingHandler()
+        handlers: list[ExecutionEventHandler] = [factory_handler]
         try:
-            register_default_handler_factory(lambda: [factory_handler])
+            register_default_handler_factory(lambda: handlers)
             execution = _SuccessExecution()
 
             await execution.execute_async(adapter=_StubAdapter())
@@ -290,7 +291,7 @@ class TestDefaultHandlerFactory:
         from rampart.core.execution import register_default_handler_factory
 
         with pytest.raises(TypeError, match="callable"):
-            register_default_handler_factory("not a function")  # type: ignore[arg-type]
+            register_default_handler_factory("not a function")  # ty: ignore[invalid-argument-type]
 
 
 class TestDriverErrorHandling:

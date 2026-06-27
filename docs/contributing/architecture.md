@@ -22,7 +22,7 @@ The `rampart/` source tree is organized by concern: foundational types live in `
 RAMPART uses `@runtime_checkable` protocols for extension points that consumers implement (`AgentAdapter`, `Session`, `Evaluator`, `Surface`, `PromptDriver`). This means:
 
 - **No inheritance required** — any class with the right methods satisfies the protocol
-- **Type-checked at development time** by Pyright in strict mode
+- **Type-checked at development time** by [ty](https://github.com/astral-sh/ty)
 - **Verifiable at runtime** with `isinstance` checks
 
 `BaseExecution` is the exception — it's an ABC because it owns the lifecycle skeleton and subclasses share real implementation.

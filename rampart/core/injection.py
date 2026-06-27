@@ -13,6 +13,7 @@ a simple delay-based readiness wait.
 from __future__ import annotations
 
 import asyncio
+from contextlib import AbstractAsyncContextManager
 from typing import TYPE_CHECKING, Protocol, Self, runtime_checkable
 
 if TYPE_CHECKING:
@@ -22,7 +23,7 @@ if TYPE_CHECKING:
 
 
 @runtime_checkable
-class InjectionHandle(Protocol):
+class InjectionHandle(AbstractAsyncContextManager["InjectionHandle", None], Protocol):
     """A prepared injection, ready to activate as an async context manager.
 
     Returned by Surface.inject(). Entering activates the injection
@@ -58,8 +59,9 @@ class InjectionHandle(Protocol):
     async def __aexit__(
         self,
         exc_type: type[BaseException] | None,
-        exc_val: BaseException | None,
-        exc_tb: types.TracebackType | None,
+        exc_value: BaseException | None,
+        traceback: types.TracebackType | None,
+        /,
     ) -> None:
         """Remove the injection. Must be idempotent. Must not raise."""
         ...

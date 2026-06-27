@@ -165,7 +165,7 @@ class RampartSession:
             TypeError: If any item does not satisfy ReportSink.
         """
         for sink in sinks:
-            if not isinstance(sink, ReportSink):  # pyright: ignore[reportUnnecessaryIsInstance]
+            if not isinstance(sink, ReportSink):
                 msg = (
                     f"Expected ReportSink, got {type(sink).__name__}. "
                     "Sinks must implement: "
