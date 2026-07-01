@@ -912,7 +912,7 @@ def finalize_worker(*, config: pytest.Config, session: RampartSession) -> None:
     limit = _size_limit(config=config)
     workeroutput = cast(
         "dict[str, Any]",
-        config.workeroutput,  # ty: ignore[unresolved-attribute] # pyright: ignore[reportAttributeAccessIssue, reportUnknownMemberType]
+        config.workeroutput,  # ty: ignore[unresolved-attribute]
     )
     if size > limit:
         workeroutput[WORKEROUTPUT_KEY] = {
