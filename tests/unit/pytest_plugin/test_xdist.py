@@ -605,12 +605,16 @@ class TestMerge:
         session = RampartSession()
         session.merge_worker_results(
             results_by_nodeid={
-                "z": [_make_result(summary="z", metadata={"test_name": "z_test"})],
-                "a": [_make_result(summary="a", metadata={"test_name": "a_test"})],
+                "z": [
+                    _make_result(summary="z", metadata={"_pytest_test_name": "z_test"}),
+                ],
+                "a": [
+                    _make_result(summary="a", metadata={"_pytest_test_name": "a_test"}),
+                ],
             },
         )
         report = session.build_report()
-        names = [r.metadata["test_name"] for r in report.results]
+        names = [r.metadata["_pytest_test_name"] for r in report.results]
         assert names == sorted(names)
 
     def test_mark_incomplete_surfaces_in_report_metadata(self) -> None:
@@ -744,7 +748,7 @@ class TestOrderingDeterminism:
         session = RampartSession()
         for node in nodes:
             handle_testnodedown(session=session, node=node, error=None)
-        return [r.metadata["nodeid"] for r in session.build_report().results]
+        return [r.metadata["_pytest_nodeid"] for r in session.build_report().results]
 
     def test_report_order_independent_of_worker_completion_order(self) -> None:
         node_a = self._payload_node(
@@ -770,8 +774,8 @@ class TestOrderingDeterminism:
         )
         payload = serialize_worker_data(session=worker_session)
         results = deserialize_worker_data(data=payload)["pkg::t"]
-        assert [r.metadata["nodeid"] for r in results] == ["pkg::t", "pkg::t"]
-        assert [r.metadata["result_index"] for r in results] == [0, 1]
+        assert [r.metadata["_pytest_nodeid"] for r in results] == ["pkg::t", "pkg::t"]
+        assert [r.metadata["_rampart_result_index"] for r in results] == [0, 1]
 
     def test_handle_testnodedown_tags_source_worker(self) -> None:
         worker_session = _make_session_with_results(
@@ -783,7 +787,7 @@ class TestOrderingDeterminism:
         node.workeroutput = {WORKEROUTPUT_KEY: payload}
         session = RampartSession()
         handle_testnodedown(session=session, node=node, error=None)
-        assert session._results[0].metadata["source_worker"] == "gw3"
+        assert session._results[0].metadata["_rampart_source_worker"] == "gw3"
 
 
 class TestTrialSpecs:

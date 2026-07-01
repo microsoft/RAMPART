@@ -16,6 +16,7 @@ from rampart.pytest_plugin._collection import ResultCollectionHandler, ResultCol
 from rampart.pytest_plugin._session import RampartSession
 from rampart.pytest_plugin.plugin import (
     _emit_sinks,
+    _enforce_incomplete_exit_status,
     _evaluate_gates,
     _has_sink_hook_impl,
     _resolve_hook_sinks,
@@ -850,3 +851,39 @@ class TestSinkHookResolution:
         ]
         result = _resolve_hook_sinks(config=config)
         assert result == [sink_a]
+
+
+class TestIncompleteExitStatus:
+    """Incomplete runs are forced to a non-zero exit status."""
+
+    def test_incomplete_run_forces_tests_failed(self) -> None:
+        session = MagicMock()
+        session.exitstatus = pytest.ExitCode.OK
+        rampart_session = RampartSession()
+        rampart_session.mark_incomplete(reason="worker gw1 crashed")
+        _enforce_incomplete_exit_status(
+            session=cast("pytest.Session", session),
+            rampart_session=rampart_session,
+        )
+        assert session.exitstatus == pytest.ExitCode.TESTS_FAILED
+
+    def test_complete_run_preserves_ok_status(self) -> None:
+        session = MagicMock()
+        session.exitstatus = pytest.ExitCode.OK
+        rampart_session = RampartSession()
+        _enforce_incomplete_exit_status(
+            session=cast("pytest.Session", session),
+            rampart_session=rampart_session,
+        )
+        assert session.exitstatus == pytest.ExitCode.OK
+
+    def test_incomplete_run_does_not_mask_existing_failure(self) -> None:
+        session = MagicMock()
+        session.exitstatus = pytest.ExitCode.INTERRUPTED
+        rampart_session = RampartSession()
+        rampart_session.mark_incomplete(reason="worker gw1 crashed")
+        _enforce_incomplete_exit_status(
+            session=cast("pytest.Session", session),
+            rampart_session=rampart_session,
+        )
+        assert session.exitstatus == pytest.ExitCode.INTERRUPTED

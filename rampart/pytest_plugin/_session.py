@@ -38,10 +38,12 @@ def _result_sort_key(result: Result) -> tuple[str, int, str]:
     outside xdist, so single-process ordering is unchanged.
     """
     metadata = result.metadata
-    nodeid = str(metadata.get("nodeid", metadata.get("test_name", "")))
-    raw_index = metadata.get("result_index", 0)
+    nodeid = str(
+        metadata.get("_pytest_nodeid", metadata.get("_pytest_test_name", "")),
+    )
+    raw_index = metadata.get("_rampart_result_index", 0)
     index = raw_index if isinstance(raw_index, int) else 0
-    source_worker = str(metadata.get("source_worker", ""))
+    source_worker = str(metadata.get("_rampart_source_worker", ""))
     return (nodeid, index, source_worker)
 
 
@@ -217,9 +219,9 @@ class RampartSession:
             result = copy.copy(original_result)
             result.metadata = {
                 **result.metadata,
-                "test_name": test_name,
-                "nodeid": node.nodeid,
-                "result_index": result_index,
+                "_pytest_test_name": test_name,
+                "_pytest_nodeid": node.nodeid,
+                "_rampart_result_index": result_index,
             }
             if harm_category is not None and result.harm_category is None:
                 result.harm_category = harm_category
@@ -408,11 +410,14 @@ class RampartSession:
         cache is invalidated when new results are absorbed or merged
         or when metadata is updated.
 
-        Results are sorted by ``(nodeid, result_index, source_worker)``
-        for a total, deterministic ordering across xdist worker
-        completion orders. ``nodeid`` falls back to ``test_name`` and
-        ``source_worker`` is absent (constant) outside xdist, so
-        single-process ordering is unaffected.
+        Results are sorted by ``(_pytest_nodeid, _rampart_result_index,
+        _rampart_source_worker)`` for a total, deterministic ordering across
+        xdist worker completion orders. ``_pytest_nodeid`` falls back to
+        ``_pytest_test_name`` and ``_rampart_source_worker`` is absent
+        (constant) outside xdist, so single-process ordering is unaffected.
+
+        These leading-underscore keys are RAMPART scheduling bookkeeping,
+        namespaced to avoid colliding with user-supplied result metadata.
 
         Returns:
             TestRunReport: Aggregated test run results.

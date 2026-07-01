@@ -796,10 +796,10 @@ def deserialize_worker_data(*, data: object) -> dict[str, list[Result]]:
     (or subclass). Caller should catch and mark the run incomplete
     rather than letting the exception propagate to pytest.
 
-    Each result's ``metadata["nodeid"]`` and ``metadata["result_index"]``
-    are set authoritatively from the outer mapping key and list position
-    so cross-worker ordering is total and independent of any (untrusted)
-    serialized values.
+    Each result's ``metadata["_pytest_nodeid"]`` and
+    ``metadata["_rampart_result_index"]`` are set authoritatively from the
+    outer mapping key and list position so cross-worker ordering is total
+    and independent of any (untrusted) serialized values.
 
     Args:
         data (object): The deserialized JSON object from
@@ -825,8 +825,8 @@ def deserialize_worker_data(*, data: object) -> dict[str, list[Result]]:
         deserialized: list[Result] = []
         for index, raw_result in enumerate(cast("list[Any]", results_data)):
             result = _deserialize_result(data=raw_result)
-            result.metadata["nodeid"] = nodeid_str
-            result.metadata["result_index"] = index
+            result.metadata["_pytest_nodeid"] = nodeid_str
+            result.metadata["_rampart_result_index"] = index
             deserialized.append(result)
         out[nodeid_str] = deserialized
     return out
@@ -912,7 +912,7 @@ def finalize_worker(*, config: pytest.Config, session: RampartSession) -> None:
     limit = _size_limit(config=config)
     workeroutput = cast(
         "dict[str, Any]",
-        config.workeroutput,  # pyright: ignore[reportAttributeAccessIssue, reportUnknownMemberType]
+        config.workeroutput,  # ty: ignore[unresolved-attribute] # pyright: ignore[reportAttributeAccessIssue, reportUnknownMemberType]
     )
     if size > limit:
         workeroutput[WORKEROUTPUT_KEY] = {
@@ -977,7 +977,7 @@ def _tag_source_worker(
     """
     for results in results_by_nodeid.values():
         for result in results:
-            result.metadata["source_worker"] = worker_id_str
+            result.metadata["_rampart_source_worker"] = worker_id_str
 
 
 def handle_testnodedown(

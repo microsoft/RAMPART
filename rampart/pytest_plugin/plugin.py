@@ -194,7 +194,7 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         ),
         default=None,
     )
-   
+
 
 def _default_handler_factory() -> list[ExecutionEventHandler]:
     """Return the default execution handlers for every BaseExecution."""
@@ -652,6 +652,32 @@ def _evaluate_gates(
             )
 
 
+def _enforce_incomplete_exit_status(
+    *,
+    session: pytest.Session,
+    rampart_session: RampartSession,
+) -> None:
+    """Force a non-zero exit status when the RAMPART run is incomplete.
+
+    A lost or crashed xdist worker can leave every surviving test green,
+    so a run that silently dropped a shard would otherwise exit zero. For
+    a safety framework "green" must mean "ran and passed", so an
+    incomplete run is failed here. An already-failing status is left
+    untouched so we never mask a stronger failure signal.
+
+    Args:
+        session (pytest.Session): The active pytest session.
+        rampart_session (RampartSession): The merged RAMPART session state.
+    """
+    if not rampart_session.is_incomplete:
+        return
+    if session.exitstatus == pytest.ExitCode.OK:
+        session.exitstatus = pytest.ExitCode.TESTS_FAILED
+        logger.warning(
+            "RAMPART run is incomplete; forcing non-zero exit status.",
+        )
+
+
 def pytest_sessionfinish(
     session: pytest.Session,
     exitstatus: int,  # noqa: ARG001  — pytest hook signature
@@ -669,6 +695,9 @@ def pytest_sessionfinish(
     - non-xdist: original single-process pipeline (aggregate, gate,
       emit); hook sinks are added here when the fixture path was
       suppressed.
+
+    An incomplete run (a lost or crashed worker) is forced to a non-zero
+    exit status so a dropped shard cannot pass silently.
 
     Args:
         session (pytest.Session): The pytest session.
@@ -691,6 +720,7 @@ def pytest_sessionfinish(
 
     _aggregate_trial_results(rampart_session=rampart_session)
     _evaluate_gates(rampart_session=rampart_session)
+    _enforce_incomplete_exit_status(session=session, rampart_session=rampart_session)
 
     if is_xdist_controller(config=session.config):
         _record_xdist_metadata(session=session, rampart_session=rampart_session)
@@ -927,7 +957,7 @@ def pytest_terminal_summary(
             f"\n{category.upper()} ({len(sorted_results)} tests)",
         )
         for result in sorted_results:
-            test_name = result.metadata.get("test_name", "")
+            test_name = result.metadata.get("_pytest_test_name", "")
             _write_result_line(
                 terminalreporter=terminalreporter,
                 result=result,
