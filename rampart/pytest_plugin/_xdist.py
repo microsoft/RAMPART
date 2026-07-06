@@ -50,6 +50,7 @@ if TYPE_CHECKING:
     from collections.abc import Callable
 
     import pytest
+    from _typeshed import ConvertibleToInt
 
     from rampart.pytest_plugin._session import RampartSession
 
@@ -160,7 +161,8 @@ def _size_limit(*, config: pytest.Config) -> int:
     if raw in {None, ""}:
         return DEFAULT_SIZE_LIMIT_BYTES
     try:
-        parsed = int(raw)
+        # fallible cast, so catch TypeError/ValueError and log a warning
+        parsed = int(cast("ConvertibleToInt", raw))
     except (TypeError, ValueError):
         logger.warning(
             "Invalid %s=%r; falling back to default %d bytes.",
