@@ -227,3 +227,49 @@ class TestEmitAsync:
         assert category_results[0]["turns"][0]["response_metadata"] == {
             "page_url": "https://example.com/chat",
         }
+
+
+class TestReportMetadata:
+    """Run-level TestRunReport.metadata is projected into the JSON output."""
+
+    def test_report_metadata_appears_in_serialized_output(self) -> None:
+        sink = JsonFileReportSink(output_dir=Path("/tmp"))
+        report = TestRunReport(
+            metadata={
+                "xdist_active": True,
+                "worker_count": 4,
+                "dist_mode": "loadgroup",
+            },
+        )
+
+        data = sink._serialize_report(report)
+
+        assert data["metadata"] == {
+            "xdist_active": True,
+            "worker_count": 4,
+            "dist_mode": "loadgroup",
+        }
+
+    def test_incomplete_run_metadata_appears_in_serialized_output(self) -> None:
+        sink = JsonFileReportSink(output_dir=Path("/tmp"))
+        report = TestRunReport(
+            metadata={
+                "incomplete": True,
+                "incomplete_reasons": ["worker gw1 payload truncated (size cap)"],
+            },
+        )
+
+        data = sink._serialize_report(report)
+
+        assert data["metadata"]["incomplete"] is True
+        assert data["metadata"]["incomplete_reasons"] == [
+            "worker gw1 payload truncated (size cap)",
+        ]
+
+    def test_empty_metadata_serializes_as_empty_dict(self) -> None:
+        sink = JsonFileReportSink(output_dir=Path("/tmp"))
+        report = TestRunReport()
+
+        data = sink._serialize_report(report)
+
+        assert data["metadata"] == {}

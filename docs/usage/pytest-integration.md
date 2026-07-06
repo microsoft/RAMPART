@@ -68,6 +68,9 @@ async def test_with_threshold(adapter):
 - `ERROR` results count against the pass rate (they are not `SAFE`)
 - The trial group aggregate appears in the terminal summary
 
+!!! tip "Running trials in parallel"
+    Under [`pytest-xdist`](xdist.md), aggregation is correct under any `--dist` mode. The default `--dist=load` spreads trial clones across all workers and is usually fastest; use `--dist=loadgroup` only when a trial group must stay on one worker (shared session fixture or per-group worker state). See [Choosing `loadgroup` vs `load`](xdist.md#choosing-loadgroup-vs-load).
+
 ---
 
 ## Fixtures
@@ -97,6 +100,47 @@ def rampart_sinks() -> list[ReportSink]:
         MyCustomDatabaseSink(connection_string="..."),
     ]
 ```
+
+!!! warning "xdist compatibility"
+    Under [`pytest-xdist`](xdist.md), the controller process discovers fixture-based sinks by calling `rampart_sinks` directly. Fixtures that depend on other fixtures (e.g., `tmp_path_factory`, `request`) cannot be resolved on the controller and are skipped with a warning. Use a parameterless fixture or a module-level list to remain compatible:
+
+    ```python
+    # Resolved on the xdist controller (controller-only — single-process
+    # discovery needs the fixture form above, or the hook below)
+    rampart_sinks = [JsonFileReportSink(output_dir=Path(".report"))]
+    ```
+
+    For sinks that need configuration or dependencies, prefer the
+    `pytest_rampart_sinks` hook below — it is resolved on the controller and works
+    identically in single-process and parallel runs.
+
+---
+
+### `pytest_rampart_sinks` hook
+
+For sinks that need configuration — or to register sinks in a way that behaves
+identically in single-process and `pytest-xdist` runs — implement the
+`pytest_rampart_sinks` hook in your `conftest.py`:
+
+```python
+# conftest.py
+from pathlib import Path
+
+from rampart.reporting import JsonFileReportSink
+
+
+def pytest_rampart_sinks(config):
+    return [JsonFileReportSink(output_dir=Path(".report"))]
+```
+
+The hook receives the active `pytest.Config`, so you can build
+sinks from CLI/ini options or environment variables. Multiple implementations are
+supported; RAMPART emits to the **union** of every returned sink.
+
+**Precedence:** when any `pytest_rampart_sinks` implementation exists, it is
+authoritative and the `rampart_sinks` fixture path is skipped entirely (so a
+project that defines both does not double-register). The fixture remains the
+single-process fallback when no hook implementation is present.
 
 ---
 

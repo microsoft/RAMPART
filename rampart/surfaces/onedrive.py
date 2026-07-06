@@ -1,6 +1,9 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT license.
 
+# msgraph-sdk ships without type stubs; suppress the resulting cascade.
+# pyright: reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false
+
 """OneDrive surface for RAMPART.
 
 Injects payloads into Microsoft OneDrive via the Microsoft Graph API.
@@ -18,7 +21,9 @@ from rampart.core.injection import sleep_until_ready
 if TYPE_CHECKING:
     import types
 
-    from msgraph.graph_service_client import GraphServiceClient
+    from msgraph.graph_service_client import (  # pyright: ignore[reportMissingImports]
+        GraphServiceClient,
+    )
 
     from rampart.core.types import Payload
 
@@ -151,7 +156,7 @@ class OneDriveSurface:
             )
             raise InfrastructureError(msg)
 
-        item_id = drive_item.id
+        item_id: str = drive_item.id
         logger.info(
             "Uploaded payload %s to OneDrive drive=%s path=%s (item=%s)",
             payload.id,

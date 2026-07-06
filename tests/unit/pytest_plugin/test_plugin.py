@@ -16,7 +16,10 @@ from rampart.pytest_plugin._collection import ResultCollectionHandler, ResultCol
 from rampart.pytest_plugin._session import RampartSession
 from rampart.pytest_plugin.plugin import (
     _emit_sinks,
+    _enforce_incomplete_exit_status,
     _evaluate_gates,
+    _has_sink_hook_impl,
+    _resolve_hook_sinks,
     _resolve_trial_n,
     _sanitize_for_terminal,
     _write_result_line,
@@ -27,6 +30,7 @@ from rampart.pytest_plugin.plugin import (
     pytest_terminal_summary,
     pytest_unconfigure,
 )
+from rampart.reporting.sink import ReportSink
 
 if TYPE_CHECKING:
     from _pytest.terminal import TerminalReporter
@@ -187,7 +191,7 @@ class TestRampartSession:
 
         session.record_trial_group(
             base_nodeid="test_example",
-            trial_items=items,
+            clone_nodeids=[item.nodeid for item in items],
             threshold=0.3,
         )
 
@@ -220,7 +224,7 @@ class TestRampartSession:
 
         session.record_trial_group(
             base_nodeid="test_err",
-            trial_items=items,
+            clone_nodeids=[item.nodeid for item in items],
             threshold=0.0,
         )
 
@@ -234,7 +238,7 @@ class TestRampartSession:
         session = RampartSession()
         session.record_trial_group(
             base_nodeid="test_empty",
-            trial_items=[],
+            clone_nodeids=[],
             threshold=0.0,
         )
         assert "test_empty" not in session.trial_groups
@@ -411,6 +415,10 @@ class TestSanitizeForTerminal:
         text = "\x1b[2J\x1b[Hinjected"
         assert _sanitize_for_terminal(text) == "injected"
 
+    def test_strips_osc_hyperlink(self) -> None:
+        text = "\x1b]8;;http://evil\x07link\x1b]8;;\x07"
+        assert _sanitize_for_terminal(text) == "link"
+
 
 class TestWriteResultLine:
     """_write_result_line writes formatted status, summary, and observability level."""
@@ -530,6 +538,27 @@ class TestTerminalSummary:
             config=cast("pytest.Config", config),
         )
         reporter.write_sep.assert_not_called()
+
+    def test_writes_incomplete_warning_even_without_results(self) -> None:
+        reporter = MagicMock()
+        config = MagicMock()
+        config.stash = _StashStub()
+        from rampart.pytest_plugin.plugin import _rampart_key
+
+        session = RampartSession()
+        session.mark_incomplete(reason="worker gw0 crashed \x1b[31mred")
+        config.stash[_rampart_key] = session
+        pytest_terminal_summary(terminalreporter=reporter, exitstatus=0, config=config)
+
+        sep_titles = [str(c) for c in reporter.write_sep.call_args_list]
+        assert any("INCOMPLETE RUN" in t for t in sep_titles)
+        reason_args = [
+            c.args[0]
+            for c in reporter.write_line.call_args_list
+            if c.args and "gw0 crashed" in c.args[0]
+        ]
+        assert reason_args
+        assert all("\x1b" not in arg for arg in reason_args)
 
     def test_writes_summary_header(self) -> None:
         reporter = MagicMock()
@@ -676,7 +705,7 @@ class TestTrialGroupRendering:
 
         session.record_trial_group(
             base_nodeid="test_file.py::test_stat",
-            trial_items=items,
+            clone_nodeids=[item.nodeid for item in items],
             threshold=0.3,
         )
 
@@ -723,7 +752,7 @@ class TestEvaluateGates:
 
         session.record_trial_group(
             base_nodeid="test.py::test_gate",
-            trial_items=items,
+            clone_nodeids=[item.nodeid for item in items],
             threshold=0.1,
         )
 
@@ -776,3 +805,85 @@ class TestSessionFinishIntegration:
 
         report = rs.build_report()
         assert report.duration_seconds >= 4.0
+
+
+class TestSinkHookResolution:
+    """The pytest_rampart_sinks hook is resolved and validated."""
+
+    def test_has_sink_hook_impl_true_when_impls_present(self) -> None:
+        config = MagicMock()
+        hook = config.pluginmanager.hook.pytest_rampart_sinks
+        hook.get_hookimpls.return_value = [MagicMock()]
+        assert _has_sink_hook_impl(config=config) is True
+
+    def test_has_sink_hook_impl_false_when_no_impls(self) -> None:
+        config = MagicMock()
+        hook = config.pluginmanager.hook.pytest_rampart_sinks
+        hook.get_hookimpls.return_value = []
+        assert _has_sink_hook_impl(config=config) is False
+
+    def test_resolve_hook_sinks_flattens_implementations(self) -> None:
+        sink_a = MagicMock(spec=ReportSink)
+        sink_b = MagicMock(spec=ReportSink)
+        config = MagicMock()
+        config.pluginmanager.hook.pytest_rampart_sinks.return_value = [
+            [sink_a],
+            [sink_b],
+        ]
+        result = _resolve_hook_sinks(config=config)
+        assert result == [sink_a, sink_b]
+
+    def test_resolve_hook_sinks_drops_non_report_sinks(self) -> None:
+        sink_a = MagicMock(spec=ReportSink)
+        config = MagicMock()
+        config.pluginmanager.hook.pytest_rampart_sinks.return_value = [
+            [sink_a, "not-a-sink"],
+        ]
+        result = _resolve_hook_sinks(config=config)
+        assert result == [sink_a]
+
+    def test_resolve_hook_sinks_skips_non_list_results(self) -> None:
+        sink_a = MagicMock(spec=ReportSink)
+        config = MagicMock()
+        config.pluginmanager.hook.pytest_rampart_sinks.return_value = [
+            "bad-impl-return",
+            [sink_a],
+        ]
+        result = _resolve_hook_sinks(config=config)
+        assert result == [sink_a]
+
+
+class TestIncompleteExitStatus:
+    """Incomplete runs are forced to a non-zero exit status."""
+
+    def test_incomplete_run_forces_tests_failed(self) -> None:
+        session = MagicMock()
+        session.exitstatus = pytest.ExitCode.OK
+        rampart_session = RampartSession()
+        rampart_session.mark_incomplete(reason="worker gw1 crashed")
+        _enforce_incomplete_exit_status(
+            session=cast("pytest.Session", session),
+            rampart_session=rampart_session,
+        )
+        assert session.exitstatus == pytest.ExitCode.TESTS_FAILED
+
+    def test_complete_run_preserves_ok_status(self) -> None:
+        session = MagicMock()
+        session.exitstatus = pytest.ExitCode.OK
+        rampart_session = RampartSession()
+        _enforce_incomplete_exit_status(
+            session=cast("pytest.Session", session),
+            rampart_session=rampart_session,
+        )
+        assert session.exitstatus == pytest.ExitCode.OK
+
+    def test_incomplete_run_does_not_mask_existing_failure(self) -> None:
+        session = MagicMock()
+        session.exitstatus = pytest.ExitCode.INTERRUPTED
+        rampart_session = RampartSession()
+        rampart_session.mark_incomplete(reason="worker gw1 crashed")
+        _enforce_incomplete_exit_status(
+            session=cast("pytest.Session", session),
+            rampart_session=rampart_session,
+        )
+        assert session.exitstatus == pytest.ExitCode.INTERRUPTED

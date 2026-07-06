@@ -88,6 +88,7 @@ asyncio_default_fixture_loop_scope = "session"
 markers = [
     "harm(*categories): categorize test by harm type",
     "trial(n=, threshold=): statistical repetition of a test",
+    "slow: marks tests that spawn subprocess pytest runs; deselect with -m 'not slow'",
 ]
 filterwarnings = [
     "ignore:.*invalid escape sequence:DeprecationWarning:.*confusables.*",

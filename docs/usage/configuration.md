@@ -4,6 +4,16 @@ RAMPART's configurable components: [`LLMConfig`][rampart.core.llm.LLMConfig] for
 
 ---
 
+## Parallel-execution tuning
+
+RAMPART exposes one pytest option for parallel-execution tuning. Other components (LLM endpoints, agent configuration) typically have their own configuration conventions.
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--rampart-xdist-max-bytes` (CLI) / `rampart_xdist_max_bytes` (ini) | `67108864` (64 MB) | Maximum size of a worker's serialized result payload when running under [`pytest-xdist`](xdist.md). Workers exceeding the cap are recorded as incomplete in `TestRunReport.metadata`. |
+
+---
+
 ## LLMConfig
 
 Immutable configuration for an LLM endpoint. Used by [`LLMDriver`][rampart.drivers.llm.LLMDriver] and [`Payloads.generate_async()`][rampart.payloads.Payloads.generate_async].

@@ -16,6 +16,17 @@ RAMPART tests interact with real or simulated agents and may take longer than un
 pytest tests/ -v --timeout=300
 ```
 
+### Parallel Execution
+
+For faster CI runs, use [`pytest-xdist`](xdist.md):
+
+```bash
+pip install pytest-xdist
+pytest tests/ -n auto
+```
+
+RAMPART aggregates results across worker processes and emits a single unified report under **any** `--dist` mode. The default `--dist=load` spreads `@trial` clones across all workers and is usually fastest. Add `--dist=loadgroup` only when a trial group needs to stay on one worker (e.g. clones share a session fixture or per-group worker state). See [Choosing `loadgroup` vs `load`](xdist.md#choosing-loadgroup-vs-load) for details and security considerations.
+
 ---
 
 ## Trial Markers for Statistical Confidence
@@ -57,11 +68,28 @@ def rampart_sinks() -> list[ReportSink]:
 
 The JSON file contains aggregate statistics and per-result data that CI dashboards can consume.
 
+!!! tip "Running in parallel"
+    Under [`pytest-xdist`](xdist.md), prefer the `pytest_rampart_sinks` hook over the fixture — it is resolved on the controller, so it works the same in single-process and parallel CI runs. See [Registering Sinks](pytest-integration.md#pytest_rampart_sinks-hook).
+
+---
+
+## Pytest Options
+
+RAMPART is configured via pytest options and Python (sinks, adapters, payloads).
+
+### `--rampart-xdist-max-bytes`
+
+Maximum size in bytes of a worker's serialized result payload when running under [`pytest-xdist`](xdist.md). Defaults to `67108864` (64 MB). Workers that exceed the cap log a warning and the controller marks the run as incomplete. Also configurable via the `rampart_xdist_max_bytes` ini option.
+
+```bash
+pytest -n auto --rampart-xdist-max-bytes=134217728   # 128 MB
+```
+
 ---
 
 ## Environment Variables
 
-RAMPART itself does not read environment variables. Your adapter and test configuration typically do. Setting them locally for ad-hoc runs:
+Your adapter and test configuration typically read environment variables. Setting them locally for ad-hoc runs:
 
 === "Linux / macOS"
 
