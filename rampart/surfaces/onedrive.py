@@ -2,7 +2,6 @@
 # Licensed under the MIT license.
 
 # msgraph-sdk ships without type stubs; suppress the resulting cascade.
-# pyright: reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false
 
 """OneDrive surface for RAMPART.
 
@@ -21,9 +20,7 @@ from rampart.core.injection import sleep_until_ready
 if TYPE_CHECKING:
     import types
 
-    from msgraph.graph_service_client import (  # pyright: ignore[reportMissingImports]
-        GraphServiceClient,
-    )
+    from msgraph.graph_service_client import GraphServiceClient
 
     from rampart.core.types import Payload
 
