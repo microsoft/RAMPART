@@ -439,7 +439,8 @@ class TestXdistTrialAggregation:
 
 class TestXdistMetadata:
     def test_report_includes_xdist_metadata(
-        self, configured_pytester: Pytester
+        self,
+        configured_pytester: Pytester,
     ) -> None:
         _setup_simple_tests(configured_pytester)
         configured_pytester.runpytest("-p", "no:cacheprovider", "-n", "2")
@@ -475,7 +476,8 @@ class TestXdistMetadata:
 
 class TestCollectOnly:
     def test_collect_only_does_not_emit_reports(
-        self, configured_pytester: Pytester
+        self,
+        configured_pytester: Pytester,
     ) -> None:
         _setup_simple_tests(configured_pytester)
         configured_pytester.runpytest("-p", "no:cacheprovider", "--collect-only")
