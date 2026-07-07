@@ -96,38 +96,6 @@ Define the `rampart_sinks` fixture in your `conftest.py`. See [pytest Markers & 
 
 ---
 
-## Portable Regression Receipt
-
-For CI gating, capture a stable JSON artifact that teams can diff across runs. Use
-`result.metadata` for scenario-level facts (what should stay stable across time)
-and run-level context (what was tested). Persist the `JsonFileReportSink` output
-as your regression receipt.
-
-These keys travel with the `Result` into whatever sink is wired up. With `JsonFileReportSink`, they appear on that result's metadata object (grouped under `by_harm_category` in the output).
-
-```python
-result = await Attacks.xpia(...).execute_async(adapter=my_adapter)
-
-# Scenario-level facts you want stable across runs — pick the keys your team needs
-result.metadata.update({
-    "scenario_id":               "xpia-login-001",
-    "threat_class":              "credential_exfiltration",
-    "expected_safe_behavior":    "never reveal a password or token",
-    "evaluator_version":         "response_contains@1.4.2",
-    "mitigation_ref":            "SEC-1234",
-})
-
-assert result, result.summary
-```
-
-!!! note
-    The framework automatically contributes a couple of keys to metadata — `test_name`, plus `harm_category` when the test carries a `@pytest.mark.harm` marker — so the persisted metadata will contain slightly more than what the snippet sets.
-
-!!! note
-    `report.metadata` (run-level metadata) is not currently included in the serialized output of `JsonFileReportSink`. If you need to track run-level context (such as `scenario_id` or `ci_run_url`) in the output, nest these fields under `result.metadata` inside the individual test results.
-
----
-
 ## TestRunReport
 
 The report object passed to sinks. See [`TestRunReport`][rampart.reporting.sink.TestRunReport] for full API.
@@ -153,4 +121,29 @@ exfil = report.population_summary(harm_category=HarmCategory.DATA_EXFILTRATION)
 !!! note
     `ERROR` results are excluded from rate calculations. A transient infrastructure failure is not a safety finding.
 
+---
 
+## Portable Regression Receipt
+
+For CI gating, consider capturing a stable JSON artifact that your team can diff across runs. Put both scenario-level facts (what should stay stable across time) and run-level context (what was tested) in `result.metadata` to use as your regression receipt.
+
+These keys live on the `Result`, so any sink _can_ persist them. With `JsonFileReportSink`, for example, they appear on each result's `metadata` object (grouped under `by_harm_category` in the output). A custom sink only records them if its `emit_async` reads `result.metadata`.
+
+```python
+result = await Attacks.xpia(...).execute_async(adapter=my_adapter)
+
+# Scenario-level facts you want stable across runs — pick the keys your team needs
+result.metadata.update({
+    "scenario_id": "xpia-login-001",
+    "threat_class": "credential_exfiltration",
+    "expected_safe_behavior": "never reveal a password or token",
+    "evaluator_version": "response_contains@1.4.2",
+    "mitigation_ref": "SEC-1234",
+    "ci_run_url": "https://ci.example.com/runs/94821",  # run-level context
+})
+
+assert result, result.summary
+```
+
+!!! note
+    The framework automatically contributes a couple of keys to metadata — `test_name`, plus `harm_category` when the test carries a `@pytest.mark.harm` marker — so the persisted metadata will contain slightly more than what the snippet sets.
