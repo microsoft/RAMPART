@@ -45,10 +45,31 @@ def rampart_sinks():
 """
 
 
-def _load_reports(pytester: Pytester) -> list[dict[str, Any]]:
-    marker = pytester.path / "rampart_report_dir.txt"
+# Each ``pytester`` child session is configuration-isolated from the repository's
+# ``pyproject.toml``, so pytest-asyncio reads an empty
+# ``asyncio_default_fixture_loop_scope`` via ``config.getini(...)`` and emits a
+# ``PytestDeprecationWarning`` once per subprocess run. Writing an ini file into
+# the child project root sets the option through the same channel pytest-asyncio
+# reads, mirroring the parent project's asyncio configuration.
+_INI = """\
+[pytest]
+asyncio_mode = auto
+asyncio_default_fixture_loop_scope = session
+"""
+
+
+@pytest.fixture
+def configured_pytester(pytester: Pytester) -> Pytester:
+    """Write the child-session pytest conftest and ini files for subprocess runs."""
+    pytester.makeconftest(_CONFTEST)
+    pytester.makeini(_INI)
+    return pytester
+
+
+def _load_reports(configured_pytester: Pytester) -> list[dict[str, Any]]:
+    marker = configured_pytester.path / "rampart_report_dir.txt"
     if not marker.exists():
-        default_dir = pytester.path / "rampart_reports"
+        default_dir = configured_pytester.path / "rampart_reports"
         if default_dir.exists():
             return [
                 json.loads(p.read_text())
@@ -63,9 +84,8 @@ def _load_reports(pytester: Pytester) -> list[dict[str, Any]]:
     ]
 
 
-def _setup_simple_tests(pytester: Pytester) -> None:
-    pytester.makeconftest(_CONFTEST)
-    pytester.makepyfile(  # pyright: ignore[reportUnknownMemberType]
+def _setup_simple_tests(configured_pytester: Pytester) -> None:
+    configured_pytester.makepyfile(
         test_a="""
         import pytest
         from rampart import record_result
@@ -110,11 +130,11 @@ def _setup_simple_tests(pytester: Pytester) -> None:
 
 
 class TestSingleProcessBaseline:
-    def test_baseline_emits_one_report(self, pytester: Pytester) -> None:
-        _setup_simple_tests(pytester)
-        result = pytester.runpytest("-p", "no:cacheprovider")
+    def test_baseline_emits_one_report(self, configured_pytester: Pytester) -> None:
+        _setup_simple_tests(configured_pytester)
+        result = configured_pytester.runpytest("-p", "no:cacheprovider")
         result.assert_outcomes(passed=4)
-        reports = _load_reports(pytester)
+        reports = _load_reports(configured_pytester)
         assert len(reports) == 1
         assert reports[0]["total_runs"] == 4
 
@@ -122,17 +142,17 @@ class TestSingleProcessBaseline:
 class TestXdistConsolidation:
     def test_xdist_emits_single_consolidated_report(
         self,
-        pytester: Pytester,
+        configured_pytester: Pytester,
     ) -> None:
-        _setup_simple_tests(pytester)
-        result = pytester.runpytest(
+        _setup_simple_tests(configured_pytester)
+        result = configured_pytester.runpytest(
             "-p",
             "no:cacheprovider",
             "-n",
             "2",
         )
         result.assert_outcomes(passed=4)
-        reports = _load_reports(pytester)
+        reports = _load_reports(configured_pytester)
         assert len(reports) == 1, (
             f"Expected exactly one report under xdist, got {len(reports)}: "
             f"{[r.get('total_runs') for r in reports]}"
@@ -140,11 +160,11 @@ class TestXdistConsolidation:
 
     def test_population_statistics_over_full_set(
         self,
-        pytester: Pytester,
+        configured_pytester: Pytester,
     ) -> None:
-        _setup_simple_tests(pytester)
-        pytester.runpytest("-p", "no:cacheprovider", "-n", "2")
-        reports = _load_reports(pytester)
+        _setup_simple_tests(configured_pytester)
+        configured_pytester.runpytest("-p", "no:cacheprovider", "-n", "2")
+        reports = _load_reports(configured_pytester)
         assert len(reports) == 1
         report = reports[0]
         assert report["total_runs"] == 4
@@ -158,10 +178,9 @@ class TestXdistConsolidation:
 class TestXdistTrialAggregation:
     def test_trial_aggregation_across_workers_loadgroup(
         self,
-        pytester: Pytester,
+        configured_pytester: Pytester,
     ) -> None:
-        pytester.makeconftest(_CONFTEST)
-        pytester.makepyfile(  # pyright: ignore[reportUnknownMemberType]
+        configured_pytester.makepyfile(
             test_trial="""
             import pytest
             from rampart import record_result
@@ -177,7 +196,7 @@ class TestXdistTrialAggregation:
                 ))
             """,
         )
-        result = pytester.runpytest(
+        result = configured_pytester.runpytest(
             "-p",
             "no:cacheprovider",
             "-n",
@@ -186,16 +205,15 @@ class TestXdistTrialAggregation:
             "loadgroup",
         )
         result.assert_outcomes(passed=4)
-        reports = _load_reports(pytester)
+        reports = _load_reports(configured_pytester)
         assert len(reports) == 1
         assert reports[0]["total_runs"] == 4
 
     def test_trial_aggregation_across_workers_load(
         self,
-        pytester: Pytester,
+        configured_pytester: Pytester,
     ) -> None:
-        pytester.makeconftest(_CONFTEST)
-        pytester.makepyfile(  # pyright: ignore[reportUnknownMemberType]
+        configured_pytester.makepyfile(
             test_trial="""
             import pytest
             from rampart import record_result
@@ -211,7 +229,7 @@ class TestXdistTrialAggregation:
                 ))
             """,
         )
-        result = pytester.runpytest(
+        result = configured_pytester.runpytest(
             "-p",
             "no:cacheprovider",
             "-n",
@@ -220,13 +238,13 @@ class TestXdistTrialAggregation:
             "load",
         )
         result.assert_outcomes(passed=4)
-        reports = _load_reports(pytester)
+        reports = _load_reports(configured_pytester)
         assert len(reports) == 1
         assert reports[0]["total_runs"] == 4
 
     def test_trial_group_fails_when_any_unsafe_under_loadgroup(
         self,
-        pytester: Pytester,
+        configured_pytester: Pytester,
     ) -> None:
         """An UNSAFE trial fails the whole group regardless of pass rate.
 
@@ -237,8 +255,7 @@ class TestXdistTrialAggregation:
         so the only way the group can FAIL is if controller-side
         aggregation correctly merged the worker results.
         """
-        pytester.makeconftest(_CONFTEST)
-        pytester.makepyfile(  # pyright: ignore[reportUnknownMemberType]
+        configured_pytester.makepyfile(
             test_trial_mixed="""
             import pytest
             from rampart import record_result
@@ -259,7 +276,7 @@ class TestXdistTrialAggregation:
                 ))
             """,
         )
-        result = pytester.runpytest(
+        result = configured_pytester.runpytest(
             "-p",
             "no:cacheprovider",
             "-n",
@@ -270,7 +287,7 @@ class TestXdistTrialAggregation:
         # All 4 clones pass at the pytest item level — record_result
         # does not fail the test; it only records a Result.
         result.assert_outcomes(passed=4)
-        reports = _load_reports(pytester)
+        reports = _load_reports(configured_pytester)
         assert len(reports) == 1
         report = reports[0]
         assert report["total_runs"] == 4
@@ -288,7 +305,7 @@ class TestXdistTrialAggregation:
 
     def test_trial_group_fails_when_any_unsafe_under_load(
         self,
-        pytester: Pytester,
+        configured_pytester: Pytester,
     ) -> None:
         """Same as above but with --dist=load so clones may split workers.
 
@@ -297,8 +314,7 @@ class TestXdistTrialAggregation:
         protects that contract: an UNSAFE clone produced on any worker
         must propagate into the controller's trial-group verdict.
         """
-        pytester.makeconftest(_CONFTEST)
-        pytester.makepyfile(  # pyright: ignore[reportUnknownMemberType]
+        configured_pytester.makepyfile(
             test_trial_mixed_load="""
             import pytest
             from rampart import record_result
@@ -317,7 +333,7 @@ class TestXdistTrialAggregation:
                 ))
             """,
         )
-        result = pytester.runpytest(
+        result = configured_pytester.runpytest(
             "-p",
             "no:cacheprovider",
             "-n",
@@ -326,7 +342,7 @@ class TestXdistTrialAggregation:
             "load",
         )
         result.assert_outcomes(passed=4)
-        reports = _load_reports(pytester)
+        reports = _load_reports(configured_pytester)
         assert len(reports) == 1
         report = reports[0]
         assert report["total_runs"] == 4
@@ -339,15 +355,14 @@ class TestXdistTrialAggregation:
 
     def test_trial_group_fails_below_threshold_under_loadgroup(
         self,
-        pytester: Pytester,
+        configured_pytester: Pytester,
     ) -> None:
         """No UNSAFE results, but pass rate below threshold => FAIL.
 
         2 SAFE + 2 UNDETERMINED trials, threshold=0.75. Pass rate is 0.5
         so the group must FAIL on the threshold rule (not the unsafe rule).
         """
-        pytester.makeconftest(_CONFTEST)
-        pytester.makepyfile(  # pyright: ignore[reportUnknownMemberType]
+        configured_pytester.makepyfile(
             test_trial_threshold="""
             import pytest
             from rampart import record_result
@@ -371,7 +386,7 @@ class TestXdistTrialAggregation:
                 ))
             """,
         )
-        result = pytester.runpytest(
+        result = configured_pytester.runpytest(
             "-p",
             "no:cacheprovider",
             "-n",
@@ -389,11 +404,10 @@ class TestXdistTrialAggregation:
 
     def test_trial_group_passes_when_all_safe_under_loadgroup(
         self,
-        pytester: Pytester,
+        configured_pytester: Pytester,
     ) -> None:
         """All-SAFE trial group with achievable threshold => PASS verdict."""
-        pytester.makeconftest(_CONFTEST)
-        pytester.makepyfile(  # pyright: ignore[reportUnknownMemberType]
+        configured_pytester.makepyfile(
             test_trial_all_safe="""
             import pytest
             from rampart import record_result
@@ -409,7 +423,7 @@ class TestXdistTrialAggregation:
                 ))
             """,
         )
-        result = pytester.runpytest(
+        result = configured_pytester.runpytest(
             "-p",
             "no:cacheprovider",
             "-n",
@@ -424,10 +438,12 @@ class TestXdistTrialAggregation:
 
 
 class TestXdistMetadata:
-    def test_report_includes_xdist_metadata(self, pytester: Pytester) -> None:
-        _setup_simple_tests(pytester)
-        pytester.runpytest("-p", "no:cacheprovider", "-n", "2")
-        reports = _load_reports(pytester)
+    def test_report_includes_xdist_metadata(
+        self, configured_pytester: Pytester
+    ) -> None:
+        _setup_simple_tests(configured_pytester)
+        configured_pytester.runpytest("-p", "no:cacheprovider", "-n", "2")
+        reports = _load_reports(configured_pytester)
         assert len(reports) == 1
         metadata = reports[0].get("metadata", {})
         assert metadata.get("xdist_active") is True
@@ -435,21 +451,21 @@ class TestXdistMetadata:
         assert "dist_mode" in metadata
         assert "population_summary" in reports[0]
 
-    def test_size_cap_marks_run_incomplete(self, pytester: Pytester) -> None:
+    def test_size_cap_marks_run_incomplete(self, configured_pytester: Pytester) -> None:
         """Forcing a 1-byte cap surfaces incompleteness in report metadata.
 
         Triggers the truncation path so the controller must record
         ``incomplete=True`` plus a reason in the merged report.
         """
-        _setup_simple_tests(pytester)
-        pytester.runpytest(
+        _setup_simple_tests(configured_pytester)
+        configured_pytester.runpytest(
             "-p",
             "no:cacheprovider",
             "-n",
             "2",
             "--rampart-xdist-max-bytes=1",
         )
-        reports = _load_reports(pytester)
+        reports = _load_reports(configured_pytester)
         assert len(reports) == 1
         metadata = reports[0].get("metadata", {})
         assert metadata.get("incomplete") is True
@@ -458,11 +474,13 @@ class TestXdistMetadata:
 
 
 class TestCollectOnly:
-    def test_collect_only_does_not_emit_reports(self, pytester: Pytester) -> None:
-        _setup_simple_tests(pytester)
-        pytester.runpytest("-p", "no:cacheprovider", "--collect-only")
+    def test_collect_only_does_not_emit_reports(
+        self, configured_pytester: Pytester
+    ) -> None:
+        _setup_simple_tests(configured_pytester)
+        configured_pytester.runpytest("-p", "no:cacheprovider", "--collect-only")
         # No sinks emit when no tests run
-        marker = pytester.path / "rampart_report_dir.txt"
+        marker = configured_pytester.path / "rampart_report_dir.txt"
         if marker.exists():
             out_dir = Path(marker.read_text().strip())
             if out_dir.exists():
@@ -473,10 +491,9 @@ class TestCollectOnly:
 class TestCloneIdDeterminism:
     def test_trial_clone_ids_deterministic_across_processes(
         self,
-        pytester: Pytester,
+        configured_pytester: Pytester,
     ) -> None:
-        pytester.makeconftest(_CONFTEST)
-        pytester.makepyfile(  # pyright: ignore[reportUnknownMemberType]
+        configured_pytester.makepyfile(
             test_det="""
             import pytest
 
@@ -485,13 +502,13 @@ class TestCloneIdDeterminism:
                 pass
             """,
         )
-        result_serial: RunResult = pytester.runpytest(
+        result_serial: RunResult = configured_pytester.runpytest(
             "-p",
             "no:cacheprovider",
             "--collect-only",
             "-q",
         )
-        result_parallel: RunResult = pytester.runpytest(
+        result_parallel: RunResult = configured_pytester.runpytest(
             "-p",
             "no:cacheprovider",
             "--collect-only",
