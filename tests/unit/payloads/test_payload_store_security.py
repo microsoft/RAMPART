@@ -1,0 +1,67 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
+"""Security tests for payload artifact path handling."""
+
+import json
+from pathlib import Path
+
+import pytest
+
+from rampart.payloads._store import PayloadStore
+
+
+def _write_collection_record(collection_dir: Path, artifact: str) -> None:
+    collection_dir.mkdir(parents=True, exist_ok=True)
+    record: dict[str, object] = {
+        "id": "safe-id",
+        "content": "binary",
+        "format": "pdf",
+        "metadata": {},
+        "artifact": artifact,
+    }
+    (collection_dir / "payloads.jsonl").write_text(json.dumps(record) + "\n")
+
+
+@pytest.mark.parametrize(
+    "artifact",
+    [
+        "../outside.pdf",
+        "artifacts/../outside.pdf",
+        "/tmp/outside.pdf",
+        "outside.pdf",
+    ],
+)
+def test_payload_store_rejects_deserialized_artifact_escape(
+    tmp_path: Path,
+    artifact: str,
+) -> None:
+    """Serialized artifact paths must stay under the collection artifacts dir."""
+    collection_dir = tmp_path / "store" / "collection"
+    _write_collection_record(collection_dir, artifact)
+
+    store = PayloadStore(root=tmp_path / "store")
+    with pytest.raises(ValueError, match="Invalid artifact path"):
+        store.load("collection")
+
+
+def test_payload_store_rejects_deserialized_artifact_symlink_escape(
+    tmp_path: Path,
+) -> None:
+    """Serialized artifact paths cannot resolve through symlinks outside artifacts."""
+    collection_dir = tmp_path / "store" / "collection"
+    artifacts_dir = collection_dir / "artifacts"
+    artifacts_dir.mkdir(parents=True)
+    outside = tmp_path / "outside.pdf"
+    outside.write_bytes(b"outside")
+    symlink = artifacts_dir / "linked.pdf"
+    try:
+        symlink.symlink_to(outside)
+    except OSError as exc:
+        pytest.skip(f"symlinks are not available on this platform: {exc}")
+
+    _write_collection_record(collection_dir, "artifacts/linked.pdf")
+
+    store = PayloadStore(root=tmp_path / "store")
+    with pytest.raises(ValueError, match="escapes"):
+        store.load("collection")
