@@ -34,7 +34,6 @@ from typing import Any
 from rampart.core.types import Payload, PayloadFormat
 
 logger = logging.getLogger(__name__)
-_MIN_ARTIFACT_PATH_PARTS = 2
 
 
 class PayloadStore:
@@ -353,10 +352,13 @@ class PayloadStore:
         if artifact_path.is_absolute() or ".." in artifact_path.parts:
             msg = f"Invalid artifact path: {artifact!r}. Must stay under artifacts/."
             raise ValueError(msg)
-        if (
-            len(artifact_path.parts) < _MIN_ARTIFACT_PATH_PARTS
-            or artifact_path.parts[0] != "artifacts"
-        ):
+        try:
+            artifact_relative = artifact_path.relative_to("artifacts")
+        except ValueError:
+            msg = f"Invalid artifact path: {artifact!r}. Must be under artifacts/."
+            raise ValueError(msg) from None
+
+        if not artifact_relative.parts:
             msg = f"Invalid artifact path: {artifact!r}. Must be under artifacts/."
             raise ValueError(msg)
 
