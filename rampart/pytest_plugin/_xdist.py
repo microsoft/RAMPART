@@ -21,6 +21,7 @@ from __future__ import annotations
 import json
 import logging
 import math
+from dataclasses import dataclass
 from datetime import datetime
 from typing import TYPE_CHECKING, Any, cast
 
@@ -48,6 +49,7 @@ from rampart.reporting.sink import ReportSink
 
 if TYPE_CHECKING:
     from collections.abc import Callable
+    from pathlib import Path
 
     import pytest
 
@@ -62,6 +64,8 @@ DEFAULT_SIZE_LIMIT_BYTES: int = 64 * 1024 * 1024
 MAX_METADATA_DEPTH: int = 6
 
 _TRUNCATED_MARKER: str = "rampart_truncated"
+
+SHARD_DIR_KEY: str = "rampart_shard_dir"
 
 
 class WorkerOutputError(Exception):
@@ -139,6 +143,43 @@ def get_worker_count(*, config: pytest.Config) -> int:
     """
     numprocesses = getattr(config.option, "numprocesses", 0)
     return int(numprocesses) if numprocesses else 0
+
+
+def _is_local_popen_spec(*, spec: str) -> bool:
+    """Return whether one ``--tx`` gateway spec targets a local popen worker.
+
+    Args:
+        spec (str): An xdist execnet gateway spec (e.g. ``"popen"`` or
+            ``"popen//python=python3.11"``).
+
+    Returns:
+        bool: True when the spec launches a same-host popen worker with
+            no proxy routing (no ``ssh=``/``socket=``/``via=``).
+    """
+    head = spec.split("//", 1)[0].strip()
+    return head == "popen" and "via=" not in spec
+
+
+def shard_eligible(*, config: pytest.Config) -> bool:
+    """Return whether durable shard transport is usable for this run.
+
+    Shard transport requires every worker to share the controller's
+    filesystem, which holds exactly when all ``--tx`` gateway specs are
+    local ``popen`` workers. Remote (``ssh=``/``socket=``) or proxied
+    (``via=``) gateways may not see the controller's shard directory, so
+    those runs fall back to the in-memory ``workeroutput`` transport.
+
+    Args:
+        config (pytest.Config): The pytest configuration object.
+
+    Returns:
+        bool: True when at least one gateway is configured and every
+            configured gateway is a local popen worker.
+    """
+    tx = getattr(config.option, "tx", None)
+    if not tx:
+        return False
+    return all(_is_local_popen_spec(spec=str(spec)) for spec in tx)
 
 
 def _size_limit(*, config: pytest.Config) -> int:
@@ -830,6 +871,230 @@ def deserialize_worker_data(*, data: object) -> dict[str, list[Result]]:
             deserialized.append(result)
         out[nodeid_str] = deserialized
     return out
+
+
+def _shard_path(*, shard_dir: Path, worker_id: str) -> Path:
+    """Return the shard file path for a worker.
+
+    Args:
+        shard_dir (Path): Directory holding per-worker shard files.
+        worker_id (str): The xdist worker id (e.g. ``"gw0"``).
+
+    Returns:
+        Path: The ``worker-<id>.jsonl`` path under ``shard_dir``.
+    """
+    return shard_dir / f"worker-{worker_id}.jsonl"
+
+
+def _shard_record_line(*, nodeid: str, index: int, result: Result) -> str:
+    """Serialize one result into a shard record JSON line.
+
+    Args:
+        nodeid (str): The originating test nodeid.
+        index (int): The per-nodeid result index.
+        result (Result): The result to persist.
+
+    Returns:
+        str: A JSON object encoding the record envelope and result body.
+    """
+    return json.dumps(
+        {
+            "schema": SCHEMA_VERSION,
+            "nodeid": nodeid,
+            "index": index,
+            "result": _serialize_result(result=result, nodeid=nodeid),
+        },
+    )
+
+
+def _shard_truncation_line(*, nodeid: str, index: int) -> str:
+    """Serialize an oversized-record marker into a shard JSON line.
+
+    Args:
+        nodeid (str): The originating test nodeid.
+        index (int): The per-nodeid result index.
+
+    Returns:
+        str: A JSON object flagging the dropped record's nodeid/index.
+    """
+    return json.dumps(
+        {
+            "schema": SCHEMA_VERSION,
+            "nodeid": nodeid,
+            "index": index,
+            _TRUNCATED_MARKER: True,
+        },
+    )
+
+
+@dataclass(frozen=True, kw_only=True)
+class DroppedRecord:
+    """A shard record the controller could not recover.
+
+    Attributes:
+        reason (str): Why the record was dropped (``"oversized"`` when a
+            worker wrote a truncation marker, ``"corrupt"`` when a line
+            failed to parse or deserialize).
+        nodeid (str | None): The originating test nodeid, when known.
+        index (int | None): The per-nodeid result index, when known.
+    """
+
+    reason: str
+    nodeid: str | None = None
+    index: int | None = None
+
+
+class ShardWriter:
+    """Append-only writer for one worker's durable result shard.
+
+    Each finished result is written as a single JSON line and flushed
+    immediately, so results a worker has already produced survive an
+    abrupt worker death (e.g. SIGKILL). An oversized result is written as
+    a marker line naming its nodeid/index rather than discarding the
+    whole shard. The writer holds the shard file open for the worker's
+    lifetime; callers must call :meth:`close` at session end.
+    """
+
+    def __init__(self, *, shard_dir: Path, worker_id: str, size_limit: int) -> None:
+        """Open the worker's shard file for appending.
+
+        Args:
+            shard_dir (Path): Directory holding per-worker shard files.
+            worker_id (str): The xdist worker id (e.g. ``"gw0"``).
+            size_limit (int): Per-record byte cap; larger records are
+                written as truncation markers.
+        """
+        self._size_limit = size_limit
+        self._path = _shard_path(shard_dir=shard_dir, worker_id=worker_id)
+        self._file = self._path.open("a", encoding="utf-8")
+
+    def write(self, *, nodeid: str, index: int, result: Result) -> None:
+        """Append one result record and flush it to disk.
+
+        Args:
+            nodeid (str): The originating test nodeid.
+            index (int): The per-nodeid result index.
+            result (Result): The finished result to persist.
+        """
+        line = _shard_record_line(nodeid=nodeid, index=index, result=result)
+        if len(line.encode("utf-8")) > self._size_limit:
+            line = _shard_truncation_line(nodeid=nodeid, index=index)
+        self._file.write(line + "\n")
+        self._file.flush()
+
+    def close(self) -> None:
+        """Close the underlying shard file."""
+        self._file.close()
+
+
+def _absorb_shard_record(
+    *,
+    record: dict[str, Any],
+    results: dict[str, list[Result]],
+    dropped: list[DroppedRecord],
+) -> None:
+    """Route one validated shard record into ``results`` or ``dropped``.
+
+    The record's nodeid and index are taken authoritatively from the
+    envelope (never from the serialized result body) so cross-worker
+    ordering cannot be influenced by untrusted payload content.
+
+    Args:
+        record (dict[str, Any]): A parsed shard record with a matching
+            schema version.
+        results (dict[str, list[Result]]): Accumulator for recovered
+            results, grouped by nodeid.
+        dropped (list[DroppedRecord]): Accumulator for dropped records.
+    """
+    nodeid = str(record.get("nodeid", ""))
+    raw_index = record.get("index")
+    index = raw_index if isinstance(raw_index, int) else None
+    if record.get(_TRUNCATED_MARKER):
+        dropped.append(DroppedRecord(reason="oversized", nodeid=nodeid, index=index))
+        return
+    try:
+        result = _deserialize_result(data=record.get("result"))
+    except WorkerOutputError:
+        dropped.append(DroppedRecord(reason="corrupt", nodeid=nodeid, index=index))
+        return
+    result.metadata["_pytest_nodeid"] = nodeid
+    if index is not None:
+        result.metadata["_rampart_result_index"] = index
+    results.setdefault(nodeid, []).append(result)
+
+
+def _read_shard_line(
+    *,
+    line: str,
+    results: dict[str, list[Result]],
+    dropped: list[DroppedRecord],
+) -> None:
+    """Parse one shard line into ``results`` or ``dropped`` in place.
+
+    Blank lines are ignored. A line that is not valid JSON, not an
+    object, or carries the wrong schema version is recorded as a corrupt
+    drop — this tolerates a truncated final line from an abrupt worker
+    death.
+
+    Args:
+        line (str): A single raw line from the shard file.
+        results (dict[str, list[Result]]): Accumulator for recovered
+            results, grouped by nodeid.
+        dropped (list[DroppedRecord]): Accumulator for dropped records.
+    """
+    stripped = line.strip()
+    if not stripped:
+        return
+    try:
+        record = json.loads(stripped)
+    except json.JSONDecodeError:
+        dropped.append(DroppedRecord(reason="corrupt"))
+        return
+    if not isinstance(record, dict) or record.get("schema") != SCHEMA_VERSION:
+        dropped.append(DroppedRecord(reason="corrupt"))
+        return
+    _absorb_shard_record(
+        record=cast("dict[str, Any]", record),
+        results=results,
+        dropped=dropped,
+    )
+
+
+def read_worker_shard(
+    *,
+    shard_dir: Path,
+    worker_id: str,
+) -> tuple[dict[str, list[Result]], list[DroppedRecord]]:
+    """Recover a worker's results from its durable shard file.
+
+    Parses the worker's ``worker-<id>.jsonl`` shard line by line,
+    tolerating a truncated or partially written final line. Corrupt and
+    oversized records are collected as :class:`DroppedRecord` entries so
+    the caller can mark the run incomplete; every cleanly parsed result
+    is returned. A missing shard file yields empty results and no drops.
+
+    As with :func:`deserialize_worker_data`, each result's
+    ``_pytest_nodeid`` and ``_rampart_result_index`` metadata are set
+    authoritatively from the record envelope, never trusting values
+    embedded in the (attacker-influenced) serialized result body.
+
+    Args:
+        shard_dir (Path): Directory holding per-worker shard files.
+        worker_id (str): The xdist worker id (e.g. ``"gw0"``).
+
+    Returns:
+        tuple[dict[str, list[Result]], list[DroppedRecord]]: Recovered
+            results grouped by nodeid, and the list of dropped records.
+    """
+    path = _shard_path(shard_dir=shard_dir, worker_id=worker_id)
+    if not path.exists():
+        return {}, []
+    results: dict[str, list[Result]] = {}
+    dropped: list[DroppedRecord] = []
+    with path.open("r", encoding="utf-8") as handle:
+        for line in handle:
+            _read_shard_line(line=line, results=results, dropped=dropped)
+    return results, dropped
 
 
 def deserialize_trial_specs(*, data: object) -> dict[str, TrialSpec]:

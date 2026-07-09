@@ -9,7 +9,7 @@ import json
 import logging
 import math
 from datetime import UTC, datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from unittest.mock import MagicMock
 
 import pytest
@@ -36,9 +36,12 @@ from rampart.pytest_plugin._xdist import (
     DEFAULT_SIZE_LIMIT_BYTES,
     MAX_METADATA_DEPTH,
     SCHEMA_VERSION,
+    SHARD_DIR_KEY,
     SIZE_LIMIT_OPTION,
     WORKEROUTPUT_KEY,
+    DroppedRecord,
     SchemaVersionError,
+    ShardWriter,
     SizeLimitError,
     WorkerOutputError,
     _sanitize,
@@ -52,9 +55,14 @@ from rampart.pytest_plugin._xdist import (
     handle_testnodedown,
     is_xdist_controller,
     is_xdist_worker,
+    read_worker_shard,
     serialize_worker_data,
+    shard_eligible,
 )
 from rampart.reporting.sink import ReportSink, TestRunReport
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def _make_result(
@@ -1032,7 +1040,268 @@ class TestConstants:
     def test_workeroutput_key_namespaced(self) -> None:
         assert WORKEROUTPUT_KEY.startswith("rampart_xdist")
 
+    def test_shard_dir_key_namespaced(self) -> None:
+        assert SHARD_DIR_KEY == "rampart_shard_dir"
+
 
 class TestTestRunReportTestable:
     def test_test_run_report_excluded_from_collection(self) -> None:
         assert TestRunReport.__test__ is False
+
+
+class TestShardEligible:
+    def test_all_popen_specs_eligible(self) -> None:
+        config = _make_config(tx=["popen", "popen"])
+        assert shard_eligible(config=config) is True
+
+    def test_bare_popen_eligible(self) -> None:
+        config = _make_config(tx=["popen"])
+        assert shard_eligible(config=config) is True
+
+    def test_popen_with_python_option_eligible(self) -> None:
+        config = _make_config(tx=["popen//python=python3.11"])
+        assert shard_eligible(config=config) is True
+
+    def test_ssh_spec_not_eligible(self) -> None:
+        config = _make_config(tx=["ssh=host//python=python3"])
+        assert shard_eligible(config=config) is False
+
+    def test_socket_spec_not_eligible(self) -> None:
+        config = _make_config(tx=["socket=192.0.2.1:8888"])
+        assert shard_eligible(config=config) is False
+
+    def test_via_proxy_not_eligible(self) -> None:
+        config = _make_config(tx=["popen//via=proxy"])
+        assert shard_eligible(config=config) is False
+
+    def test_mixed_local_and_remote_not_eligible(self) -> None:
+        config = _make_config(tx=["popen", "ssh=host"])
+        assert shard_eligible(config=config) is False
+
+    def test_no_tx_not_eligible(self) -> None:
+        config = _make_config(tx=None)
+        assert shard_eligible(config=config) is False
+
+    def test_empty_tx_not_eligible(self) -> None:
+        config = _make_config(tx=[])
+        assert shard_eligible(config=config) is False
+
+
+class TestShardWriter:
+    def test_write_appends_one_line_per_result(self, tmp_path: Path) -> None:
+        writer = ShardWriter(
+            shard_dir=tmp_path,
+            worker_id="gw0",
+            size_limit=DEFAULT_SIZE_LIMIT_BYTES,
+        )
+        writer.write(nodeid="test::a", index=0, result=_make_result(summary="one"))
+        writer.write(nodeid="test::a", index=1, result=_make_result(summary="two"))
+        writer.close()
+        lines = (
+            (tmp_path / "worker-gw0.jsonl")
+            .read_text(
+                encoding="utf-8",
+            )
+            .splitlines()
+        )
+        assert len(lines) == 2
+        first = json.loads(lines[0])
+        assert first["schema"] == SCHEMA_VERSION
+        assert first["nodeid"] == "test::a"
+        assert first["index"] == 0
+        assert first["result"]["summary"] == "one"
+
+    def test_write_flushes_before_close(self, tmp_path: Path) -> None:
+        writer = ShardWriter(
+            shard_dir=tmp_path,
+            worker_id="gw0",
+            size_limit=DEFAULT_SIZE_LIMIT_BYTES,
+        )
+        writer.write(nodeid="n", index=0, result=_make_result())
+        content = (tmp_path / "worker-gw0.jsonl").read_text(encoding="utf-8")
+        assert json.loads(content.strip())["nodeid"] == "n"
+
+    def test_oversized_record_becomes_marker(self, tmp_path: Path) -> None:
+        writer = ShardWriter(shard_dir=tmp_path, worker_id="gw0", size_limit=10)
+        writer.write(
+            nodeid="test::big",
+            index=3,
+            result=_make_result(summary="x" * 500),
+        )
+        writer.close()
+        record = json.loads(
+            (tmp_path / "worker-gw0.jsonl").read_text(encoding="utf-8").strip(),
+        )
+        assert record["nodeid"] == "test::big"
+        assert record["index"] == 3
+        assert "result" not in record
+
+    def test_separate_files_per_worker(self, tmp_path: Path) -> None:
+        for worker in ("gw0", "gw1"):
+            writer = ShardWriter(
+                shard_dir=tmp_path,
+                worker_id=worker,
+                size_limit=DEFAULT_SIZE_LIMIT_BYTES,
+            )
+            writer.write(nodeid="n", index=0, result=_make_result())
+            writer.close()
+        assert (tmp_path / "worker-gw0.jsonl").exists()
+        assert (tmp_path / "worker-gw1.jsonl").exists()
+
+
+class TestReadWorkerShard:
+    def test_round_trip_via_writer(self, tmp_path: Path) -> None:
+        writer = ShardWriter(
+            shard_dir=tmp_path,
+            worker_id="gw0",
+            size_limit=DEFAULT_SIZE_LIMIT_BYTES,
+        )
+        writer.write(nodeid="test::a", index=0, result=_make_result(summary="one"))
+        writer.write(nodeid="test::b", index=0, result=_make_result(summary="two"))
+        writer.close()
+        results, dropped = read_worker_shard(shard_dir=tmp_path, worker_id="gw0")
+        assert dropped == []
+        assert set(results) == {"test::a", "test::b"}
+        assert results["test::a"][0].summary == "one"
+
+    def test_missing_file_returns_empty(self, tmp_path: Path) -> None:
+        results, dropped = read_worker_shard(shard_dir=tmp_path, worker_id="ghost")
+        assert results == {}
+        assert dropped == []
+
+    def test_metadata_set_authoritatively_from_envelope(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        bogus = _make_result(
+            metadata={"_pytest_nodeid": "spoofed::node", "_rampart_result_index": 99},
+        )
+        writer = ShardWriter(
+            shard_dir=tmp_path,
+            worker_id="gw0",
+            size_limit=DEFAULT_SIZE_LIMIT_BYTES,
+        )
+        writer.write(nodeid="real::node", index=4, result=bogus)
+        writer.close()
+        results, _ = read_worker_shard(shard_dir=tmp_path, worker_id="gw0")
+        recovered = results["real::node"][0]
+        assert recovered.metadata["_pytest_nodeid"] == "real::node"
+        assert recovered.metadata["_rampart_result_index"] == 4
+
+    def test_truncated_final_line_recovered_as_dropped(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        writer = ShardWriter(
+            shard_dir=tmp_path,
+            worker_id="gw0",
+            size_limit=DEFAULT_SIZE_LIMIT_BYTES,
+        )
+        writer.write(nodeid="test::a", index=0, result=_make_result(summary="done"))
+        writer.close()
+        with (tmp_path / "worker-gw0.jsonl").open("a", encoding="utf-8") as handle:
+            handle.write('{"schema": "rampart.xdist.v1", "nodeid": "test::b", "inde')
+        results, dropped = read_worker_shard(shard_dir=tmp_path, worker_id="gw0")
+        assert results["test::a"][0].summary == "done"
+        assert len(dropped) == 1
+        assert dropped[0].reason == "corrupt"
+
+    def test_oversized_marker_recorded_as_dropped(self, tmp_path: Path) -> None:
+        writer = ShardWriter(shard_dir=tmp_path, worker_id="gw0", size_limit=10)
+        writer.write(
+            nodeid="test::big",
+            index=2,
+            result=_make_result(summary="x" * 500),
+        )
+        writer.close()
+        results, dropped = read_worker_shard(shard_dir=tmp_path, worker_id="gw0")
+        assert results == {}
+        assert dropped == [
+            DroppedRecord(reason="oversized", nodeid="test::big", index=2),
+        ]
+
+    def test_corrupt_line_recorded_as_dropped(self, tmp_path: Path) -> None:
+        (tmp_path / "worker-gw0.jsonl").write_text(
+            "not json at all\n",
+            encoding="utf-8",
+        )
+        results, dropped = read_worker_shard(shard_dir=tmp_path, worker_id="gw0")
+        assert results == {}
+        assert dropped == [DroppedRecord(reason="corrupt")]
+
+    def test_wrong_schema_recorded_as_dropped(self, tmp_path: Path) -> None:
+        line = json.dumps(
+            {"schema": "other.v9", "nodeid": "n", "index": 0, "result": {}},
+        )
+        (tmp_path / "worker-gw0.jsonl").write_text(line + "\n", encoding="utf-8")
+        results, dropped = read_worker_shard(shard_dir=tmp_path, worker_id="gw0")
+        assert results == {}
+        assert dropped[0].reason == "corrupt"
+
+    def test_non_dict_result_body_dropped_with_ids(self, tmp_path: Path) -> None:
+        line = json.dumps(
+            {
+                "schema": SCHEMA_VERSION,
+                "nodeid": "test::x",
+                "index": 7,
+                "result": 123,
+            },
+        )
+        (tmp_path / "worker-gw0.jsonl").write_text(line + "\n", encoding="utf-8")
+        results, dropped = read_worker_shard(shard_dir=tmp_path, worker_id="gw0")
+        assert results == {}
+        assert dropped == [
+            DroppedRecord(reason="corrupt", nodeid="test::x", index=7),
+        ]
+
+    def test_blank_lines_ignored(self, tmp_path: Path) -> None:
+        writer = ShardWriter(
+            shard_dir=tmp_path,
+            worker_id="gw0",
+            size_limit=DEFAULT_SIZE_LIMIT_BYTES,
+        )
+        writer.write(nodeid="test::a", index=0, result=_make_result())
+        writer.close()
+        with (tmp_path / "worker-gw0.jsonl").open("a", encoding="utf-8") as handle:
+            handle.write("\n   \n")
+        results, dropped = read_worker_shard(shard_dir=tmp_path, worker_id="gw0")
+        assert set(results) == {"test::a"}
+        assert dropped == []
+
+    def test_multiple_results_same_nodeid_grouped(self, tmp_path: Path) -> None:
+        writer = ShardWriter(
+            shard_dir=tmp_path,
+            worker_id="gw0",
+            size_limit=DEFAULT_SIZE_LIMIT_BYTES,
+        )
+        writer.write(nodeid="test::a", index=0, result=_make_result(summary="first"))
+        writer.write(nodeid="test::a", index=1, result=_make_result(summary="second"))
+        writer.close()
+        results, dropped = read_worker_shard(shard_dir=tmp_path, worker_id="gw0")
+        assert dropped == []
+        indexes = [r.metadata["_rampart_result_index"] for r in results["test::a"]]
+        assert indexes == [0, 1]
+
+    def test_rich_result_survives_shard_round_trip(self, tmp_path: Path) -> None:
+        eval_result = _make_eval_result(outcome=EvalOutcome.DETECTED, confidence=0.8)
+        turn = _make_turn(eval_result=eval_result, turn_number=2)
+        result = _make_result(
+            summary="rich",
+            harm_category=HarmCategory.JAILBREAK,
+            turns=[turn],
+            observability_level=ObservabilityLevel.TOOL_AND_SIDE_EFFECTS,
+        )
+        writer = ShardWriter(
+            shard_dir=tmp_path,
+            worker_id="gw0",
+            size_limit=DEFAULT_SIZE_LIMIT_BYTES,
+        )
+        writer.write(nodeid="test::rich", index=0, result=result)
+        writer.close()
+        results, _ = read_worker_shard(shard_dir=tmp_path, worker_id="gw0")
+        recovered = results["test::rich"][0]
+        assert recovered.harm_category is HarmCategory.JAILBREAK
+        assert recovered.observability_level is ObservabilityLevel.TOOL_AND_SIDE_EFFECTS
+        assert len(recovered.turns) == 1
+        assert recovered.turns[0].eval_result is not None
+        assert recovered.turns[0].eval_result.outcome is EvalOutcome.DETECTED
