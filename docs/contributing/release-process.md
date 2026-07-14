@@ -47,29 +47,35 @@ local_scheme = "no-local-version"
 
 The `no-local-version` setting omits local version suffixes such as `+g<sha>` because PyPI does not support them for upstream releases. See the [setuptools-scm local scheme documentation](https://setuptools-scm.readthedocs.io/en/latest/extending/#setuptools_scmlocal_scheme) for details.
 
-For development builds on `main`, the release tag must be reachable from `main` history for Hatch VCS to infer the next development version from that tag. If the release branch contains commits beyond `main`, merge or cherry-pick those release commits back to `main` after publishing.
+For development builds on `main` to version correctly, the release tag must be reachable from `main`, meaning it points at a commit that is part of `main`'s history. If it is not, `git describe` finds no tag, setuptools-scm counts commits from the repository root instead, and builds come out as `x.y.devN` versions that sort *before* the release.
+
+Tagging the release branch does not satisfy this, because the release branch is never merged into `main`. Cherry-picking the release commit back to `main` does not help either: cherry-pick creates a new commit with a different SHA that the tag does not point to. Instead, tag a commit that is already on `main` and cut the release branch from that tag, as described in step 5.
 
 ### Update README File
-The README file is published to PyPI and also needs to be updated so the links work properly. _Note: There may not be any links to update, but it is good practice to check in case our README changes._
+The README is published to PyPI, so any repository-relative links must resolve for someone reading it there. Because the release is tagged on `main` (step 5), the published README is `main`'s README; there is no separate release-branch copy to maintain.
 
-Keep README image links relative when they point to files in this repository, e.g., `docs/images/RAMPART.svg`. During package builds, `scripts/hatch_build.py` generates the PyPI README metadata and rewrites those image paths to raw GitHub URLs with the release version.
+Image links can stay relative, e.g., `docs/images/RAMPART.svg`. During package builds, `scripts/hatch_build.py` rewrites those image paths to raw GitHub URLs pinned to the release version.
 
-Replace any other "main" links like "doc/index.md" with "raw" links that have the correct version number, i.e., "https://raw.githubusercontent.com/microsoft/RAMPART/releases/vx.y.z/docs/index.md".
+If the README gains other repository-relative links (for example to `docs/index.md` or a directory), make them absolute `https://github.com/microsoft/RAMPART/...` URLs on `main`, or extend `scripts/hatch_build.py` to rewrite them at build time the way it already does for images. Do not fix these with a release-only commit on the release branch, because the tag must stay on a commit that is part of `main`.
 
-For directories, update using the "tree" link, e.g., "https://github.com/microsoft/RAMPART/tree/releases/vx.y.z/docs/usage"
+## 5. Tag the Release on `main` and Publish the Release Branch
 
-This is required for the release branch because PyPI does not pick up other files besides the README, which results in local links breaking.
+Tag the release on `main` first, then cut the release branch from that tag. Tagging `main` rather than the release branch is what keeps the tag reachable from `main`, so development builds version correctly (see the [Git tag](#git-tag) note in step 4).
 
-## 5. Publish the Release Branch to GitHub
-
-Commit your changes to a release branch and push the tag:
+Confirm any release-prep changes have already merged to `main`, then:
 
 ```bash
-git checkout -b releases/vx.y.z
-git commit -am "release vx.y.z"
-git push origin releases/vx.y.z
+git checkout main
+git pull origin main
+
+# Tag the current main commit and push the tag.
 git tag -a vx.y.z -m "vx.y.z release"
-git push --tags
+git push origin vx.y.z
+
+# Cut the release branch from the tagged commit, for release-only
+# artifacts and future patch releases.
+git checkout -b releases/vx.y.z vx.y.z
+git push origin releases/vx.y.z
 ```
 
 
@@ -126,19 +132,19 @@ Confirm the version matches the release and the package is installed under the e
     uv run pytest path/to/RAMPART/tests/integration/test_smoke.py -v
     ```
 
-If you need to make changes to fix issues found during testing, cherry-pick from `main` after the fix lands:
+If you need to make changes to fix issues found during testing, land the fix on `main` first, then move the tag to the new `main` commit so it stays reachable from `main`:
 
 ```bash
-git checkout main && git pull
-git log main  # find the commit hash to cherry-pick
-git checkout releases/vx.y.z
-git cherry-pick <commit-hash>
-git push origin releases/vx.y.z
+git checkout main && git pull origin main
+# After the fix has merged to main:
 git tag -a vx.y.z -m "vx.y.z release" --force
-git push --tags --force
+git push origin vx.y.z --force
+# Point the release branch at the retagged commit.
+git branch -f releases/vx.y.z vx.y.z
+git push origin releases/vx.y.z --force
 ```
 
-Rebuild the package after any cherry-pick and re-test.
+Rebuild the package after re-tagging and re-test.
 
 ## 8. Publish to PyPI
 
@@ -155,7 +161,7 @@ If successful, the URL `https://pypi.org/project/rampart/x.y.z/` will return the
 
 After the release is on PyPI, open a PR to `main` containing only:
 
-- Any follow-up documentation or metadata updates needed after the release. Do not bump the package version in `pyproject.toml`; once `main` has commits after the release tag, Hatch VCS will infer the next development version automatically.
+- Any follow-up documentation or metadata updates needed after the release. Do not bump the package version in `pyproject.toml`. Because the release was tagged on `main` in step 5, the next commit merged to `main` produces the next development version (for example `x.y.(z+1).devN`) automatically.
 - Replace any references to the previous release version in the codebase with the new released version (without `.dev0`) where applicable (e.g., installation docs that pin to the latest tag).
 
 Open this PR from a branch separate from your `releases/vx.y.z` branch.
