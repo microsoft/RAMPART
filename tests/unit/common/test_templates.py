@@ -8,21 +8,26 @@ import yaml
 
 from rampart.common.templates import (
     PromptTemplate,
+    PromptTemplateSchemaError,
     TemplateParameterError,
     load_prompt_template,
 )
 
 
+def _write_yaml(tmp_path: Path, data: object) -> Path:
+    path = tmp_path / "prompt.yaml"
+    path.write_text(yaml.safe_dump(data), encoding="utf-8")
+    return path
+
+
 def _write_template(tmp_path: Path, **overrides: object) -> Path:
-    data: dict[str, object] = {
+    definition: dict[str, object] = {
         "name": "Greeting",
         "parameters": ["subject"],
         "value": "Hello, {{ subject }}!",
     }
-    data.update(overrides)
-    path = tmp_path / "prompt.yaml"
-    path.write_text(yaml.safe_dump(data), encoding="utf-8")
-    return path
+    definition.update(overrides)
+    return _write_yaml(tmp_path, definition)
 
 
 class TestLoadPromptTemplate:
@@ -72,3 +77,52 @@ class TestLoadPromptTemplate:
             match=r"missing=\('subject',\), unused=\('declared_but_unused',\)",
         ):
             load_prompt_template(path)
+
+    @pytest.mark.parametrize(
+        ("definition", "error_fragment"),
+        [
+            (
+                {"name": "Greeting", "value": "Hello!"},
+                "parameters",
+            ),
+            (
+                {
+                    "name": 42,
+                    "parameters": ["subject"],
+                    "value": "Hello, {{ subject }}!",
+                },
+                "name",
+            ),
+            (
+                {
+                    "name": "Greeting",
+                    "parameters": ["subject"],
+                    "value": "Hello, {{ subject }}!",
+                    "unexpected": True,
+                },
+                "unexpected",
+            ),
+            (
+                {
+                    "name": "Greeting",
+                    "parameters": ["subject", "subject"],
+                    "value": "Hello, {{ subject }}!",
+                },
+                "parameters must contain unique keys",
+            ),
+        ],
+    )
+    def test_rejects_invalid_yaml_schema(
+        self,
+        tmp_path: Path,
+        definition: object,
+        error_fragment: str,
+    ) -> None:
+        path = _write_yaml(tmp_path, definition)
+
+        with pytest.raises(PromptTemplateSchemaError) as exc_info:
+            load_prompt_template(path)
+
+        assert exc_info.value.path == path
+        assert error_fragment in str(exc_info.value)
+        assert exc_info.value.__cause__ is not None

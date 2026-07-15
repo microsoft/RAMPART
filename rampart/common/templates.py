@@ -11,6 +11,7 @@ directories. Each file uses this schema:
 - ``value`` (required): Jinja2 template source.
 - ``description`` (optional): Human-readable purpose; defaults to ``None``.
 
+Unknown keys and type coercion are rejected. Parameter names must be unique.
 The loader maps ``parameters`` to :attr:`PromptTemplate.parameter_keys`,
 compiles ``value``, and returns a structured template that validates every
 render call before evaluating Jinja markup.
@@ -18,14 +19,15 @@ render call before evaluating Jinja markup.
 
 from __future__ import annotations
 
-from collections.abc import Collection, Mapping
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 import yaml
 from jinja2 import Environment, StrictUndefined, Template, meta, select_autoescape
+from pydantic import BaseModel, ConfigDict, ValidationError, field_validator
 
 if TYPE_CHECKING:
+    from collections.abc import Collection
     from pathlib import Path
 
 
@@ -33,6 +35,56 @@ _JINJA_ENVIRONMENT = Environment(
     autoescape=select_autoescape(default_for_string=False, default=False),
     undefined=StrictUndefined,
 )
+
+
+class _PromptTemplateYaml(BaseModel):
+    """Strict schema for the serialized YAML representation."""
+
+    model_config = ConfigDict(
+        extra="forbid",
+        frozen=True,
+        hide_input_in_errors=True,
+        strict=True,
+    )
+
+    name: str
+    parameters: list[str]
+    value: str
+    description: str | None = None
+
+    @field_validator("parameters")
+    @classmethod
+    def _require_unique_parameters(cls, parameters: list[str]) -> list[str]:
+        """Reject duplicate parameter declarations.
+
+        Args:
+            parameters: Parameter keys parsed from YAML.
+
+        Returns:
+            list[str]: The validated parameter keys.
+
+        Raises:
+            ValueError: If a parameter key appears more than once.
+        """
+        if len(parameters) != len(set(parameters)):
+            msg = "parameters must contain unique keys"
+            raise ValueError(msg)
+        return parameters
+
+
+class PromptTemplateSchemaError(ValueError):
+    """Raised when YAML data does not match the prompt-template schema."""
+
+    def __init__(self, *, path: Path, details: str) -> None:
+        """Initialize an error without exposing Pydantic in the public contract.
+
+        Args:
+            path: Path to the invalid YAML template.
+            details: Human-readable validation details.
+        """
+        self.path = path
+        msg = f"Prompt template {path} has an invalid YAML schema:\n{details}"
+        super().__init__(msg)
 
 
 class TemplateParameterError(ValueError):
@@ -117,77 +169,41 @@ def load_prompt_template(path: Path) -> PromptTemplate:
 
     Raises:
         FileNotFoundError: If *path* does not exist.
-        KeyError: If a required YAML key is absent.
-        TypeError: If a YAML field has the wrong type.
-        ValueError: If parameter declarations are duplicated or do not match
-            the Jinja template variables.
+        PromptTemplateSchemaError: If the YAML data does not match the schema,
+            including duplicate parameter declarations.
+        ValueError: If parameter declarations do not match the Jinja template
+            variables.
         yaml.YAMLError: If the file is not valid YAML.
     """
     with path.open(encoding="utf-8") as f:
         data = yaml.safe_load(f)
 
-    if not isinstance(data, Mapping):
-        msg = f"Prompt template {path} must contain a YAML mapping."
-        raise TypeError(msg)
+    try:
+        definition = _PromptTemplateYaml.model_validate(data)
+    except ValidationError as exc:
+        raise PromptTemplateSchemaError(path=path, details=str(exc)) from exc
 
-    name = _required_string(data, "name", path=path)
-    value = _required_string(data, "value", path=path)
-    description = data.get("description")
-    if description is not None and not isinstance(description, str):
-        msg = f"Prompt template {path} field 'description' must be a string or null."
-        raise TypeError(msg)
-
-    if "parameters" not in data:
-        msg = f"Prompt template {path} is missing required field 'parameters'."
-        raise KeyError(msg)
-    raw_parameter_keys = data["parameters"]
-    if not isinstance(raw_parameter_keys, list) or not all(
-        isinstance(key, str) for key in raw_parameter_keys
-    ):
-        msg = f"Prompt template {path} field 'parameters' must be a list of strings."
-        raise TypeError(msg)
-    parameter_keys = tuple(raw_parameter_keys)
-    if len(parameter_keys) != len(set(parameter_keys)):
-        msg = f"Prompt template {path} field 'parameters' contains duplicate keys."
-        raise ValueError(msg)
-
-    parsed = _JINJA_ENVIRONMENT.parse(value, name=name, filename=str(path))
+    parameter_keys = tuple(definition.parameters)
+    parsed = _JINJA_ENVIRONMENT.parse(
+        definition.value,
+        name=definition.name,
+        filename=str(path),
+    )
     referenced_keys = meta.find_undeclared_variables(parsed)
     declared_keys = set(parameter_keys)
     if referenced_keys != declared_keys:
         missing = tuple(sorted(referenced_keys - declared_keys))
         unused = tuple(sorted(declared_keys - referenced_keys))
         msg = (
-            f"Prompt template {name!r} parameter declarations do not match its "
+            f"Prompt template {definition.name!r} parameter declarations do not match "
+            "its "
             f"Jinja variables: missing={missing!r}, unused={unused!r}"
         )
         raise ValueError(msg)
 
     return PromptTemplate(
-        name=name,
-        description=description,
+        name=definition.name,
+        description=definition.description,
         parameter_keys=parameter_keys,
         _template=_JINJA_ENVIRONMENT.from_string(parsed),
     )
-
-
-def _required_string(
-    data: Mapping[object, object],
-    key: str,
-    *,
-    path: Path,
-) -> str:
-    """Return a required string field from parsed YAML data.
-
-    Raises:
-        KeyError: If *key* is absent.
-        TypeError: If the field value is not a string.
-    """
-    if key not in data:
-        msg = f"Prompt template {path} is missing required field {key!r}."
-        raise KeyError(msg)
-    value = data[key]
-    if not isinstance(value, str):
-        msg = f"Prompt template {path} field {key!r} must be a string."
-        raise TypeError(msg)
-    return value
