@@ -32,10 +32,19 @@ If you are incrementing the minor version, search the codebase for the new minor
 
 If you find functionality to remove, merge the removal PR to `main` before proceeding.
 
-## 4. Update the Version
+## 4. Prepare Release Metadata
 
-### Git tag
-RAMPART derives package versions from Git tags using Hatch VCS and setuptools-scm. No `pyproject.toml` version bump is required for a release. The release version is determined by the `vx.y.z` tag pushed in step 5.
+Before tagging the release:
+
+- Do not add or update a version in `pyproject.toml`. The release version comes from the `vx.y.z` tag created in step 5.
+- Review `README.md` for repository-relative links that need to work on PyPI.
+- Keep image links under `docs/images/` relative. During package builds, `scripts/hatch_build.py` rewrites them to raw GitHub URLs pinned to the release version.
+- For other repository-relative links, use absolute `https://github.com/microsoft/RAMPART/...` URLs on `main`, or extend `scripts/hatch_build.py` to rewrite them at build time.
+- Merge any required README or metadata changes to `main` before continuing to step 5.
+
+### Why the Tag Must Be on `main`
+
+RAMPART derives package versions from Git tags using Hatch VCS and setuptools-scm:
 
 ```toml
 [tool.hatch.version]
@@ -51,16 +60,9 @@ For development builds on `main` to version correctly, the release tag must be r
 
 Tagging the release branch does not satisfy this, because the release branch is never merged into `main`. Cherry-picking the release commit back to `main` does not help either: cherry-pick creates a new commit with a different SHA that the tag does not point to. Instead, tag a commit that is already on `main` and cut the release branch from that tag, as described in step 5.
 
-### Update README File
-The README is published to PyPI, so any repository-relative links must resolve for someone reading it there. Because the release is tagged on `main` (step 5), the published README is `main`'s README; there is no separate release-branch copy to maintain.
-
-Image links can stay relative, e.g., `docs/images/RAMPART.svg`. During package builds, `scripts/hatch_build.py` rewrites those image paths to raw GitHub URLs pinned to the release version.
-
-If the README gains other repository-relative links (for example to `docs/index.md` or a directory), make them absolute `https://github.com/microsoft/RAMPART/...` URLs on `main`, or extend `scripts/hatch_build.py` to rewrite them at build time the way it already does for images. Do not fix these with a release-only commit on the release branch, because the tag must stay on a commit that is part of `main`.
-
 ## 5. Tag the Release on `main` and Publish the Release Branch
 
-Tag the release on `main` first, then cut the release branch from that tag. Tagging `main` rather than the release branch is what keeps the tag reachable from `main`, so development builds version correctly (see the [Git tag](#git-tag) note in step 4).
+Tag the release on `main` first, then cut the release branch from that tag. Tagging `main` rather than the release branch is what keeps the tag reachable from `main`, so development builds version correctly (see [Why the Tag Must Be on `main`](#why-the-tag-must-be-on-main) in step 4).
 
 Confirm any release-prep changes have already merged to `main`, then:
 
@@ -228,7 +230,7 @@ A patch release (e.g., `0.2.0` → `0.2.1`) ships a targeted fix — typically a
 
     Resolve any conflicts manually. Patch-sized fixes typically apply cleanly.
 
-3. **Update release-specific references** as needed. Do not bump the package version in `pyproject.toml`; the patch version comes from the `vx.y.z` tag. Also update any version-pinned links in `README.md`.
+3. **Update release-specific references** as needed, such as documentation that names the patch version (for example, "Fixed in v0.2.1") or `README.md` links pinned to a release tag.
 
     ```bash
     git commit -am "Prepare x.y.z release"
