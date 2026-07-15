@@ -36,7 +36,7 @@ from pyrit.exceptions import EmptyResponseException
 from pyrit.memory import CentralMemory
 from pyrit.prompt_normalizer import PromptNormalizer
 
-from rampart.common.templates import load_prompt_template
+from rampart.common.templates import PromptTemplate
 from rampart.core.errors import DriverError
 from rampart.core.prompt_driver import PromptDecision
 from rampart.core.types import Payload, Request, Turn
@@ -51,7 +51,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 _PROMPTS_DIR = Path(__file__).resolve().parent / "prompts"
-_SYSTEM_PROMPT_TEMPLATE = load_prompt_template(
+_SYSTEM_PROMPT_TEMPLATE = PromptTemplate.from_yaml(
     _PROMPTS_DIR / "llm_driver_system_prompt.yaml",
 )
 

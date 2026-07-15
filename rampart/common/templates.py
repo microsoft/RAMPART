@@ -19,57 +19,30 @@ render call before evaluating Jinja markup.
 
 from __future__ import annotations
 
+from collections.abc import Hashable
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Annotated, TypeAlias, TypeVar
 
 import yaml
 from jinja2 import Environment, StrictUndefined, Template, meta, select_autoescape
-from pydantic import BaseModel, ConfigDict, ValidationError, field_validator
+from pydantic import AfterValidator, BaseModel, ConfigDict, ValidationError
+
+__all__ = [
+    "PromptTemplate",
+    "PromptTemplateSchemaError",
+    "TemplateParameterError",
+]
 
 if TYPE_CHECKING:
     from collections.abc import Collection
     from pathlib import Path
+    from typing import Self
 
 
 _JINJA_ENVIRONMENT = Environment(
     autoescape=select_autoescape(default_for_string=False, default=False),
     undefined=StrictUndefined,
 )
-
-
-class _PromptTemplateYaml(BaseModel):
-    """Strict schema for the serialized YAML representation."""
-
-    model_config = ConfigDict(
-        extra="forbid",
-        frozen=True,
-        hide_input_in_errors=True,
-        strict=True,
-    )
-
-    name: str
-    parameters: list[str]
-    value: str
-    description: str | None = None
-
-    @field_validator("parameters")
-    @classmethod
-    def _require_unique_parameters(cls, parameters: list[str]) -> list[str]:
-        """Reject duplicate parameter declarations.
-
-        Args:
-            parameters: Parameter keys parsed from YAML.
-
-        Returns:
-            list[str]: The validated parameter keys.
-
-        Raises:
-            ValueError: If a parameter key appears more than once.
-        """
-        if len(parameters) != len(set(parameters)):
-            msg = "parameters must contain unique keys"
-            raise ValueError(msg)
-        return parameters
 
 
 class PromptTemplateSchemaError(ValueError):
@@ -127,6 +100,36 @@ class PromptTemplate:
     parameter_keys: tuple[str, ...]
     _template: Template = field(repr=False, compare=False)
 
+    @classmethod
+    def from_yaml(cls, path: Path) -> Self:
+        """Load and compile a prompt template from YAML.
+
+        ``name``, ``parameters``, and ``value`` are required. ``description``
+        is optional. Declared parameters must exactly match the variables
+        referenced by the Jinja template.
+
+        Args:
+            path: Path to the YAML template file.
+
+        Returns:
+            Self: A structured, compiled prompt template.
+
+        Raises:
+            FileNotFoundError: If *path* does not exist.
+            PromptTemplateSchemaError: If the YAML data does not match the
+                schema, including duplicate parameter declarations.
+            ValueError: If parameter declarations do not match the Jinja
+                template variables.
+            yaml.YAMLError: If the file is not valid YAML.
+        """
+        definition = _load_yaml_definition(path)
+        return cls(
+            name=definition.name,
+            description=definition.description,
+            parameter_keys=tuple(definition.parameters),
+            _template=_compile_template(definition, path=path),
+        )
+
     def render(self, **kwargs: object) -> str:
         """Render with exactly the declared keyword arguments.
 
@@ -153,57 +156,104 @@ class PromptTemplate:
         return self._template.render(**kwargs)
 
 
-def load_prompt_template(path: Path) -> PromptTemplate:
-    """Load and compile a structured YAML prompt template.
+_UniqueItemT = TypeVar("_UniqueItemT", bound=Hashable)
 
-    ``name``, ``parameters``, and ``value`` are required. ``description``
-    is optional. The declared parameters must exactly match the variables
-    referenced by the Jinja template.
+
+def _require_unique(values: list[_UniqueItemT]) -> list[_UniqueItemT]:
+    """Reject duplicate values.
 
     Args:
-        path: Absolute path to the YAML template file
-            (e.g. ``.../prompts/llm_judge.yaml``).
+        values: Values to validate.
 
     Returns:
-        PromptTemplate: Structured metadata and a compiled template.
+        list[_UniqueItemT]: The validated values in their original order.
+
+    Raises:
+        ValueError: If any value appears more than once.
+    """
+    if len(values) != len(set(values)):
+        msg = "items must be unique"
+        raise ValueError(msg)
+    return values
+
+
+_UniqueList: TypeAlias = Annotated[
+    list[_UniqueItemT],
+    AfterValidator(_require_unique),
+]
+
+
+class _PromptTemplateYaml(BaseModel):
+    """Strict schema for the serialized YAML representation."""
+
+    model_config = ConfigDict(
+        extra="forbid",
+        frozen=True,
+        hide_input_in_errors=True,
+        strict=True,
+    )
+
+    name: str
+    parameters: _UniqueList[str]
+    value: str
+    description: str | None = None
+
+
+def _load_yaml_definition(path: Path) -> _PromptTemplateYaml:
+    """Load and validate the serialized YAML representation.
+
+    Args:
+        path: Path to the YAML template file.
+
+    Returns:
+        _PromptTemplateYaml: The validated YAML definition.
 
     Raises:
         FileNotFoundError: If *path* does not exist.
         PromptTemplateSchemaError: If the YAML data does not match the schema,
             including duplicate parameter declarations.
-        ValueError: If parameter declarations do not match the Jinja template
-            variables.
         yaml.YAMLError: If the file is not valid YAML.
     """
     with path.open(encoding="utf-8") as f:
         data = yaml.safe_load(f)
 
     try:
-        definition = _PromptTemplateYaml.model_validate(data)
+        return _PromptTemplateYaml.model_validate(data)
     except ValidationError as exc:
         raise PromptTemplateSchemaError(path=path, details=str(exc)) from exc
 
-    parameter_keys = tuple(definition.parameters)
+
+def _compile_template(
+    definition: _PromptTemplateYaml,
+    *,
+    path: Path,
+) -> Template:
+    """Compile a validated definition after checking its parameter contract.
+
+    Args:
+        definition: Validated YAML template definition.
+        path: Source path used in Jinja diagnostics.
+
+    Returns:
+        Template: The compiled Jinja template.
+
+    Raises:
+        ValueError: If declared parameters do not match the Jinja variables.
+    """
     parsed = _JINJA_ENVIRONMENT.parse(
         definition.value,
         name=definition.name,
         filename=str(path),
     )
     referenced_keys = meta.find_undeclared_variables(parsed)
-    declared_keys = set(parameter_keys)
+    declared_keys = set(definition.parameters)
     if referenced_keys != declared_keys:
         missing = tuple(sorted(referenced_keys - declared_keys))
         unused = tuple(sorted(declared_keys - referenced_keys))
         msg = (
-            f"Prompt template {definition.name!r} parameter declarations do not match "
-            "its "
+            f"Prompt template {definition.name!r} parameters do not match its "
             f"Jinja variables: missing={missing!r}, unused={unused!r}"
         )
         raise ValueError(msg)
 
-    return PromptTemplate(
-        name=definition.name,
-        description=definition.description,
-        parameter_keys=parameter_keys,
-        _template=_JINJA_ENVIRONMENT.from_string(parsed),
-    )
+    return _JINJA_ENVIRONMENT.from_string(parsed)

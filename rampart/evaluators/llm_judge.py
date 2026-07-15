@@ -22,7 +22,7 @@ from pyrit.exceptions import (
 )
 from pyrit.prompt_normalizer import PromptNormalizer
 
-from rampart.common.templates import load_prompt_template
+from rampart.common.templates import PromptTemplate
 from rampart.core.errors import EvaluatorError
 from rampart.core.evaluator import BaseEvaluator
 from rampart.core.types import EvalContext, EvalOutcome, EvalResult
@@ -60,7 +60,7 @@ class TranscriptScope(Enum):
 
 
 _PROMPTS_DIR = Path(__file__).resolve().parent / "prompts"
-_SYSTEM_PROMPT_TEMPLATE = load_prompt_template(_PROMPTS_DIR / "llm_judge.yaml")
+_SYSTEM_PROMPT_TEMPLATE = PromptTemplate.from_yaml(_PROMPTS_DIR / "llm_judge.yaml")
 
 _ALLOWED_OUTCOMES: frozenset[str] = frozenset(
     {"detected", "not_detected", "undetermined"},

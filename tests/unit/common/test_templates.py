@@ -2,6 +2,7 @@
 # Licensed under the MIT license.
 
 from pathlib import Path
+from textwrap import dedent
 
 import pytest
 import yaml
@@ -10,13 +11,18 @@ from rampart.common.templates import (
     PromptTemplate,
     PromptTemplateSchemaError,
     TemplateParameterError,
-    load_prompt_template,
 )
 
 
 def _write_yaml(tmp_path: Path, data: object) -> Path:
     path = tmp_path / "prompt.yaml"
     path.write_text(yaml.safe_dump(data), encoding="utf-8")
+    return path
+
+
+def _write_raw_yaml(tmp_path: Path, content: str) -> Path:
+    path = tmp_path / "prompt.yaml"
+    path.write_text(dedent(content), encoding="utf-8")
     return path
 
 
@@ -30,11 +36,69 @@ def _write_template(tmp_path: Path, **overrides: object) -> Path:
     return _write_yaml(tmp_path, definition)
 
 
-class TestLoadPromptTemplate:
+class TestPromptTemplateFromYaml:
+    def test_loads_raw_yaml_block_scalars(self, tmp_path: Path) -> None:
+        path = _write_raw_yaml(
+            tmp_path,
+            (
+                "name: Greeting\n"
+                "description: |\n"
+                "  Greets a subject across\n"
+                "  multiple lines.\n"
+                "parameters:\n"
+                "  - subject\n"
+                "value: |\n"
+                "  Hello, {{ subject }}!\n"
+                "  Welcome to RAMPART.\n"
+            ),
+        )
+
+        template = PromptTemplate.from_yaml(path)
+
+        assert template.name == "Greeting"
+        assert template.description == "Greets a subject across\nmultiple lines.\n"
+        assert template.parameter_keys == ("subject",)
+        assert template.render(subject="Ada") == "Hello, Ada!\nWelcome to RAMPART."
+
+    def test_rejects_malformed_raw_yaml(self, tmp_path: Path) -> None:
+        path = _write_raw_yaml(
+            tmp_path,
+            """\
+            name: Broken
+            parameters:
+              - subject
+            value: "{{ subject }}"
+            description: [unterminated
+            """,
+        )
+
+        with pytest.raises(yaml.YAMLError):
+            PromptTemplate.from_yaml(path)
+
+    @pytest.mark.parametrize(
+        "content",
+        [
+            pytest.param("", id="empty"),
+            pytest.param("- name\n- parameters\n- value\n", id="sequence"),
+        ],
+    )
+    def test_rejects_raw_yaml_without_mapping(
+        self,
+        tmp_path: Path,
+        content: str,
+    ) -> None:
+        path = _write_raw_yaml(tmp_path, content)
+
+        with pytest.raises(PromptTemplateSchemaError) as exc_info:
+            PromptTemplate.from_yaml(path)
+
+        assert exc_info.value.path == path
+        assert exc_info.value.__cause__ is not None
+
     def test_loads_metadata_and_renders_successfully(self, tmp_path: Path) -> None:
         path = _write_template(tmp_path, description="Greets a subject.")
 
-        template = load_prompt_template(path)
+        template = PromptTemplate.from_yaml(path)
 
         assert isinstance(template, PromptTemplate)
         assert template.name == "Greeting"
@@ -43,12 +107,12 @@ class TestLoadPromptTemplate:
         assert template.render(subject="Ada") == "Hello, Ada!"
 
     def test_optional_description_defaults_to_none(self, tmp_path: Path) -> None:
-        template = load_prompt_template(_write_template(tmp_path))
+        template = PromptTemplate.from_yaml(_write_template(tmp_path))
 
         assert template.description is None
 
     def test_rejects_missing_parameter(self, tmp_path: Path) -> None:
-        template = load_prompt_template(_write_template(tmp_path))
+        template = PromptTemplate.from_yaml(_write_template(tmp_path))
 
         with pytest.raises(TemplateParameterError) as exc_info:
             template.render()
@@ -58,7 +122,7 @@ class TestLoadPromptTemplate:
         assert exc_info.value.unexpected == ()
 
     def test_rejects_unexpected_parameter(self, tmp_path: Path) -> None:
-        template = load_prompt_template(_write_template(tmp_path))
+        template = PromptTemplate.from_yaml(_write_template(tmp_path))
 
         with pytest.raises(TemplateParameterError) as exc_info:
             template.render(subject="Ada", subejct="typo")
@@ -76,7 +140,7 @@ class TestLoadPromptTemplate:
             ValueError,
             match=r"missing=\('subject',\), unused=\('declared_but_unused',\)",
         ):
-            load_prompt_template(path)
+            PromptTemplate.from_yaml(path)
 
     @pytest.mark.parametrize(
         ("definition", "error_fragment"),
@@ -108,7 +172,7 @@ class TestLoadPromptTemplate:
                     "parameters": ["subject", "subject"],
                     "value": "Hello, {{ subject }}!",
                 },
-                "parameters must contain unique keys",
+                "items must be unique",
             ),
         ],
     )
@@ -121,7 +185,7 @@ class TestLoadPromptTemplate:
         path = _write_yaml(tmp_path, definition)
 
         with pytest.raises(PromptTemplateSchemaError) as exc_info:
-            load_prompt_template(path)
+            PromptTemplate.from_yaml(path)
 
         assert exc_info.value.path == path
         assert error_fragment in str(exc_info.value)
