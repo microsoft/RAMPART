@@ -9,6 +9,9 @@ from pathlib import Path
 
 from hatchling.metadata.plugin.interface import MetadataHookInterface
 
+# These patterns only rewrite ``docs/images/`` paths; images stored elsewhere
+# (for example ``assets/``) pass through unchanged and must already use an
+# absolute URL to render on PyPI.
 _GITHUB_IMAGE_URL_PATTERNS = (
     re.compile(r"(https://github\.com/microsoft/RAMPART/raw/)main(/docs/images/)"),
     re.compile(
@@ -19,8 +22,11 @@ _RELATIVE_HTML_IMAGE_URL_PATTERNS = (
     re.compile(r'(<img\b[^>]*\bsrc=")(?:\./)?(docs/images/[^"]+)(")'),
     re.compile(r"(<img\b[^>]*\bsrc=')(?:\./)?(docs/images/[^']+)(')"),
 )
+# The URL group stops at whitespace so an optional Markdown title, as in
+# ``![alt](docs/images/x.png "title")``, is preserved in group 3 instead of
+# being folded into the rewritten image URL.
 _RELATIVE_MARKDOWN_IMAGE_URL_PATTERN = re.compile(
-    r"(!\[[^\]]*\]\()(?:\./)?(docs/images/[^)]+)(\))",
+    r"(!\[[^\]]*\]\()(?:\./)?(docs/images/[^)\s]+)([^)]*\))",
 )
 
 
@@ -40,7 +46,7 @@ def _raw_image_url(*, readme_ref: str, image_path: str) -> str:
 
 
 def _render_readme(*, root: Path, version: str) -> str:
-    """Render README content for package metadata."""
+    """Return README content rendered for package metadata."""
     readme = (root / "README.md").read_text(encoding="utf-8")
     readme_ref = _readme_ref(version)
 
