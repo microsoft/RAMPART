@@ -124,7 +124,16 @@ git checkout releases/vx.y
 git merge --ff-only vx.y.0
 ```
 
-Rebuild the package and re-test. For a patch release, land the additional fix on `main`, cherry-pick it onto `releases/vx.y`, delete and recreate the local patch tag, then re-test.
+For a patch release, land the additional fix on `main`, then update the release branch and local tag:
+
+```bash
+git checkout releases/vx.y
+git cherry-pick <additional-fix-sha>
+git tag -d vx.y.z
+git tag -a vx.y.z -m "vx.y.z release"
+```
+
+Rebuild the package and re-test.
 
 ## 8. Publish the Git References and Package
 
@@ -198,9 +207,16 @@ A patch release (e.g., `0.2.0` to `0.2.1`) ships a targeted fix, typically a sec
 - A critical bug was found in the latest release that blocks users.
 - The fix is already merged to `main`, but `main` contains other changes that aren't ready for release.
 
-#### Abbreviated steps
+#### Steps
 
-1. **Check out the existing minor release branch**:
+1. **Choose the next patch version**. Increment the patch component from the latest published tag and confirm that the new tag does not already exist. For example, use `v0.2.1` after `v0.2.0`:
+
+    ```bash
+    git fetch origin --tags
+    git tag --list "vx.y.*"
+    ```
+
+2. **Check out the existing minor release branch**:
 
     ```bash
     git fetch origin
@@ -208,7 +224,7 @@ A patch release (e.g., `0.2.0` to `0.2.1`) ships a targeted fix, typically a sec
     git pull --ff-only origin releases/vx.y
     ```
 
-2. **Cherry-pick the fix** after it has merged to `main`:
+3. **Cherry-pick the fix** after it has merged to `main`:
 
     ```bash
     git cherry-pick <commit-sha>
@@ -216,17 +232,17 @@ A patch release (e.g., `0.2.0` to `0.2.1`) ships a targeted fix, typically a sec
 
     Resolve any conflicts manually. Patch-sized fixes typically apply cleanly. Cherry-pick only the commits intended for the patch; do not merge `main` into the release branch.
 
-3. **Update release-specific references** as needed, such as documentation that names the patch version (for example, "Fixed in v0.2.1") or `README.md` links pinned to a release tag. Skip this commit if no references need updating.
+4. **Update release-specific references** as needed, such as documentation that names the patch version (for example, "Fixed in v0.2.1") or `README.md` links pinned to a release tag. Skip this commit if no references need updating.
 
     ```bash
     git add <files>
     git commit -m "Prepare x.y.z release"
     ```
 
-4. **Create the tag locally**. Do not push the branch or tag until testing passes:
+5. **Create the tag locally**. Do not push the branch or tag until testing passes:
 
     ```bash
     git tag -a vx.y.z -m "vx.y.z release"
     ```
 
-5. **Follow the regular release process from step 6 onward**: build, test, push the branch and tag, publish to PyPI, update `main`, and create the GitHub release. Patch release notes should clearly state the reason for the patch (e.g., "Security fix for…" or "Critical bug fix for…").
+6. **Follow the regular release process from step 6 onward**: build, test, push the branch and tag, publish to PyPI, update `main`, and create the GitHub release. Patch release notes should clearly state the reason for the patch (e.g., "Security fix for…" or "Critical bug fix for…").
