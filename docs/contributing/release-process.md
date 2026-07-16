@@ -43,7 +43,7 @@ Before tagging the release:
 - Merge any required README or metadata changes to `main` before continuing to step 5.
 
 !!! note "Versioning"
-    RAMPART uses Hatch VCS with setuptools-scm's `semver-pep440-release-branch` scheme. After `v0.2.0`, builds from `main` use `0.3.0.devN`, builds from `releases/v0.2` use `0.2.1.devN`, and a tagged commit uses the exact tag. Git only considers tags in the current commit's ancestry, so create `vx.y.0` on `main` before branching; patch tags remain on `releases/vx.y` and do not affect `main`. See the [setuptools-scm version scheme documentation](https://github.com/pypa/setuptools-scm/blob/main/docs/extending.md#available-implementations).
+    RAMPART uses Hatch VCS with setuptools-scm's `semver-pep440-release-branch` scheme. After `v0.2.0`, builds from `main` use `0.3.0.devN`, builds from `releases/v0.2` use `0.2.1.devN`, and a tagged commit uses the exact tag. Git only considers tags in the current commit's ancestry, so create `vx.y.0` on `main` before branching; patch tags remain on `releases/vx.y` and do not affect `main`. Until `v0.2.0` is tagged on `main`, development builds use the `0.1.0.devN` fallback; these builds are not published. See the [setuptools-scm version scheme documentation](https://github.com/pypa/setuptools-scm/blob/main/docs/extending.md#available-implementations).
 
 ## 5. Tag the Minor Release on `main` and Create the Release Branch
 
@@ -55,13 +55,9 @@ Confirm any release-prep changes have already merged to `main`, then:
 git checkout main
 git pull origin main
 
-# Tag the current main commit and push the tag.
+# Create the tag and release branch.
 git tag -a vx.y.0 -m "vx.y.0 release"
-git push origin vx.y.0
-
-# Create the branch used for every patch in this minor series.
 git checkout -b releases/vx.y vx.y.0
-git push origin releases/vx.y
 ```
 
 
@@ -118,21 +114,26 @@ Confirm the version matches the release and the package is installed under the e
     uv run pytest path/to/RAMPART/tests/integration/test_smoke.py -v
     ```
 
-For a minor release, if you need to make changes to fix issues found during testing, land the fix on `main` first, then move the tag to the new `main` commit so it stays reachable from `main`:
+For a minor release, if testing finds an issue, land the fix on `main`, recreate the local tag on the fixed commit, and fast-forward the local release branch:
 
 ```bash
 git checkout main && git pull origin main
-# After the fix has merged to main:
-git tag -a vx.y.0 -m "vx.y.0 release" --force
-git push origin vx.y.0 --force
-# Point the release branch at the retagged commit.
-git branch -f releases/vx.y vx.y.0
-git push origin releases/vx.y --force
+git tag -d vx.y.0
+git tag -a vx.y.0 -m "vx.y.0 release"
+git checkout releases/vx.y
+git merge --ff-only vx.y.0
 ```
 
-Rebuild the package after re-tagging and re-test. For a patch release, land the additional fix on `main`, cherry-pick it onto `releases/vx.y`, move the patch tag to the updated release-branch commit, and re-test.
+Rebuild the package and re-test. For a patch release, land the additional fix on `main`, cherry-pick it onto `releases/vx.y`, delete and recreate the local patch tag, then re-test.
 
-## 8. Publish to PyPI
+## 8. Publish the Git References and Package
+
+After all tests pass, push the release branch and tag:
+
+```bash
+git push origin releases/vx.y
+git push origin vx.y.z
+```
 
 Create a PyPI account if you don't have one and ask another maintainer to add you to the `rampart` project. Before publishing, have an API token scoped to the project ready (create one in your PyPI project settings).
 
@@ -154,7 +155,7 @@ Open this PR from a branch separate from your `releases/vx.y` branch.
 
 ## 10. Create the GitHub Release
 
-Go to the [releases page](https://github.com/microsoft/RAMPART/releases), select **Draft a new release**, and choose the tag you pushed in step 5 (or step 4 of the [patch release process](#patch-releases)). Click **Generate release notes** to pre-populate the description.
+Go to the [releases page](https://github.com/microsoft/RAMPART/releases), select **Draft a new release**, and choose the tag you pushed in step 8. Click **Generate release notes** to pre-populate the description.
 
 Structure the description as:
 
@@ -222,12 +223,10 @@ A patch release (e.g., `0.2.0` to `0.2.1`) ships a targeted fix, typically a sec
     git commit -m "Prepare x.y.z release"
     ```
 
-4. **Push and tag**:
+4. **Create the tag locally**. Do not push the branch or tag until testing passes:
 
     ```bash
-    git push origin releases/vx.y
     git tag -a vx.y.z -m "vx.y.z release"
-    git push origin vx.y.z
     ```
 
-5. **Follow the regular release process from step 6 onward**: build, test, publish to PyPI, update `main`, and create the GitHub release. Patch release notes should clearly state the reason for the patch (e.g., "Security fix for…" or "Critical bug fix for…").
+5. **Follow the regular release process from step 6 onward**: build, test, push the branch and tag, publish to PyPI, update `main`, and create the GitHub release. Patch release notes should clearly state the reason for the patch (e.g., "Security fix for…" or "Critical bug fix for…").
