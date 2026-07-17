@@ -135,7 +135,7 @@ See [pytest Markers & Fixtures](../usage/pytest-integration.md) for the full mar
 
 ## Step 4: Add Reporting
 
-Add a `rampart_sinks` fixture to your `conftest.py` so RAMPART writes structured JSON reports. See [pytest Markers & Fixtures](../usage/pytest-integration.md#rampart_sinks) for the setup.
+Register report sinks with the `pytest_rampart_sinks` hook in your `conftest.py` so RAMPART writes structured JSON reports. See [pytest Markers & Fixtures](../usage/pytest-integration.md#pytest_rampart_sinks-hook) for the setup. (The older `rampart_sinks` fixture is still supported but deprecated.)
 
 ---
 
@@ -177,6 +177,6 @@ JSON reports are written to `.report/`.
 
 - [XPIA Attack](../attacks/xpia.md) — Surface-based injection, DOCX payloads, multi-surface attacks
 - [Writing Tests](../usage/authoring-tests.md) — Adapters, manifests, evaluators, surfaces in depth
-- [pytest Markers & Fixtures](../usage/pytest-integration.md) — `@harm`, `@trial`, `rampart_sinks`
+- [pytest Markers & Fixtures](../usage/pytest-integration.md) — `@harm`, `@trial`, `pytest_rampart_sinks`
 - [Configuration](../usage/configuration.md) — LLMConfig, Persona, AppManifest
 - [RAMPART Examples](https://github.com/microsoft/rampart-examples) — Runnable demos showing complete adapter + test setups

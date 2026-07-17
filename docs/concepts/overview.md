@@ -125,7 +125,7 @@ RAMPART registers as a pytest plugin automatically when installed. It provides:
 - **Markers**: `@pytest.mark.harm(...)` for categorization, `@pytest.mark.trial(n=...)` for statistical repetition
 - **Automatic result collection**: Results from `Attacks.*` and `Probes.*` are collected without manual wiring
 - **Terminal summary**: A safety summary printed after the standard pytest output
-- **Report sinks**: Structured output via the `rampart_sinks` fixture
+- **Report sinks**: Structured output via the `pytest_rampart_sinks` hook (the `rampart_sinks` fixture is deprecated)
 
 See [pytest Markers & Fixtures](../usage/pytest-integration.md) for setup details.
 

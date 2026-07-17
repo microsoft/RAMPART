@@ -53,23 +53,23 @@ This runs 10 independent trials. The test group passes only if ≥ 80% of trials
 
 ## Structured Reports
 
-Configure `rampart_sinks` to write JSON reports for downstream processing:
+Register the `pytest_rampart_sinks` hook to write JSON reports for downstream processing:
 
 ```python
 # conftest.py
 from pathlib import Path
-import pytest
-from rampart.reporting import JsonFileReportSink, ReportSink
 
-@pytest.fixture(scope="session")
-def rampart_sinks() -> list[ReportSink]:
+from rampart.reporting import JsonFileReportSink
+
+
+def pytest_rampart_sinks(config):
     return [JsonFileReportSink(output_dir=Path(".report"))]
 ```
 
-The JSON file contains aggregate statistics and per-result data that CI dashboards can consume.
+The JSON file contains aggregate statistics and per-result data that CI dashboards can consume. The hook is resolved on the controller, so it behaves identically in single-process and [`pytest-xdist`](xdist.md) CI runs. See [Registering Sinks](pytest-integration.md#pytest_rampart_sinks-hook).
 
-!!! tip "Running in parallel"
-    Under [`pytest-xdist`](xdist.md), prefer the `pytest_rampart_sinks` hook over the fixture — it is resolved on the controller, so it works the same in single-process and parallel CI runs. See [Registering Sinks](pytest-integration.md#pytest_rampart_sinks-hook).
+!!! warning "Deprecated"
+    The older `rampart_sinks` fixture still works but is deprecated and will be removed in `0.3.0`. Prefer the `pytest_rampart_sinks` hook above.
 
 ---
 
