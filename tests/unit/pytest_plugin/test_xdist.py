@@ -999,6 +999,55 @@ class TestSinkDiscovery:
         assert any("pytest_rampart_sinks" in r.getMessage() for r in caplog.records)
 
 
+class TestSinkDeprecationWarning:
+    """Deprecation-warning contract for controller-side ``rampart_sinks`` discovery.
+
+    The ``@pytest.fixture`` form warns when resolved; the module-level list form
+    is not a fixture and must stay silent. These fast, in-process checks replace
+    the equivalent ``pytester`` subprocess test in ``test_xdist_aggregation.py``.
+    """
+
+    def test_fixture_form_emits_deprecation_warning(self) -> None:
+        sink = MagicMock(spec=ReportSink)
+
+        @pytest.fixture
+        def rampart_sinks() -> list[ReportSink]:
+            return [sink]
+
+        plugin = MagicMock(
+            spec=["rampart_sinks", "__name__"],
+            rampart_sinks=rampart_sinks,
+            __name__="mod",
+        )
+        config = MagicMock()
+        config.pluginmanager.get_plugins.return_value = [plugin]
+        with pytest.warns(
+            DeprecationWarning, match="rampart_sinks fixture is deprecated"
+        ):
+            result = discover_sinks_from_conftest(config=config)
+        assert sink in result
+
+    def test_list_form_does_not_emit_deprecation_warning(
+        self,
+        recwarn: pytest.WarningsRecorder,
+    ) -> None:
+        sink = MagicMock(spec=ReportSink)
+        plugin = MagicMock(
+            spec=["rampart_sinks", "__name__"],
+            rampart_sinks=[sink],
+            __name__="mod",
+        )
+        config = MagicMock()
+        config.pluginmanager.get_plugins.return_value = [plugin]
+        result = discover_sinks_from_conftest(config=config)
+        assert sink in result
+        assert not any(
+            issubclass(w.category, DeprecationWarning)
+            and "rampart_sinks fixture is deprecated" in str(w.message)
+            for w in recwarn
+        )
+
+
 class TestReportTestRunMetadata:
     def test_set_report_metadata_appears_in_report(self) -> None:
         session = RampartSession()

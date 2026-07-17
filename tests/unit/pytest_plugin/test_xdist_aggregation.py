@@ -45,20 +45,6 @@ def rampart_sinks():
 """
 
 
-_LIST_CONFTEST = """\
-from pathlib import Path
-
-from rampart.reporting import JsonFileReportSink
-
-
-_OUT_DIR = Path("rampart_reports").absolute()
-_OUT_DIR.mkdir(parents=True, exist_ok=True)
-Path("rampart_report_dir.txt").write_text(str(_OUT_DIR))
-
-rampart_sinks = [JsonFileReportSink(output_dir=_OUT_DIR)]
-"""
-
-
 # Each ``pytester`` child session is configuration-isolated from the repository's
 # ``pyproject.toml``, so pytest-asyncio reads an empty
 # ``asyncio_default_fixture_loop_scope`` via ``config.getini(...)`` and emits a
@@ -545,10 +531,11 @@ class TestCloneIdDeterminism:
 
 
 class TestSinkFixtureDeprecation:
-    """Deprecation-warning contract for the ``rampart_sinks`` fixture.
+    """End-to-end deprecation-warning contract for the ``rampart_sinks`` fixture.
 
-    The fixture warns wherever it is resolved (single-process and the xdist
-    controller); the module-level list form is not a fixture and must not warn.
+    The fixture warns wherever it is resolved: single-process and on the xdist
+    controller. The list form's silence is covered by the fast unit tests in
+    ``test_xdist.py::TestSinkDeprecationWarning``.
     """
 
     _DEPRECATION_LINE = "*rampart_sinks fixture is deprecated*"
@@ -570,18 +557,3 @@ class TestSinkFixtureDeprecation:
         result = configured_pytester.runpytest("-p", "no:cacheprovider", "-n", "2")
         result.assert_outcomes(passed=4)
         result.stdout.fnmatch_lines([self._DEPRECATION_LINE])
-
-    def test_controller_list_form_does_not_warn_under_xdist(
-        self,
-        configured_pytester: Pytester,
-    ) -> None:
-        # The list form is a module-level attribute, not a fixture, so it must
-        # not emit the fixture deprecation warning. Overwrite the fixture-form
-        # conftest that ``configured_pytester`` wrote with the list form.
-        configured_pytester.makeconftest(_LIST_CONFTEST)
-        _setup_simple_tests(configured_pytester)
-        result = configured_pytester.runpytest("-p", "no:cacheprovider", "-n", "2")
-        result.assert_outcomes(passed=4)
-        reports = _load_reports(configured_pytester)
-        assert len(reports) == 1
-        result.stdout.no_fnmatch_line(self._DEPRECATION_LINE)
