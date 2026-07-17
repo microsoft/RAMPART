@@ -104,7 +104,7 @@ class TestOneDriveSurfaceInit:
             folder_path="test",
             indexing_delay=42.0,
         )
-        assert surface.indexing_delay == 42.0
+        assert surface.indexing_delay == pytest.approx(42.0)
 
     def test_strips_leading_trailing_slashes_from_folder_path(self) -> None:
         surface = OneDriveSurface(

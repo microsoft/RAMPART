@@ -123,7 +123,12 @@ class _DefaultHandlerRegistry:
         self.factory: ExecutionHandlerFactory | None = None
 
     def __call__(self) -> list[ExecutionEventHandler]:
-        """Invoke the stored factory, or return an empty list if unset."""
+        """Invoke the stored factory, or return an empty list if unset.
+
+        Returns:
+            list[ExecutionEventHandler]: A fresh list from the stored
+                factory, or an empty list when no factory is registered.
+        """
         if self.factory is None:
             return []
         return self.factory()
@@ -156,9 +161,7 @@ def register_default_handler_factory(
             "factory must satisfy ExecutionHandlerFactory (callable returning "
             "list[ExecutionEventHandler])"
         )
-        raise TypeError(
-            msg,
-        )
+        raise TypeError(msg)
     _default_handler_factory.factory = factory
 
 
@@ -313,7 +316,7 @@ class BaseExecution(ABC):
         for handler in self._handlers:
             try:
                 await handler.on_event(event_data=event_data)
-            except Exception:  # noqa: BLE001  — handler errors must not break execution
+            except Exception:
                 logger.warning(
                     "ExecutionEventHandler %s raised on %s — ignored.",
                     handler.__class__.__name__,

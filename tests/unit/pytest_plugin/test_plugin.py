@@ -202,7 +202,7 @@ class TestRampartSession:
         assert group.safe == 2
         assert group.unsafe == 2
         assert group.errors == 1
-        assert group.threshold == 0.3
+        assert group.threshold == pytest.approx(0.3)
         assert group.pass_rate == pytest.approx(0.4)
         assert not group.passed  # UNSAFE present → always fails
 
@@ -231,7 +231,7 @@ class TestRampartSession:
         group = session.trial_groups["test_err"]
         assert group.errors == 3
         assert group.unsafe == 0
-        assert group.pass_rate == 0.0
+        assert group.pass_rate == pytest.approx(0.0)
         assert group.passed  # threshold=0.0 means any pass rate is acceptable
 
     def test_record_trial_group_empty_items_noop(self) -> None:
@@ -668,7 +668,7 @@ class TestRampartSessionDuration:
         node.nodeid = "test.py::test_dur"
         session.absorb(node=node, collector=collector)
         report = session.build_report()
-        assert report.duration_seconds == 0.0
+        assert report.duration_seconds == pytest.approx(0.0)
 
     def test_set_duration_reflected_in_report(self) -> None:
         session = RampartSession()
@@ -681,7 +681,7 @@ class TestRampartSessionDuration:
         session.absorb(node=node, collector=collector)
         session.set_duration(duration_seconds=42.5)
         report = session.build_report()
-        assert report.duration_seconds == 42.5
+        assert report.duration_seconds == pytest.approx(42.5)
 
 
 class TestTrialGroupRendering:

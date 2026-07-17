@@ -122,7 +122,7 @@ class TestGeneration:
         """Manifest tools and agent name appear in the LLM user message."""
         captured: dict[str, str] = {}
 
-        async def capture(*, system_message: str, user_message: str) -> str:
+        def capture(*, system_message: str, user_message: str) -> str:
             captured["user_message"] = user_message
             return "variant"
 
@@ -148,7 +148,7 @@ class TestGeneration:
         """Persona system_prompt is forwarded as the LLM system message."""
         captured: dict[str, str] = {}
 
-        async def capture(*, system_message: str, user_message: str) -> str:
+        def capture(*, system_message: str, user_message: str) -> str:
             captured["system_message"] = system_message
             return "variant"
 

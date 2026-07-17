@@ -121,7 +121,8 @@ class JsonFileReportSink:
             "turns": [self._serialize_turn(t) for t in result.turns],
         }
 
-    def _serialize_turn(self, turn: Turn) -> dict[str, Any]:
+    @staticmethod
+    def _serialize_turn(turn: Turn) -> dict[str, Any]:
         """Convert a single Turn to a JSON-serializable dict.
 
         Args:

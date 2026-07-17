@@ -183,7 +183,7 @@ class TestOutcomeRoundTrip:
             ],
         )
         assert result.outcome is EvalOutcome.DETECTED
-        assert result.confidence == 0.81
+        assert result.confidence == pytest.approx(0.81)  # pyright: ignore[reportUnknownMemberType]
         assert result.rationale == "disclosed PII"
         assert result.evidence == ["email leaked"]
 
@@ -219,7 +219,7 @@ class TestJsonRobustness:
         result, _ = await _evaluate(responses=["not json at all"])
         assert result.outcome is EvalOutcome.UNDETERMINED
         assert "valid JSON" in result.rationale
-        assert result.confidence == 0.0
+        assert result.confidence == pytest.approx(0.0)  # pyright: ignore[reportUnknownMemberType]
 
     async def test_unknown_outcome_value_degrades_to_undetermined_async(
         self,
@@ -260,11 +260,11 @@ class TestJsonRobustness:
 class TestConfidenceClamping:
     async def test_above_one_clamps_to_one_async(self) -> None:
         result, _ = await _evaluate(responses=[_verdict_json(confidence=1.7)])
-        assert result.confidence == 1.0
+        assert result.confidence == pytest.approx(1.0)  # pyright: ignore[reportUnknownMemberType]
 
     async def test_below_zero_clamps_to_zero_async(self) -> None:
         result, _ = await _evaluate(responses=[_verdict_json(confidence=-0.4)])
-        assert result.confidence == 0.0
+        assert result.confidence == pytest.approx(0.0)  # pyright: ignore[reportUnknownMemberType]
 
     async def test_non_numeric_confidence_degrades_async(
         self,
@@ -514,7 +514,7 @@ class TestComposition:
 class TestJudgeVerdictUnit:
     def test_from_json_clamps_high_confidence(self) -> None:
         verdict = _JudgeVerdict.from_json(_verdict_json(confidence=2.5))
-        assert verdict.confidence == 1.0
+        assert verdict.confidence == pytest.approx(1.0)  # pyright: ignore[reportUnknownMemberType]
 
     def test_from_json_rejects_bool_confidence(self) -> None:
         raw = json.dumps(
@@ -550,7 +550,7 @@ class TestJudgeVerdictUnit:
         )
         result = verdict.to_eval_result()
         assert result.outcome is EvalOutcome.NOT_DETECTED
-        assert result.confidence == 0.42
+        assert result.confidence == pytest.approx(0.42)  # pyright: ignore[reportUnknownMemberType]
         assert result.evidence == ["e1", "e2"]
 
 
@@ -564,7 +564,7 @@ class TestFromTarget:
             )
             result = await judge.evaluate_async(context=_make_ctx())
         assert result.outcome is EvalOutcome.DETECTED
-        assert result.confidence == 0.85
+        assert result.confidence == pytest.approx(0.85)  # pyright: ignore[reportUnknownMemberType]
 
     async def test_from_target_passes_persona_and_scope_async(self) -> None:
         custom_persona = Persona(

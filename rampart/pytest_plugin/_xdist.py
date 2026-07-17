@@ -51,6 +51,7 @@ if TYPE_CHECKING:
     from collections.abc import Callable
 
     import pytest
+    from _typeshed import ConvertibleToInt
 
     from rampart.pytest_plugin._session import RampartSession
 
@@ -148,6 +149,9 @@ def _size_limit(*, config: pytest.Config) -> int:
     Reads from the ``--rampart-xdist-max-bytes`` CLI option first, then
     the ``rampart_xdist_max_bytes`` ini option, then falls back to
     ``DEFAULT_SIZE_LIMIT_BYTES``.
+
+    Returns:
+        int: The resolved size cap in bytes.
     """
     raw: Any = config.getoption(SIZE_LIMIT_OPTION, default=None)
     if raw is None:
@@ -155,10 +159,11 @@ def _size_limit(*, config: pytest.Config) -> int:
             raw = config.getini(SIZE_LIMIT_OPTION)
         except (ValueError, KeyError):
             raw = None
-    if raw in (None, ""):
+    if raw in {None, ""}:
         return DEFAULT_SIZE_LIMIT_BYTES
     try:
-        parsed = int(raw)
+        # fallible cast, so catch TypeError/ValueError and log a warning
+        parsed = int(cast("ConvertibleToInt", raw))
     except (TypeError, ValueError):
         logger.warning(
             "Invalid %s=%r; falling back to default %d bytes.",
@@ -242,7 +247,11 @@ def _sanitize(  # noqa: PLR0911
 
 
 def _is_json_passthrough(value: Any) -> bool:  # noqa: ANN401
-    """True if a value would pass through ``_sanitize`` unchanged."""
+    """True if a value would pass through ``_sanitize`` unchanged.
+
+    Returns:
+        bool: True if ``value`` is JSON-safe as-is.
+    """
     if value is None or isinstance(value, str | bool):
         return True
     if isinstance(value, int):
@@ -293,17 +302,29 @@ def _sanitize_metadata(
 
 
 def _safe_float(*, value: float) -> float | None:
-    """Coerce non-finite floats to None for JSON safety."""
+    """Coerce non-finite floats to None for JSON safety.
+
+    Returns:
+        float | None: ``value`` when finite, else ``None``.
+    """
     return value if math.isfinite(value) else None
 
 
 def _isoformat(*, timestamp: datetime | None) -> str | None:
-    """Convert a datetime to ISO 8601 string, or None."""
+    """Convert a datetime to ISO 8601 string, or None.
+
+    Returns:
+        str | None: The ISO 8601 string, or ``None`` when ``timestamp`` is None.
+    """
     return timestamp.isoformat() if timestamp is not None else None
 
 
 def _serialize_eval_result(*, eval_result: EvalResult) -> dict[str, Any]:
-    """Serialize an EvalResult to a JSON-safe dict."""
+    """Serialize an EvalResult to a JSON-safe dict.
+
+    Returns:
+        dict[str, Any]: The JSON-safe representation.
+    """
     return {
         "outcome": eval_result.outcome.value,
         "confidence": _safe_float(value=eval_result.confidence),
@@ -313,7 +334,11 @@ def _serialize_eval_result(*, eval_result: EvalResult) -> dict[str, Any]:
 
 
 def _serialize_tool_call(*, tool_call: ToolCall, nodeid: str) -> dict[str, Any]:
-    """Serialize a ToolCall to a JSON-safe dict."""
+    """Serialize a ToolCall to a JSON-safe dict.
+
+    Returns:
+        dict[str, Any]: The JSON-safe representation.
+    """
     return {
         "name": tool_call.name,
         "arguments": _sanitize_metadata(
@@ -331,7 +356,11 @@ def _serialize_side_effect(
     side_effect: SideEffect,
     nodeid: str,
 ) -> dict[str, Any]:
-    """Serialize a SideEffect to a JSON-safe dict."""
+    """Serialize a SideEffect to a JSON-safe dict.
+
+    Returns:
+        dict[str, Any]: The JSON-safe representation.
+    """
     return {
         "kind": side_effect.kind,
         "details": _sanitize_metadata(
@@ -347,6 +376,9 @@ def _serialize_payload(*, payload: Payload, nodeid: str) -> dict[str, Any]:
 
     The artifact path (if any) is converted to a string for display
     only; the controller never accesses worker-local files.
+
+    Returns:
+        dict[str, Any]: The JSON-safe representation.
     """
     return {
         "content": payload.content,
@@ -362,7 +394,11 @@ def _serialize_payload(*, payload: Payload, nodeid: str) -> dict[str, Any]:
 
 
 def _serialize_request(*, request: Request, nodeid: str) -> dict[str, Any]:
-    """Serialize a Request to a JSON-safe dict."""
+    """Serialize a Request to a JSON-safe dict.
+
+    Returns:
+        dict[str, Any]: The JSON-safe representation.
+    """
     return {
         "prompt": request.prompt,
         "attachments": [
@@ -372,7 +408,11 @@ def _serialize_request(*, request: Request, nodeid: str) -> dict[str, Any]:
 
 
 def _serialize_response(*, response: Response, nodeid: str) -> dict[str, Any]:
-    """Serialize a Response to a JSON-safe dict."""
+    """Serialize a Response to a JSON-safe dict.
+
+    Returns:
+        dict[str, Any]: The JSON-safe representation.
+    """
     return {
         "text": response.text,
         "tool_calls": [
@@ -392,7 +432,11 @@ def _serialize_response(*, response: Response, nodeid: str) -> dict[str, Any]:
 
 
 def _serialize_turn(*, turn: Turn, nodeid: str) -> dict[str, Any]:
-    """Serialize a Turn to a JSON-safe dict."""
+    """Serialize a Turn to a JSON-safe dict.
+
+    Returns:
+        dict[str, Any]: The JSON-safe representation.
+    """
     return {
         "request": _serialize_request(request=turn.request, nodeid=nodeid),
         "response": _serialize_response(response=turn.response, nodeid=nodeid),
@@ -408,7 +452,11 @@ def _serialize_turn(*, turn: Turn, nodeid: str) -> dict[str, Any]:
 
 
 def _serialize_injection_record(*, injection: InjectionRecord) -> dict[str, Any]:
-    """Serialize an InjectionRecord to a JSON-safe dict."""
+    """Serialize an InjectionRecord to a JSON-safe dict.
+
+    Returns:
+        dict[str, Any]: The JSON-safe representation.
+    """
     return {
         "payload_id": injection.payload_id,
         "surface_name": injection.surface_name,
@@ -424,6 +472,9 @@ def _serialize_result(*, result: Result, nodeid: str) -> dict[str, Any]:
     ``JsonFileReportSink._serialize_result``. The two projections are
     deliberately separate (different fields, sanitization, and size
     handling) and must not be naively merged into one serializer.
+
+    Returns:
+        dict[str, Any]: The full-fidelity JSON-safe representation.
     """
     return {
         "safe": result.safe,
@@ -482,7 +533,15 @@ def serialize_worker_data(*, session: RampartSession) -> dict[str, Any]:
 
 
 def _validate_schema(*, data: object) -> dict[str, Any]:
-    """Validate that ``data`` is a worker payload of the expected schema."""
+    """Validate that ``data`` is a worker payload of the expected schema.
+
+    Returns:
+        dict[str, Any]: The validated payload as a typed dict.
+
+    Raises:
+        SchemaVersionError: If the ``schema`` key is missing or unknown.
+        WorkerOutputError: If ``data`` is not a dict.
+    """
     if not isinstance(data, dict):
         msg = f"Expected dict worker payload, got {type(data).__name__}."
         raise WorkerOutputError(msg)
@@ -502,7 +561,14 @@ def _validate_schema(*, data: object) -> dict[str, Any]:
 
 
 def _deserialize_safety_status(*, value: object) -> SafetyStatus:
-    """Deserialize a SafetyStatus enum value."""
+    """Deserialize a SafetyStatus enum value.
+
+    Returns:
+        SafetyStatus: The deserialized enum member.
+
+    Raises:
+        WorkerOutputError: If ``value`` is not a valid SafetyStatus.
+    """
     if not isinstance(value, str):
         msg = f"Expected string for SafetyStatus, got {type(value).__name__}."
         raise WorkerOutputError(msg)
@@ -514,7 +580,14 @@ def _deserialize_safety_status(*, value: object) -> SafetyStatus:
 
 
 def _deserialize_observability_level(*, value: object) -> ObservabilityLevel:
-    """Deserialize an ObservabilityLevel enum value."""
+    """Deserialize an ObservabilityLevel enum value.
+
+    Returns:
+        ObservabilityLevel: The deserialized enum member.
+
+    Raises:
+        WorkerOutputError: If ``value`` is not a valid ObservabilityLevel.
+    """
     if not isinstance(value, str):
         msg = f"Expected string for ObservabilityLevel, got {type(value).__name__}."
         raise WorkerOutputError(msg)
@@ -526,7 +599,14 @@ def _deserialize_observability_level(*, value: object) -> ObservabilityLevel:
 
 
 def _deserialize_eval_outcome(*, value: object) -> EvalOutcome:
-    """Deserialize an EvalOutcome enum value."""
+    """Deserialize an EvalOutcome enum value.
+
+    Returns:
+        EvalOutcome: The deserialized enum member.
+
+    Raises:
+        WorkerOutputError: If ``value`` is not a valid EvalOutcome.
+    """
     if not isinstance(value, str):
         msg = f"Expected string for EvalOutcome, got {type(value).__name__}."
         raise WorkerOutputError(msg)
@@ -538,7 +618,14 @@ def _deserialize_eval_outcome(*, value: object) -> EvalOutcome:
 
 
 def _deserialize_harm_category(*, value: object) -> HarmCategory | str | None:
-    """Deserialize a HarmCategory enum value, plain string, or None."""
+    """Deserialize a HarmCategory enum value, plain string, or None.
+
+    Returns:
+        HarmCategory | str | None: The category, raw string, or None.
+
+    Raises:
+        WorkerOutputError: If ``value`` is neither a string nor None.
+    """
     if value is None:
         return None
     if not isinstance(value, str):
@@ -551,7 +638,14 @@ def _deserialize_harm_category(*, value: object) -> HarmCategory | str | None:
 
 
 def _deserialize_datetime(*, value: object) -> datetime | None:
-    """Deserialize an ISO 8601 datetime string, or None."""
+    """Deserialize an ISO 8601 datetime string, or None.
+
+    Returns:
+        datetime | None: The parsed datetime, or None.
+
+    Raises:
+        WorkerOutputError: If ``value`` is not a valid ISO 8601 string.
+    """
     if value is None:
         return None
     if not isinstance(value, str):
@@ -565,7 +659,14 @@ def _deserialize_datetime(*, value: object) -> datetime | None:
 
 
 def _deserialize_eval_result(*, data: object) -> EvalResult | None:
-    """Deserialize an EvalResult, or None when input is None."""
+    """Deserialize an EvalResult, or None when input is None.
+
+    Returns:
+        EvalResult | None: The deserialized result, or None.
+
+    Raises:
+        WorkerOutputError: If ``data`` is not a dict.
+    """
     if data is None:
         return None
     if not isinstance(data, dict):
@@ -593,7 +694,14 @@ def _deserialize_eval_result(*, data: object) -> EvalResult | None:
 
 
 def _deserialize_tool_call(*, data: object) -> ToolCall:
-    """Deserialize a ToolCall."""
+    """Deserialize a ToolCall.
+
+    Returns:
+        ToolCall: The deserialized tool call.
+
+    Raises:
+        WorkerOutputError: If ``data`` is not a dict.
+    """
     if not isinstance(data, dict):
         msg = f"Expected dict for ToolCall, got {type(data).__name__}."
         raise WorkerOutputError(msg)
@@ -613,7 +721,14 @@ def _deserialize_tool_call(*, data: object) -> ToolCall:
 
 
 def _deserialize_side_effect(*, data: object) -> SideEffect:
-    """Deserialize a SideEffect."""
+    """Deserialize a SideEffect.
+
+    Returns:
+        SideEffect: The deserialized side effect.
+
+    Raises:
+        WorkerOutputError: If ``data`` is not a dict.
+    """
     if not isinstance(data, dict):
         msg = f"Expected dict for SideEffect, got {type(data).__name__}."
         raise WorkerOutputError(msg)
@@ -636,6 +751,12 @@ def _deserialize_payload(*, data: object) -> Payload:
     payloads always use ``format=TEXT`` and ``artifact=None``; the
     original format and artifact path are preserved under namespaced
     keys in metadata for debugging.
+
+    Returns:
+        Payload: The deserialized payload.
+
+    Raises:
+        WorkerOutputError: If ``data`` is not a dict.
     """
     if not isinstance(data, dict):
         msg = f"Expected dict for Payload, got {type(data).__name__}."
@@ -666,7 +787,14 @@ def _deserialize_payload(*, data: object) -> Payload:
 
 
 def _deserialize_request(*, data: object) -> Request:
-    """Deserialize a Request, providing a fallback prompt when empty."""
+    """Deserialize a Request, providing a fallback prompt when empty.
+
+    Returns:
+        Request: The deserialized request.
+
+    Raises:
+        WorkerOutputError: If ``data`` is not a dict.
+    """
     if not isinstance(data, dict):
         msg = f"Expected dict for Request, got {type(data).__name__}."
         raise WorkerOutputError(msg)
@@ -689,7 +817,14 @@ def _deserialize_request(*, data: object) -> Request:
 
 
 def _deserialize_response(*, data: object) -> Response:
-    """Deserialize a Response."""
+    """Deserialize a Response.
+
+    Returns:
+        Response: The deserialized response.
+
+    Raises:
+        WorkerOutputError: If ``data`` is not a dict.
+    """
     if not isinstance(data, dict):
         msg = f"Expected dict for Response, got {type(data).__name__}."
         raise WorkerOutputError(msg)
@@ -716,7 +851,14 @@ def _deserialize_response(*, data: object) -> Response:
 
 
 def _deserialize_turn(*, data: object) -> Turn:
-    """Deserialize a Turn."""
+    """Deserialize a Turn.
+
+    Returns:
+        Turn: The deserialized turn.
+
+    Raises:
+        WorkerOutputError: If ``data`` is not a dict.
+    """
     if not isinstance(data, dict):
         msg = f"Expected dict for Turn, got {type(data).__name__}."
         raise WorkerOutputError(msg)
@@ -733,7 +875,14 @@ def _deserialize_turn(*, data: object) -> Turn:
 
 
 def _deserialize_injection_record(*, data: object) -> InjectionRecord:
-    """Deserialize an InjectionRecord."""
+    """Deserialize an InjectionRecord.
+
+    Returns:
+        InjectionRecord: The deserialized injection record.
+
+    Raises:
+        WorkerOutputError: If ``data`` is not a dict.
+    """
     if not isinstance(data, dict):
         msg = f"Expected dict for InjectionRecord, got {type(data).__name__}."
         raise WorkerOutputError(msg)
@@ -746,7 +895,14 @@ def _deserialize_injection_record(*, data: object) -> InjectionRecord:
 
 
 def _deserialize_result(*, data: object) -> Result:
-    """Deserialize a Result."""
+    """Deserialize a Result.
+
+    Returns:
+        Result: The deserialized result.
+
+    Raises:
+        WorkerOutputError: If ``data`` is not a dict.
+    """
     if not isinstance(data, dict):
         msg = f"Expected dict for Result, got {type(data).__name__}."
         raise WorkerOutputError(msg)
@@ -1162,8 +1318,12 @@ def _resolve_sink_candidate(
     pointing at the ``pytest_rampart_sinks`` hook, which works identically
     on the controller and in every worker.
 
-    Returns None on failure (logged) so the caller can continue
-    scanning other plugins.
+    Returns:
+        None on failure (logged) so the caller can continue scanning other plugins.
+
+    Raises:
+        KeyboardInterrupt: If the function is interrupted by the user.
+        SystemExit: If the function attempts to exit the program.
     """
     import inspect  # noqa: PLC0415
 

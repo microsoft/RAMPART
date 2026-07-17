@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import ast
 import importlib.util
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -113,8 +114,8 @@ class TestMetadataForwarding:
         )
 
         kwargs = mock_cls.call_args.kwargs
-        assert kwargs["temperature"] == 0.7
-        assert kwargs["top_p"] == 0.9
+        assert kwargs["temperature"] == pytest.approx(0.7)
+        assert kwargs["top_p"] == pytest.approx(0.9)
 
     @patch("rampart.pyrit_bridge.llm_bridge.OpenAIChatTarget")
     def test_all_recognised_params_forwarded(self, mock_cls: MagicMock) -> None:
@@ -156,7 +157,7 @@ class TestMetadataForwarding:
 
         kwargs = mock_cls.call_args.kwargs
         assert "custom_key" not in kwargs
-        assert kwargs["temperature"] == 0.5
+        assert kwargs["temperature"] == pytest.approx(0.5)
 
     @patch("rampart.pyrit_bridge.llm_bridge.OpenAIChatTarget")
     def test_empty_metadata_adds_no_extra_kwargs(self, mock_cls: MagicMock) -> None:
@@ -253,8 +254,8 @@ def _module_imports_pyrit(module_name: str) -> list[str]:
         f"Cannot locate source for {module_name}"
     )
 
-    with open(spec.origin) as f:
-        tree = ast.parse(f.read(), filename=spec.origin)
+    source = Path(spec.origin).read_text(encoding="utf-8")
+    tree = ast.parse(source, filename=spec.origin)
 
     violations: list[str] = []
     for node in ast.walk(tree):

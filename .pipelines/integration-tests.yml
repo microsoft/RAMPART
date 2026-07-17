@@ -1,0 +1,35 @@
+# RAMPART core integration tests — PR entrypoint.
+#
+# Lives in microsoft/RAMPART so the Azure Pipelines GitHub App can
+# trigger on PRs to main. All real logic lives in RAMPART-Internal so
+# it can be edited without a public-repo PR; this file is a thin
+# extends-only shim.
+#
+# Fork-PR semantics (configured in the ADO pipeline UI, not here):
+#   - In-repo branch PR  → auto-runs (secrets available).
+#   - Maintainer fork PR → auto-runs (secrets available).
+#   - External fork PR   → waits for `/azp run` comment from a
+#                          write-access user, per
+#                          "Require a team member's comment" setting.
+#
+# Blast radius if a malicious fork PR slips past `/azp run`: the
+# integration MI holds only `Cognitive Services OpenAI User` on a
+# single AOAI account. No KV access, no other Azure resources.
+
+trigger: none
+
+pr:
+  branches:
+    include:
+      - main
+
+resources:
+  repositories:
+    - repository: internal
+      type: git
+      name: RAMPART-Internal
+      ref: refs/heads/main
+
+extends:
+  template: pipelines/templates/integration-tests.yml@internal
+  # rampartAlias defaults to 'self' — self IS RAMPART on this entrypoint.

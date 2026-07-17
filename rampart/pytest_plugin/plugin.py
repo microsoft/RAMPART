@@ -131,14 +131,10 @@ def _resolve_trial_n(marker: pytest.Mark) -> int:
 
     if not isinstance(raw, int) or isinstance(raw, bool):
         msg = f"trial(n=) must be an integer, got {type(raw).__name__}: {raw!r}"
-        raise pytest.UsageError(
-            msg,
-        )
+        raise pytest.UsageError(msg)
     if raw < 1:
         msg = f"trial(n=) must be >= 1, got {raw}"
-        raise pytest.UsageError(
-            msg,
-        )
+        raise pytest.UsageError(msg)
     return raw
 
 
@@ -251,7 +247,7 @@ def _copy_markers_to_clone(*, source: pytest.Item, clone: pytest.Item) -> None:
         if marker.name == "trial":
             continue
         clone.add_marker(
-            pytest.mark.__getattr__(marker.name)(*marker.args, **marker.kwargs),
+            getattr(pytest.mark, marker.name)(*marker.args, **marker.kwargs),
         )
 
 
@@ -274,6 +270,10 @@ def _create_trial_clones(
 
     Returns:
         list[pytest.Item]: The cloned trial items with trial metadata.
+
+    Raises:
+        pytest.UsageError: If the original item has no parent (cannot be
+            cloned in isolation).
     """
     original_name: str = getattr(item, "originalname", item.name)
     display_name = item.name
@@ -282,9 +282,7 @@ def _create_trial_clones(
     fixtureinfo = getattr(item, "_fixtureinfo", None)
     if parent is None:
         msg = f"Cannot clone trial item with no parent: {item.nodeid}"
-        raise pytest.UsageError(
-            msg,
-        )
+        raise pytest.UsageError(msg)
     clones: list[pytest.Item] = []
 
     for i in range(count):
@@ -408,7 +406,7 @@ def _absorb_results(
     """
     try:
         rampart_session.absorb(node=node, collector=collector)
-    except Exception:  # noqa: BLE001  — plugin must not break test runs
+    except Exception:
         logger.warning(
             "Failed to absorb results for %s — results may be incomplete.",
             node.nodeid,
@@ -799,7 +797,7 @@ async def _emit_sinks_async(*, rampart_session: RampartSession) -> None:
     for sink in rampart_session.sinks:
         try:
             await sink.emit_async(report=report)
-        except Exception:  # noqa: BLE001  — sink errors must not break teardown
+        except Exception:
             logger.warning(
                 "Sink %s.emit_async failed — report may not be persisted.",
                 type(sink).__name__,

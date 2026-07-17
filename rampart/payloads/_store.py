@@ -141,9 +141,7 @@ class PayloadStore:
                 f"at {payloads_path.parent}/. Run payload generation "
                 f"first (conftest.py fixture or CLI)."
             )
-            raise FileNotFoundError(
-                msg,
-            )
+            raise FileNotFoundError(msg)
 
         payloads: list[Payload] = []
         with payloads_path.open("r", encoding="utf-8") as f:
@@ -161,11 +159,22 @@ class PayloadStore:
         return payloads
 
     def exists(self, name: str) -> bool:
-        """Check whether a collection exists on disk."""
+        """Check whether a collection exists on disk.
+
+        Returns:
+            bool: True if the collection directory and its
+                ``payloads.jsonl`` file both exist.
+        """
         return self._collection_path(name).exists()
 
     def list_collections(self) -> list[str]:
-        """List all collection names on disk."""
+        """List all collection names on disk.
+
+        Returns:
+            list[str]: Sorted collection names (directories under the
+                store root that contain a ``payloads.jsonl``). Empty
+                list if the root does not exist.
+        """
         if not self._root.exists():
             return []
         return sorted(
@@ -196,20 +205,21 @@ class PayloadStore:
         path = self._root / name / "manifest.json"
         if not path.exists():
             msg = f"No manifest for collection '{name}'"
-            raise FileNotFoundError(
-                msg,
-            )
+            raise FileNotFoundError(msg)
         with path.open("r", encoding="utf-8") as f:
             return json.load(f)
 
     @staticmethod
     def _validate_collection_name(name: str) -> None:
-        """Reject names that would escape the store root."""
-        if not name or "/" in name or "\\" in name or name in (".", ".."):
+        """Reject names that would escape the store root.
+
+        Raises:
+            ValueError: If the name is empty, contains path separators,
+                or is a relative-path component (``.`` / ``..``).
+        """
+        if not name or "/" in name or "\\" in name or name in {".", ".."}:
             msg = f"Invalid collection name: {name!r}. Must be a simple directory name."
-            raise ValueError(
-                msg,
-            )
+            raise ValueError(msg)
 
     def _collection_path(self, name: str) -> Path:
         """Return the payloads.jsonl path for a collection."""
@@ -232,8 +242,8 @@ class PayloadStore:
                 )
                 f.write(json.dumps(record) + "\n")
 
+    @staticmethod
     def _write_manifest(
-        self,
         directory: Path,
         *,
         collection: str,

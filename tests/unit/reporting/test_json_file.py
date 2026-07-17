@@ -9,6 +9,8 @@ import json
 from pathlib import Path
 from typing import Any
 
+import pytest
+
 from rampart.core.result import HarmCategory, Result, SafetyStatus
 from rampart.core.types import (
     EvalOutcome,
@@ -163,7 +165,7 @@ class TestSerializeResult:
 
         turn_data = data["turns"][0]
         assert turn_data["eval_outcome"] == "detected"
-        assert turn_data["eval_confidence"] == 0.95
+        assert turn_data["eval_confidence"] == pytest.approx(0.95)
         assert turn_data["eval_rationale"] == "found secret"
 
     def test_turns_omit_eval_result_when_none(self) -> None:

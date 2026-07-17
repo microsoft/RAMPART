@@ -211,7 +211,12 @@ class XPIAExecution(BaseExecution):
         )
 
     def _build_injection_records(self) -> list[InjectionRecord]:
-        """Build injection records from handles for the Result."""
+        """Build injection records from handles for the Result.
+
+        Returns:
+            list[InjectionRecord]: One record per handle, populated with
+                ``payload_id`` and ``surface_name``.
+        """
         return [
             InjectionRecord(
                 payload_id=h.payload_id,
@@ -220,8 +225,8 @@ class XPIAExecution(BaseExecution):
             for h in self._handles
         ]
 
+    @staticmethod
     def _adjust_for_observability(
-        self,
         *,
         adapter: AgentAdapter,
         turns: list[Turn],

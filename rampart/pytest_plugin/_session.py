@@ -173,9 +173,7 @@ class RampartSession:
                     "Sinks must implement: "
                     "async def emit_async(*, report: TestRunReport) -> None"
                 )
-                raise TypeError(
-                    msg,
-                )
+                raise TypeError(msg)
             self._sinks.append(sink)
 
     def set_duration(self, *, duration_seconds: float) -> None:

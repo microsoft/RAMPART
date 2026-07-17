@@ -85,8 +85,8 @@ class PayloadGenerator:
         results = await asyncio.gather(*tasks)
         return [r.strip() for r in results]
 
+    @staticmethod
     def _build_user_message(
-        self,
         *,
         template: PayloadTemplate,
         manifest: AppManifest | None,

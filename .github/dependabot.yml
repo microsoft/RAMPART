@@ -24,6 +24,10 @@ updates:
     commit-message:
       prefix: "[MAINT]"
     groups:
+      minor-and-patch:
+        update-types:
+          - minor
+          - patch
       security-minor-and-patch:
         applies-to: security-updates
         update-types:
@@ -37,6 +41,10 @@ updates:
     commit-message:
       prefix: "[MAINT]"
     groups:
+      minor-and-patch:
+        update-types:
+          - minor
+          - patch
       security-minor-and-patch:
         applies-to: security-updates
         update-types:

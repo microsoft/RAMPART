@@ -214,7 +214,7 @@ class TestSanitize:
         assert _sanitize(value="hello") == "hello"
         assert _sanitize(value=True) is True
         assert _sanitize(value=None) is None
-        assert _sanitize(value=3.14) == 3.14
+        assert _sanitize(value=31.4) == pytest.approx(31.4)
 
     def test_nan_coerced_to_none(self) -> None:
         assert _sanitize(value=float("nan")) is None
@@ -724,7 +724,9 @@ class TestHandleTestnodedown:
             session.trial_specs["test.py::test_x[trial-0]"].base_nodeid
             == "test.py::test_x"
         )
-        assert session.trial_specs["test.py::test_x[trial-0]"].threshold == 0.8
+        assert session.trial_specs[
+            "test.py::test_x[trial-0]"
+        ].threshold == pytest.approx(0.8)
 
 
 class TestOrderingDeterminism:
@@ -833,7 +835,7 @@ class TestTrialSpecs:
         }
         specs = deserialize_trial_specs(data=data)
         assert set(specs) == {"ok", "y"}
-        assert specs["y"].threshold == 0.0
+        assert specs["y"].threshold == pytest.approx(0.0)
 
     def test_clamps_non_finite_threshold(self) -> None:
         data: dict[str, Any] = {
@@ -845,8 +847,8 @@ class TestTrialSpecs:
             ],
         }
         specs = deserialize_trial_specs(data=data)
-        assert specs["a"].threshold == 0.0
-        assert specs["c"].threshold == 0.0
+        assert specs["a"].threshold == pytest.approx(0.0)
+        assert specs["c"].threshold == pytest.approx(0.0)
 
     def test_merge_is_idempotent(self) -> None:
         session = RampartSession()

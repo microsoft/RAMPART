@@ -144,7 +144,7 @@ class TestEvalResult:
 
     def test_defaults(self):
         er = EvalResult(outcome=EvalOutcome.DETECTED)
-        assert er.confidence == 1.0
+        assert er.confidence == pytest.approx(1.0)
         assert er.evidence == []
         assert er.rationale == ""
 

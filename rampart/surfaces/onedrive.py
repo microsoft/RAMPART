@@ -101,11 +101,14 @@ class OneDriveSurface:
         return _OneDriveInjection(surface=self, payload=payload)
 
     async def upload_async(self, *, payload: Payload) -> str:
-        """Upload payload content to OneDrive. Returns the item ID.
+        """Upload payload content to OneDrive.
 
         Uses the small-file upload endpoint
         (``PUT .../root:/{path}:/content``), which supports files
         up to 4 MiB.
+
+        Returns:
+            str: The Graph ``DriveItem`` id of the uploaded file.
 
         Raises:
             ValueError: If a binary payload has no artifact path, or
@@ -121,9 +124,7 @@ class OneDriveSurface:
                     f"Binary payload format {payload.format.value} "
                     "requires an artifact path."
                 )
-                raise ValueError(
-                    msg,
-                )
+                raise ValueError(msg)
 
             content = payload.artifact.read_bytes()
         else:
@@ -135,9 +136,7 @@ class OneDriveSurface:
                 "exceeds the 4 MiB small-upload limit. Upload sessions "
                 "are not yet implemented."
             )
-            raise ValueError(
-                msg,
-            )
+            raise ValueError(msg)
 
         # Graph path-based addressing: root:/{relative-path}:
         # The trailing colon is required by the API.
@@ -152,9 +151,7 @@ class OneDriveSurface:
                 "Graph API returned no DriveItem after upload to "
                 f"drive={self.drive_id} path={upload_path}"
             )
-            raise InfrastructureError(
-                msg,
-            )
+            raise InfrastructureError(msg)
 
         item_id: str = drive_item.id
         logger.info(
@@ -208,7 +205,16 @@ class _OneDriveInjection:
         await sleep_until_ready(delay=self._surface.indexing_delay)
 
     async def __aenter__(self) -> Self:
-        """Upload payload to OneDrive. Raises InfrastructureError on failure."""
+        """Upload payload to OneDrive.
+
+        Returns:
+            Self: This injection handle, with ``_item_id`` populated
+                from the upload, ready for use inside ``async with``.
+
+        Raises:
+            InfrastructureError: If the Graph API upload fails for any
+                reason (wraps the underlying exception).
+        """
         try:
             self._item_id = await self._surface.upload_async(
                 payload=self._payload,
@@ -220,9 +226,7 @@ class _OneDriveInjection:
                 f"OneDrive upload failed for drive={self._surface.drive_id} "
                 f"path={self._surface.folder_path}: {exc}"
             )
-            raise InfrastructureError(
-                msg,
-            ) from exc
+            raise InfrastructureError(msg) from exc
         return self
 
     async def __aexit__(
@@ -235,7 +239,7 @@ class _OneDriveInjection:
         if self._item_id is not None:
             try:
                 await self._surface.delete_async(item_id=self._item_id)
-            except Exception:  # noqa: BLE001  — cleanup must not raise
+            except Exception:
                 logger.warning(
                     "OneDrive cleanup failed for item %s in drive=%s",
                     self._item_id,

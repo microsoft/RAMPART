@@ -10,22 +10,20 @@ their agent to the RAMPART framework.
 from __future__ import annotations
 
 from contextlib import AbstractAsyncContextManager
-from typing import TYPE_CHECKING, Protocol, Self, runtime_checkable
+from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 if TYPE_CHECKING:
-    import types
-
     from rampart.core.manifest import AppManifest
     from rampart.core.types import ObservabilityLevel, Request, Response
 
 
 @runtime_checkable
-class Session(AbstractAsyncContextManager["Session"], Protocol):
+class Session(AbstractAsyncContextManager["Session", None], Protocol):
     """A bounded unit of interaction with the agent.
 
     Sessions are async context managers. Entering returns the session
-    ready for use; exiting guarantees cleanup of any resources the
-    adapter holds (API clients, browser contexts, temporary state).
+    ready for use; exiting guarantees idempotent cleanup of any resources
+    the adapter holds (API clients, browser contexts, temporary state).
 
     Fresh state = fresh session. Create a new one via the adapter.
     """
@@ -44,20 +42,6 @@ class Session(AbstractAsyncContextManager["Session"], Protocol):
         Returns:
             Response: The agent's response with all observable data.
         """
-        ...
-
-    async def __aenter__(self) -> Self:
-        """Enter the session context. Returns self."""
-        ...
-
-    async def __aexit__(
-        self,
-        exc_type: type[BaseException] | None,
-        exc_value: BaseException | None,
-        traceback: types.TracebackType | None,
-        /,
-    ) -> None:
-        """Clean up session resources. Must be idempotent."""
         ...
 
 
