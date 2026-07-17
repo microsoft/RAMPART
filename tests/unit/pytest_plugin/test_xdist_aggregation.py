@@ -144,6 +144,13 @@ class TestXdistConsolidation:
         self,
         configured_pytester: Pytester,
     ) -> None:
+        """A distributed run merges into one report with full population stats.
+
+        A single ``-n 2`` run proves both that xdist yields exactly one
+        consolidated report and that the merged population statistics reflect
+        the entire set (per-field aggregation itself is unit-tested in
+        ``tests/unit/reporting/test_report.py::TestPopulationSummary``).
+        """
         _setup_simple_tests(configured_pytester)
         result = configured_pytester.runpytest(
             "-p",
@@ -157,15 +164,6 @@ class TestXdistConsolidation:
             f"Expected exactly one report under xdist, got {len(reports)}: "
             f"{[r.get('total_runs') for r in reports]}"
         )
-
-    def test_population_statistics_over_full_set(
-        self,
-        configured_pytester: Pytester,
-    ) -> None:
-        _setup_simple_tests(configured_pytester)
-        configured_pytester.runpytest("-p", "no:cacheprovider", "-n", "2")
-        reports = _load_reports(configured_pytester)
-        assert len(reports) == 1
         report = reports[0]
         assert report["total_runs"] == 4
         assert report["passed"] == 3
@@ -242,67 +240,6 @@ class TestXdistTrialAggregation:
         assert len(reports) == 1
         assert reports[0]["total_runs"] == 4
 
-    def test_trial_group_fails_when_any_unsafe_under_loadgroup(
-        self,
-        configured_pytester: Pytester,
-    ) -> None:
-        """An UNSAFE trial fails the whole group regardless of pass rate.
-
-        Trial body switches on the clone name (``[trial-0]``..``[trial-3]``)
-        so the same outcome distribution is produced regardless of which
-        worker executes the clone. Three trials are SAFE and one is UNSAFE;
-        with threshold=0.5 the group would otherwise pass on rate alone,
-        so the only way the group can FAIL is if controller-side
-        aggregation correctly merged the worker results.
-        """
-        configured_pytester.makepyfile(
-            test_trial_mixed="""
-            import pytest
-            from rampart import record_result
-            from rampart.core.result import Result, SafetyStatus
-            from rampart.core.types import ObservabilityLevel
-
-            @pytest.mark.harm("test")
-            @pytest.mark.trial(n=4, threshold=0.5)
-            def test_trial_mixed(request):
-                # Trial-3 is UNSAFE; the rest are SAFE. With threshold=0.5
-                # the group MUST FAIL on the unconditional unsafe rule.
-                unsafe = request.node.name.endswith("[trial-3]")
-                record_result(Result(
-                    safe=not unsafe,
-                    status=SafetyStatus.UNSAFE if unsafe else SafetyStatus.SAFE,
-                    summary="u" if unsafe else "s",
-                    observability_level=ObservabilityLevel.RESPONSE_ONLY,
-                ))
-            """,
-        )
-        result = configured_pytester.runpytest(
-            "-p",
-            "no:cacheprovider",
-            "-n",
-            "2",
-            "--dist",
-            "loadgroup",
-        )
-        # All 4 clones pass at the pytest item level — record_result
-        # does not fail the test; it only records a Result.
-        result.assert_outcomes(passed=4)
-        reports = _load_reports(configured_pytester)
-        assert len(reports) == 1
-        report = reports[0]
-        assert report["total_runs"] == 4
-        assert report["passed"] == 3
-        assert report["failed"] == 1
-        # The trial-group FAIL line proves the controller correctly
-        # aggregated worker results. The bracketed stats uniquely
-        # identify the group line (the per-clone lines lack them).
-        summary = "\n".join(result.outlines)
-        assert "RAMPART Safety Summary" in summary
-        assert (
-            "FAIL  test_trial_mixed [3/4 safe, 75% pass rate, threshold: 50%]"
-            in summary
-        )
-
     def test_trial_group_fails_when_any_unsafe_under_load(
         self,
         configured_pytester: Pytester,
@@ -352,89 +289,6 @@ class TestXdistTrialAggregation:
             "FAIL  test_trial_mixed_load [3/4 safe, 75% pass rate, threshold: 50%]"
             in summary
         )
-
-    def test_trial_group_fails_below_threshold_under_loadgroup(
-        self,
-        configured_pytester: Pytester,
-    ) -> None:
-        """No UNSAFE results, but pass rate below threshold => FAIL.
-
-        2 SAFE + 2 UNDETERMINED trials, threshold=0.75. Pass rate is 0.5
-        so the group must FAIL on the threshold rule (not the unsafe rule).
-        """
-        configured_pytester.makepyfile(
-            test_trial_threshold="""
-            import pytest
-            from rampart import record_result
-            from rampart.core.result import Result, SafetyStatus
-            from rampart.core.types import ObservabilityLevel
-
-            @pytest.mark.harm("test")
-            @pytest.mark.trial(n=4, threshold=0.75)
-            def test_trial_threshold(request):
-                undetermined = request.node.name.endswith(
-                    ("[trial-2]", "[trial-3]"),
-                )
-                record_result(Result(
-                    safe=True,
-                    status=(
-                        SafetyStatus.UNDETERMINED
-                        if undetermined else SafetyStatus.SAFE
-                    ),
-                    summary="t",
-                    observability_level=ObservabilityLevel.RESPONSE_ONLY,
-                ))
-            """,
-        )
-        result = configured_pytester.runpytest(
-            "-p",
-            "no:cacheprovider",
-            "-n",
-            "2",
-            "--dist",
-            "loadgroup",
-        )
-        # All 4 clones pass as pytest tests (record_result(safe=True)),
-        # but the trial GROUP should fail on threshold.
-        result.assert_outcomes(passed=4)
-        summary = "\n".join(result.outlines)
-        assert "FAIL  test_trial_threshold" in summary
-        assert "50% pass rate" in summary
-        assert "threshold: 75%" in summary
-
-    def test_trial_group_passes_when_all_safe_under_loadgroup(
-        self,
-        configured_pytester: Pytester,
-    ) -> None:
-        """All-SAFE trial group with achievable threshold => PASS verdict."""
-        configured_pytester.makepyfile(
-            test_trial_all_safe="""
-            import pytest
-            from rampart import record_result
-            from rampart.core.result import Result, SafetyStatus
-            from rampart.core.types import ObservabilityLevel
-
-            @pytest.mark.harm("test")
-            @pytest.mark.trial(n=3, threshold=0.5)
-            def test_trial_all_safe():
-                record_result(Result(
-                    safe=True, status=SafetyStatus.SAFE, summary="ok",
-                    observability_level=ObservabilityLevel.RESPONSE_ONLY,
-                ))
-            """,
-        )
-        result = configured_pytester.runpytest(
-            "-p",
-            "no:cacheprovider",
-            "-n",
-            "2",
-            "--dist",
-            "loadgroup",
-        )
-        result.assert_outcomes(passed=3)
-        summary = "\n".join(result.outlines)
-        assert "PASS  test_trial_all_safe" in summary
-        assert "PASSED" in summary
 
 
 class TestXdistMetadata:
