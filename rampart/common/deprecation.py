@@ -26,9 +26,6 @@ def emit_deprecation_warning(
         new_item (type | Callable[..., Any] | str): The replacement class,
             function, or its string name.
         removed_in (str): The release in which ``old_item`` will be removed.
-
-    Returns:
-        None
     """
     old_name = _qualified_name(item=old_item)
     new_name = _qualified_name(item=new_item)
