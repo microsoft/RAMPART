@@ -68,6 +68,30 @@ def test_payload_store_rejects_deserialized_artifact_symlink_escape(
         store.load("collection")
 
 
+def test_payload_store_rejects_deserialized_artifacts_directory_symlink_escape(
+    tmp_path: Path,
+) -> None:
+    """The collection artifacts directory cannot resolve outside the collection."""
+    collection_dir = tmp_path / "store" / "collection"
+    collection_dir.mkdir(parents=True)
+    outside_dir = tmp_path / "outside"
+    outside_dir.mkdir()
+    (outside_dir / "linked.pdf").write_bytes(b"outside")
+    try:
+        (collection_dir / "artifacts").symlink_to(
+            outside_dir,
+            target_is_directory=True,
+        )
+    except OSError as exc:
+        pytest.skip(f"symlinks are not available on this platform: {exc}")
+
+    _write_collection_record(collection_dir, "artifacts/linked.pdf")
+
+    store = PayloadStore(root=tmp_path / "store")
+    with pytest.raises(ValueError, match=r"artifacts directory.*escapes"):
+        store.load("collection")
+
+
 def test_payload_store_rejects_missing_deserialized_artifact(
     tmp_path: Path,
 ) -> None:

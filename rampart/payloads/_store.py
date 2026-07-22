@@ -354,16 +354,22 @@ class PayloadStore:
             raise ValueError(msg)
         try:
             artifact_relative = artifact_path.relative_to("artifacts")
-        except ValueError:
-            raise ValueError(msg)  # noqa: B904 - preserve the exception chain
+        except ValueError as exc:
+            raise ValueError(msg) from exc
 
         if not artifact_relative.parts:
             raise ValueError(msg)
 
+        artifacts_dir = collection_dir / "artifacts"
+        PayloadStore._ensure_within_directory(
+            path=artifacts_dir,
+            directory=collection_dir,
+            description="artifacts directory",
+        )
         resolved = collection_dir / artifact_path
         PayloadStore._ensure_within_directory(
             path=resolved,
-            directory=collection_dir / "artifacts",
+            directory=artifacts_dir,
             description="artifact path",
         )
         return resolved
