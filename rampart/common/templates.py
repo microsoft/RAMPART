@@ -24,12 +24,19 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Annotated, TypeAlias, TypeVar
 
 import yaml
-from jinja2 import Environment, StrictUndefined, Template, meta, select_autoescape
+from jinja2 import (
+    Environment,
+    StrictUndefined,
+    Template,
+    TemplateError,
+    meta,
+    select_autoescape,
+)
 from pydantic import AfterValidator, BaseModel, ConfigDict, ValidationError
 
 __all__ = [
     "PromptTemplate",
-    "PromptTemplateSchemaError",
+    "PromptTemplateDefinitionError",
     "TemplateParameterError",
 ]
 
@@ -45,18 +52,18 @@ _JINJA_ENVIRONMENT = Environment(
 )
 
 
-class PromptTemplateSchemaError(ValueError):
-    """Raised when YAML data does not match the prompt-template schema."""
+class PromptTemplateDefinitionError(ValueError):
+    """Raised when file contents do not define a valid prompt template."""
 
     def __init__(self, *, path: Path, details: str) -> None:
-        """Initialize an error without exposing Pydantic in the public contract.
+        """Initialize an invalid-definition error.
 
         Args:
             path: Path to the invalid YAML template.
-            details: Human-readable validation details.
+            details: Human-readable failure details.
         """
         self.path = path
-        msg = f"Prompt template {path} has an invalid YAML schema:\n{details}"
+        msg = f"Prompt template {path} is invalid:\n{details}"
         super().__init__(msg)
 
 
@@ -116,11 +123,8 @@ class PromptTemplate:
 
         Raises:
             FileNotFoundError: If *path* does not exist.
-            PromptTemplateSchemaError: If the YAML data does not match the
-                schema, including duplicate parameter declarations.
-            ValueError: If parameter declarations do not match the Jinja
-                template variables.
-            yaml.YAMLError: If the file is not valid YAML.
+            PromptTemplateDefinitionError: If the file contents do not define
+                a valid prompt template.
         """
         definition = _load_yaml_definition(path)
         return cls(
@@ -210,17 +214,19 @@ def _load_yaml_definition(path: Path) -> _PromptTemplateYaml:
 
     Raises:
         FileNotFoundError: If *path* does not exist.
-        PromptTemplateSchemaError: If the YAML data does not match the schema,
-            including duplicate parameter declarations.
-        yaml.YAMLError: If the file is not valid YAML.
+        PromptTemplateDefinitionError: If the file is not valid UTF-8 or YAML,
+            or if its data does not match the template schema.
     """
-    with path.open(encoding="utf-8") as f:
-        data = yaml.safe_load(f)
+    try:
+        with path.open(encoding="utf-8") as f:
+            data = yaml.safe_load(f)
+    except (UnicodeError, yaml.YAMLError) as exc:
+        raise PromptTemplateDefinitionError(path=path, details=str(exc)) from exc
 
     try:
         return _PromptTemplateYaml.model_validate(data)
     except ValidationError as exc:
-        raise PromptTemplateSchemaError(path=path, details=str(exc)) from exc
+        raise PromptTemplateDefinitionError(path=path, details=str(exc)) from exc
 
 
 def _compile_template(
@@ -238,14 +244,19 @@ def _compile_template(
         Template: The compiled Jinja template.
 
     Raises:
-        ValueError: If declared parameters do not match the Jinja variables.
+        PromptTemplateDefinitionError: If the Jinja template is invalid or
+            declared parameters do not match its variables.
     """
-    parsed = _JINJA_ENVIRONMENT.parse(
-        definition.value,
-        name=definition.name,
-        filename=str(path),
-    )
-    referenced_keys = meta.find_undeclared_variables(parsed)
+    try:
+        parsed = _JINJA_ENVIRONMENT.parse(
+            definition.value,
+            name=definition.name,
+            filename=str(path),
+        )
+        referenced_keys = meta.find_undeclared_variables(parsed)
+    except TemplateError as exc:
+        raise PromptTemplateDefinitionError(path=path, details=str(exc)) from exc
+
     declared_keys = set(definition.parameters)
     if referenced_keys != declared_keys:
         missing = tuple(sorted(referenced_keys - declared_keys))
@@ -254,6 +265,9 @@ def _compile_template(
             f"Prompt template {definition.name!r} parameters do not match its "
             f"Jinja variables: missing={missing!r}, unused={unused!r}"
         )
-        raise ValueError(msg)
+        raise PromptTemplateDefinitionError(path=path, details=msg)
 
-    return _JINJA_ENVIRONMENT.from_string(parsed)
+    try:
+        return _JINJA_ENVIRONMENT.from_string(parsed)
+    except TemplateError as exc:
+        raise PromptTemplateDefinitionError(path=path, details=str(exc)) from exc

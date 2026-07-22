@@ -6,10 +6,11 @@ from textwrap import dedent
 
 import pytest
 import yaml
+from jinja2 import TemplateError
 
 from rampart.common.templates import (
     PromptTemplate,
-    PromptTemplateSchemaError,
+    PromptTemplateDefinitionError,
     TemplateParameterError,
 )
 
@@ -72,8 +73,10 @@ class TestPromptTemplateFromYaml:
             """,
         )
 
-        with pytest.raises(yaml.YAMLError):
+        with pytest.raises(PromptTemplateDefinitionError) as exc_info:
             PromptTemplate.from_yaml(path)
+
+        assert isinstance(exc_info.value.__cause__, yaml.YAMLError)
 
     @pytest.mark.parametrize(
         "content",
@@ -89,7 +92,7 @@ class TestPromptTemplateFromYaml:
     ) -> None:
         path = _write_raw_yaml(tmp_path, content)
 
-        with pytest.raises(PromptTemplateSchemaError) as exc_info:
+        with pytest.raises(PromptTemplateDefinitionError) as exc_info:
             PromptTemplate.from_yaml(path)
 
         assert exc_info.value.path == path
@@ -137,9 +140,32 @@ class TestPromptTemplateFromYaml:
         )
 
         with pytest.raises(
-            ValueError,
+            PromptTemplateDefinitionError,
             match=r"missing=\('subject',\), unused=\('declared_but_unused',\)",
         ):
+            PromptTemplate.from_yaml(path)
+
+    def test_wraps_invalid_jinja_syntax(self, tmp_path: Path) -> None:
+        path = _write_template(tmp_path, value="{{ subject")
+
+        with pytest.raises(PromptTemplateDefinitionError) as exc_info:
+            PromptTemplate.from_yaml(path)
+
+        assert isinstance(exc_info.value.__cause__, TemplateError)
+
+    def test_wraps_invalid_utf8(self, tmp_path: Path) -> None:
+        path = tmp_path / "prompt.yaml"
+        path.write_bytes(b"\xff")
+
+        with pytest.raises(PromptTemplateDefinitionError) as exc_info:
+            PromptTemplate.from_yaml(path)
+
+        assert isinstance(exc_info.value.__cause__, UnicodeDecodeError)
+
+    def test_preserves_missing_file_error(self, tmp_path: Path) -> None:
+        path = tmp_path / "missing.yaml"
+
+        with pytest.raises(FileNotFoundError):
             PromptTemplate.from_yaml(path)
 
     @pytest.mark.parametrize(
@@ -184,7 +210,7 @@ class TestPromptTemplateFromYaml:
     ) -> None:
         path = _write_yaml(tmp_path, definition)
 
-        with pytest.raises(PromptTemplateSchemaError) as exc_info:
+        with pytest.raises(PromptTemplateDefinitionError) as exc_info:
             PromptTemplate.from_yaml(path)
 
         assert exc_info.value.path == path
