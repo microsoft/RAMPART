@@ -348,18 +348,16 @@ class PayloadStore:
     @staticmethod
     def _resolve_artifact_path(*, collection_dir: Path, artifact: str) -> Path:
         """Resolve a serialized artifact path inside collection artifacts/."""
+        msg = f"Invalid artifact path: {artifact!r}. Must be under artifacts/."
         artifact_path = Path(artifact)
         if artifact_path.is_absolute() or ".." in artifact_path.parts:
-            msg = f"Invalid artifact path: {artifact!r}. Must stay under artifacts/."
             raise ValueError(msg)
         try:
             artifact_relative = artifact_path.relative_to("artifacts")
         except ValueError:
-            msg = f"Invalid artifact path: {artifact!r}. Must be under artifacts/."
-            raise ValueError(msg) from None
+            raise ValueError(msg)  # noqa: B904 - preserve the exception chain
 
         if not artifact_relative.parts:
-            msg = f"Invalid artifact path: {artifact!r}. Must be under artifacts/."
             raise ValueError(msg)
 
         resolved = collection_dir / artifact_path

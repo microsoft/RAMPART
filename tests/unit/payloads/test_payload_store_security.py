@@ -30,6 +30,7 @@ def _write_collection_record(collection_dir: Path, artifact: str) -> None:
         "artifacts/../outside.pdf",
         "/tmp/outside.pdf",
         "outside.pdf",
+        "artifacts",
     ],
 )
 def test_payload_store_rejects_deserialized_artifact_escape(
@@ -64,4 +65,16 @@ def test_payload_store_rejects_deserialized_artifact_symlink_escape(
 
     store = PayloadStore(root=tmp_path / "store")
     with pytest.raises(ValueError, match="escapes"):
+        store.load("collection")
+
+
+def test_payload_store_rejects_missing_deserialized_artifact(
+    tmp_path: Path,
+) -> None:
+    """A valid serialized artifact path must refer to an existing file."""
+    collection_dir = tmp_path / "store" / "collection"
+    _write_collection_record(collection_dir, "artifacts/gone.pdf")
+
+    store = PayloadStore(root=tmp_path / "store")
+    with pytest.raises(FileNotFoundError, match="Missing artifact"):
         store.load("collection")
