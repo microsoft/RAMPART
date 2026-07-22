@@ -91,7 +91,7 @@ class TemplateParameterError(ValueError):
         super().__init__(msg)
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, kw_only=True, slots=True)
 class PromptTemplate:
     """Compiled prompt template with metadata and an explicit render contract."""
 
