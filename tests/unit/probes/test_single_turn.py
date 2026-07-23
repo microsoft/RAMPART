@@ -149,7 +149,7 @@ class TestProbeParameterValidation:
 
     def test_both_prompt_and_driver_raises(self) -> None:
         with pytest.raises(ValueError, match="exactly one"):
-            Probes.behavior(  # type: ignore[call-overload]
+            Probes.behavior(  # ty: ignore[no-matching-overload]
                 prompt="hello",
                 driver=StaticDriver(prompts=["driven"]),
                 evaluator=_DetectsAlways(),
@@ -157,7 +157,7 @@ class TestProbeParameterValidation:
 
     def test_both_prompt_and_prompts_raises(self) -> None:
         with pytest.raises(ValueError, match="exactly one"):
-            Probes.behavior(  # type: ignore[call-overload]
+            Probes.behavior(  # ty: ignore[no-matching-overload]
                 prompt="hello",
                 prompts=["a", "b"],
                 evaluator=_DetectsAlways(),
@@ -165,7 +165,7 @@ class TestProbeParameterValidation:
 
     def test_no_source_raises(self) -> None:
         with pytest.raises(ValueError, match="exactly one"):
-            Probes.behavior(evaluator=_DetectsAlways())  # type: ignore[call-overload]
+            Probes.behavior(evaluator=_DetectsAlways())  # ty: ignore[no-matching-overload]
 
 
 class TestProbeInfrastructureError:

@@ -22,7 +22,7 @@ The `rampart/` source tree is organized by concern: foundational types live in `
 RAMPART uses `@runtime_checkable` protocols for extension points that consumers implement (`AgentAdapter`, `Session`, `Evaluator`, `Surface`, `PromptDriver`). This means:
 
 - **No inheritance required** — any class with the right methods satisfies the protocol
-- **Type-checked at development time** by Pyright in strict mode
+- **Type-checked at development time** by [ty](https://github.com/astral-sh/ty)
 - **Verifiable at runtime** with `isinstance` checks
 
 `BaseExecution` is the exception — it's an ABC because it owns the lifecycle skeleton and subclasses share real implementation.
@@ -56,6 +56,15 @@ This allows the same evaluator (e.g., `ToolCalled`) to be used in both attack an
 - **Handler registration** — framework-level handlers (result collection) are injected automatically
 
 Subclasses implement only `_execute_async` and `strategy_name`. They should **not** catch `InfrastructureError` — the base class handles it.
+
+### Pytest Plugin
+
+`pytest_plugin/` integrates RAMPART with pytest:
+
+- `plugin.py` — hook registrations (configure, collection, sessionfinish, terminal summary, optional `pytest_testnodedown`).
+- `_session.py` — session-scoped state container (`RampartSession`), trial-group aggregates, sink registry, idempotency and incomplete-run flags.
+- `_collection.py` — per-test `ResultCollector` and the `ContextVar`-based handler that captures results from executions.
+- `_xdist.py` — pytest-xdist support: detection helpers, JSON-safe serialization of `Result` objects, controller-side merge, and conftest-scanning sink discovery. Workers serialize their results into `config.workeroutput`; the controller deserializes via `pytest_testnodedown` and emits a single unified report. See [Parallel Execution](../usage/xdist.md) for the data flow and trust boundary.
 
 ### PyRIT Bridge
 

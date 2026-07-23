@@ -137,11 +137,20 @@ class Result:
         return [t.eval_result for t in self.turns if t.eval_result is not None]
 
     def __bool__(self) -> bool:
-        """Assert-safe: bool(result) means the agent behaved safely."""
+        """Assert-safe: bool(result) means the agent behaved safely.
+
+        Returns:
+            bool: ``self.safe`` (True when the agent behaved safely).
+        """
         return self.safe
 
     def __repr__(self) -> str:
-        """Show status and summary for quick debugging."""
+        """Show status and summary for quick debugging.
+
+        Returns:
+            str: A compact representation including safe, status, and
+                summary fields.
+        """
         return (
             f"Result(safe={self.safe}, "
             f"status={self.status.value}, "

@@ -5,7 +5,7 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any, cast
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -16,7 +16,10 @@ from rampart.pytest_plugin._collection import ResultCollectionHandler, ResultCol
 from rampart.pytest_plugin._session import RampartSession
 from rampart.pytest_plugin.plugin import (
     _emit_sinks,
+    _enforce_incomplete_exit_status,
     _evaluate_gates,
+    _has_sink_hook_impl,
+    _resolve_hook_sinks,
     _resolve_trial_n,
     _sanitize_for_terminal,
     _write_result_line,
@@ -27,6 +30,10 @@ from rampart.pytest_plugin.plugin import (
     pytest_terminal_summary,
     pytest_unconfigure,
 )
+from rampart.reporting.sink import ReportSink
+
+if TYPE_CHECKING:
+    from _pytest.terminal import TerminalReporter
 
 
 class _StashStub:
@@ -184,7 +191,7 @@ class TestRampartSession:
 
         session.record_trial_group(
             base_nodeid="test_example",
-            trial_items=items,
+            clone_nodeids=[item.nodeid for item in items],
             threshold=0.3,
         )
 
@@ -195,8 +202,8 @@ class TestRampartSession:
         assert group.safe == 2
         assert group.unsafe == 2
         assert group.errors == 1
-        assert group.threshold == 0.3
-        assert group.pass_rate == pytest.approx(0.4)  # pyright: ignore[reportUnknownMemberType]
+        assert group.threshold == pytest.approx(0.3)
+        assert group.pass_rate == pytest.approx(0.4)
         assert not group.passed  # UNSAFE present → always fails
 
     def test_record_trial_group_all_errors(self) -> None:
@@ -217,21 +224,83 @@ class TestRampartSession:
 
         session.record_trial_group(
             base_nodeid="test_err",
-            trial_items=items,
+            clone_nodeids=[item.nodeid for item in items],
             threshold=0.0,
         )
 
         group = session.trial_groups["test_err"]
         assert group.errors == 3
         assert group.unsafe == 0
-        assert group.pass_rate == 0.0
+        assert group.pass_rate == pytest.approx(0.0)
         assert group.passed  # threshold=0.0 means any pass rate is acceptable
+
+    def test_record_trial_group_fails_below_threshold(self) -> None:
+        session = RampartSession()
+
+        items: list[Any] = [MagicMock() for _ in range(4)]
+        statuses = [
+            SafetyStatus.SAFE,
+            SafetyStatus.SAFE,
+            SafetyStatus.UNDETERMINED,
+            SafetyStatus.UNDETERMINED,
+        ]
+        for idx, item in enumerate(items):
+            item.nodeid = f"test_file.py::test_thresh[trial-{idx}]"
+            collector = ResultCollector()
+            collector.record(
+                result=Result(
+                    safe=statuses[idx] == SafetyStatus.SAFE,
+                    status=statuses[idx],
+                    summary=f"trial-{idx}",
+                ),
+            )
+            session.absorb(node=item, collector=collector)
+
+        session.record_trial_group(
+            base_nodeid="test_thresh",
+            clone_nodeids=[item.nodeid for item in items],
+            threshold=0.75,
+        )
+
+        group = session.trial_groups["test_thresh"]
+        assert group.unsafe == 0
+        assert group.safe == 2
+        assert group.pass_rate == pytest.approx(0.5)
+        assert not group.passed  # no UNSAFE, but pass rate below threshold
+
+    def test_record_trial_group_passes_when_all_safe(self) -> None:
+        session = RampartSession()
+
+        items: list[Any] = [MagicMock() for _ in range(3)]
+        for idx, item in enumerate(items):
+            item.nodeid = f"test_file.py::test_all_safe[trial-{idx}]"
+            collector = ResultCollector()
+            collector.record(
+                result=Result(
+                    safe=True,
+                    status=SafetyStatus.SAFE,
+                    summary=f"trial-{idx}",
+                ),
+            )
+            session.absorb(node=item, collector=collector)
+
+        session.record_trial_group(
+            base_nodeid="test_all_safe",
+            clone_nodeids=[item.nodeid for item in items],
+            threshold=0.5,
+        )
+
+        group = session.trial_groups["test_all_safe"]
+        assert group.unsafe == 0
+        assert group.safe == 3
+        assert group.pass_rate == pytest.approx(1.0)
+        assert group.passed  # all SAFE and at/above threshold
 
     def test_record_trial_group_empty_items_noop(self) -> None:
         session = RampartSession()
         session.record_trial_group(
             base_nodeid="test_empty",
-            trial_items=[],
+            clone_nodeids=[],
             threshold=0.0,
         )
         assert "test_empty" not in session.trial_groups
@@ -286,7 +355,10 @@ class TestTrialCloning:
 
         items: list[Any] = [item]
         config = MagicMock()
-        pytest_collection_modifyitems(config=config, items=items)
+        pytest_collection_modifyitems(
+            config=cast("pytest.Config", config),
+            items=items,
+        )
 
         assert len(items) == 3
         calls = mock_from_parent.call_args_list
@@ -299,7 +371,10 @@ class TestTrialCloning:
         config = MagicMock()
 
         with pytest.raises(pytest.UsageError, match="must be >= 1"):
-            pytest_collection_modifyitems(config=config, items=items)
+            pytest_collection_modifyitems(
+                config=cast("pytest.Config", config),
+                items=items,
+            )
 
     def test_non_trial_items_unchanged(self, monkeypatch: pytest.MonkeyPatch) -> None:
         plain = _make_plain_item()
@@ -311,7 +386,10 @@ class TestTrialCloning:
 
         items: list[Any] = [plain, trial]
         config = MagicMock()
-        pytest_collection_modifyitems(config=config, items=items)
+        pytest_collection_modifyitems(
+            config=cast("pytest.Config", config),
+            items=items,
+        )
 
         assert items[0] is plain
         assert len(items) == 3
@@ -324,7 +402,10 @@ class TestTrialCloning:
         config = MagicMock()
 
         with pytest.raises(pytest.UsageError, match="no parent"):
-            pytest_collection_modifyitems(config=config, items=items)
+            pytest_collection_modifyitems(
+                config=cast("pytest.Config", config),
+                items=items,
+            )
 
 
 class TestResolveTrialN:
@@ -396,6 +477,10 @@ class TestSanitizeForTerminal:
         text = "\x1b[2J\x1b[Hinjected"
         assert _sanitize_for_terminal(text) == "injected"
 
+    def test_strips_osc_hyperlink(self) -> None:
+        text = "\x1b]8;;http://evil\x07link\x1b]8;;\x07"
+        assert _sanitize_for_terminal(text) == "link"
+
 
 class TestWriteResultLine:
     """_write_result_line writes formatted status, summary, and observability level."""
@@ -408,7 +493,10 @@ class TestWriteResultLine:
             summary="ok",
             observability_level=ObservabilityLevel.RESPONSE_ONLY,
         )
-        _write_result_line(terminalreporter=reporter, result=result)
+        _write_result_line(
+            terminalreporter=cast("TerminalReporter", reporter),
+            result=result,
+        )
         reporter.write_line.assert_called_once_with("  PASS  ok (response_only)")
 
     def test_unsafe_result_includes_observability(self) -> None:
@@ -419,7 +507,10 @@ class TestWriteResultLine:
             summary="bad",
             observability_level=ObservabilityLevel.TOOL_AND_SIDE_EFFECTS,
         )
-        _write_result_line(terminalreporter=reporter, result=result)
+        _write_result_line(
+            terminalreporter=cast("TerminalReporter", reporter),
+            result=result,
+        )
         reporter.write_line.assert_called_once_with(
             "  FAIL  bad (tool_and_side_effects)",
         )
@@ -433,7 +524,7 @@ class TestWriteResultLine:
             observability_level=ObservabilityLevel.TOOL_ONLY,
         )
         _write_result_line(
-            terminalreporter=reporter,
+            terminalreporter=cast("TerminalReporter", reporter),
             result=result,
             test_name="test_exfil",
         )
@@ -448,7 +539,10 @@ class TestWriteResultLine:
             status=SafetyStatus.SAFE,
             summary="\x1b[31mevil\x1b[0m",
         )
-        _write_result_line(terminalreporter=reporter, result=result)
+        _write_result_line(
+            terminalreporter=cast("TerminalReporter", reporter),
+            result=result,
+        )
         line = reporter.write_line.call_args[0][0]
         assert "evil" in line
         assert "\x1b" not in line
@@ -486,7 +580,11 @@ class TestTerminalSummary:
         reporter = MagicMock()
         config = MagicMock()
         config.stash = _StashStub()
-        pytest_terminal_summary(terminalreporter=reporter, exitstatus=0, config=config)
+        pytest_terminal_summary(
+            terminalreporter=cast("TerminalReporter", reporter),
+            exitstatus=0,
+            config=cast("pytest.Config", config),
+        )
         reporter.write_sep.assert_not_called()
 
     def test_noop_when_no_results(self) -> None:
@@ -496,8 +594,33 @@ class TestTerminalSummary:
         from rampart.pytest_plugin.plugin import _rampart_key
 
         config.stash[_rampart_key] = RampartSession()
-        pytest_terminal_summary(terminalreporter=reporter, exitstatus=0, config=config)
+        pytest_terminal_summary(
+            terminalreporter=cast("TerminalReporter", reporter),
+            exitstatus=0,
+            config=cast("pytest.Config", config),
+        )
         reporter.write_sep.assert_not_called()
+
+    def test_writes_incomplete_warning_even_without_results(self) -> None:
+        reporter = MagicMock()
+        config = MagicMock()
+        config.stash = _StashStub()
+        from rampart.pytest_plugin.plugin import _rampart_key
+
+        session = RampartSession()
+        session.mark_incomplete(reason="worker gw0 crashed \x1b[31mred")
+        config.stash[_rampart_key] = session
+        pytest_terminal_summary(terminalreporter=reporter, exitstatus=0, config=config)
+
+        sep_titles = [str(c) for c in reporter.write_sep.call_args_list]
+        assert any("INCOMPLETE RUN" in t for t in sep_titles)
+        reason_args = [
+            c.args[0]
+            for c in reporter.write_line.call_args_list
+            if c.args and "gw0 crashed" in c.args[0]
+        ]
+        assert reason_args
+        assert all("\x1b" not in arg for arg in reason_args)
 
     def test_writes_summary_header(self) -> None:
         reporter = MagicMock()
@@ -506,7 +629,11 @@ class TestTerminalSummary:
         from rampart.pytest_plugin.plugin import _rampart_key
 
         config.stash[_rampart_key] = self._make_session_with_results()
-        pytest_terminal_summary(terminalreporter=reporter, exitstatus=0, config=config)
+        pytest_terminal_summary(
+            terminalreporter=cast("TerminalReporter", reporter),
+            exitstatus=0,
+            config=cast("pytest.Config", config),
+        )
         reporter.write_sep.assert_called_once_with("=", "RAMPART Safety Summary")
 
     def test_writes_population_stats(self) -> None:
@@ -516,7 +643,11 @@ class TestTerminalSummary:
         from rampart.pytest_plugin.plugin import _rampart_key
 
         config.stash[_rampart_key] = self._make_session_with_results()
-        pytest_terminal_summary(terminalreporter=reporter, exitstatus=0, config=config)
+        pytest_terminal_summary(
+            terminalreporter=cast("TerminalReporter", reporter),
+            exitstatus=0,
+            config=cast("pytest.Config", config),
+        )
         # Check that the Population line was written
         population_calls = [
             c for c in reporter.write_line.call_args_list if "Population:" in str(c)
@@ -570,7 +701,7 @@ class TestRampartSessionAddSinks:
             pass
 
         with pytest.raises(TypeError, match="Expected ReportSink"):
-            session.add_sinks(sinks=[NotASink()])  # pyright: ignore[reportArgumentType]
+            session.add_sinks(sinks=[NotASink()])  # ty: ignore[invalid-argument-type]
 
     def test_add_sinks_preserves_existing(self) -> None:
         """Config-loaded sinks are not lost when fixture sinks are added."""
@@ -599,7 +730,7 @@ class TestRampartSessionDuration:
         node.nodeid = "test.py::test_dur"
         session.absorb(node=node, collector=collector)
         report = session.build_report()
-        assert report.duration_seconds == 0.0
+        assert report.duration_seconds == pytest.approx(0.0)
 
     def test_set_duration_reflected_in_report(self) -> None:
         session = RampartSession()
@@ -612,7 +743,7 @@ class TestRampartSessionDuration:
         session.absorb(node=node, collector=collector)
         session.set_duration(duration_seconds=42.5)
         report = session.build_report()
-        assert report.duration_seconds == 42.5
+        assert report.duration_seconds == pytest.approx(42.5)
 
 
 class TestTrialGroupRendering:
@@ -636,12 +767,15 @@ class TestTrialGroupRendering:
 
         session.record_trial_group(
             base_nodeid="test_file.py::test_stat",
-            trial_items=items,
+            clone_nodeids=[item.nodeid for item in items],
             threshold=0.3,
         )
 
         reporter = MagicMock()
-        _write_trial_group_lines(terminalreporter=reporter, rampart_session=session)
+        _write_trial_group_lines(
+            terminalreporter=cast("TerminalReporter", reporter),
+            rampart_session=session,
+        )
 
         reporter.write_line.assert_called_once()
         line = reporter.write_line.call_args[0][0]
@@ -649,10 +783,46 @@ class TestTrialGroupRendering:
         assert "80% pass rate" in line
         assert "FAILED" in line  # UNSAFE present → always fails
 
+    def test_writes_passing_trial_group_line(self) -> None:
+        session = RampartSession()
+        items: list[Any] = [MagicMock() for _ in range(3)]
+        for idx, item in enumerate(items):
+            item.nodeid = f"test_file.py::test_pass[trial-{idx}]"
+            collector = ResultCollector()
+            collector.record(
+                result=Result(
+                    safe=True,
+                    status=SafetyStatus.SAFE,
+                    summary=f"t-{idx}",
+                ),
+            )
+            session.absorb(node=item, collector=collector)
+
+        session.record_trial_group(
+            base_nodeid="test_file.py::test_pass",
+            clone_nodeids=[item.nodeid for item in items],
+            threshold=0.5,
+        )
+
+        reporter = MagicMock()
+        _write_trial_group_lines(
+            terminalreporter=cast("TerminalReporter", reporter),
+            rampart_session=session,
+        )
+
+        reporter.write_line.assert_called_once()
+        line = reporter.write_line.call_args[0][0]
+        assert "3/3 safe" in line
+        assert "100% pass rate" in line
+        assert "PASSED" in line
+
     def test_no_trial_groups_writes_nothing(self) -> None:
         session = RampartSession()
         reporter = MagicMock()
-        _write_trial_group_lines(terminalreporter=reporter, rampart_session=session)
+        _write_trial_group_lines(
+            terminalreporter=cast("TerminalReporter", reporter),
+            rampart_session=session,
+        )
         reporter.write_line.assert_not_called()
 
 
@@ -677,7 +847,7 @@ class TestEvaluateGates:
 
         session.record_trial_group(
             base_nodeid="test.py::test_gate",
-            trial_items=items,
+            clone_nodeids=[item.nodeid for item in items],
             threshold=0.1,
         )
 
@@ -726,7 +896,89 @@ class TestSessionFinishIntegration:
         session_mock.config.stash = config_stash
         session_mock.items = []
 
-        pytest_sessionfinish(session=session_mock, exitstatus=0)
+        pytest_sessionfinish(session=cast("pytest.Session", session_mock), exitstatus=0)
 
         report = rs.build_report()
         assert report.duration_seconds >= 4.0
+
+
+class TestSinkHookResolution:
+    """The pytest_rampart_sinks hook is resolved and validated."""
+
+    def test_has_sink_hook_impl_true_when_impls_present(self) -> None:
+        config = MagicMock()
+        hook = config.pluginmanager.hook.pytest_rampart_sinks
+        hook.get_hookimpls.return_value = [MagicMock()]
+        assert _has_sink_hook_impl(config=config) is True
+
+    def test_has_sink_hook_impl_false_when_no_impls(self) -> None:
+        config = MagicMock()
+        hook = config.pluginmanager.hook.pytest_rampart_sinks
+        hook.get_hookimpls.return_value = []
+        assert _has_sink_hook_impl(config=config) is False
+
+    def test_resolve_hook_sinks_flattens_implementations(self) -> None:
+        sink_a = MagicMock(spec=ReportSink)
+        sink_b = MagicMock(spec=ReportSink)
+        config = MagicMock()
+        config.pluginmanager.hook.pytest_rampart_sinks.return_value = [
+            [sink_a],
+            [sink_b],
+        ]
+        result = _resolve_hook_sinks(config=config)
+        assert result == [sink_a, sink_b]
+
+    def test_resolve_hook_sinks_drops_non_report_sinks(self) -> None:
+        sink_a = MagicMock(spec=ReportSink)
+        config = MagicMock()
+        config.pluginmanager.hook.pytest_rampart_sinks.return_value = [
+            [sink_a, "not-a-sink"],
+        ]
+        result = _resolve_hook_sinks(config=config)
+        assert result == [sink_a]
+
+    def test_resolve_hook_sinks_skips_non_list_results(self) -> None:
+        sink_a = MagicMock(spec=ReportSink)
+        config = MagicMock()
+        config.pluginmanager.hook.pytest_rampart_sinks.return_value = [
+            "bad-impl-return",
+            [sink_a],
+        ]
+        result = _resolve_hook_sinks(config=config)
+        assert result == [sink_a]
+
+
+class TestIncompleteExitStatus:
+    """Incomplete runs are forced to a non-zero exit status."""
+
+    def test_incomplete_run_forces_tests_failed(self) -> None:
+        session = MagicMock()
+        session.exitstatus = pytest.ExitCode.OK
+        rampart_session = RampartSession()
+        rampart_session.mark_incomplete(reason="worker gw1 crashed")
+        _enforce_incomplete_exit_status(
+            session=cast("pytest.Session", session),
+            rampart_session=rampart_session,
+        )
+        assert session.exitstatus == pytest.ExitCode.TESTS_FAILED
+
+    def test_complete_run_preserves_ok_status(self) -> None:
+        session = MagicMock()
+        session.exitstatus = pytest.ExitCode.OK
+        rampart_session = RampartSession()
+        _enforce_incomplete_exit_status(
+            session=cast("pytest.Session", session),
+            rampart_session=rampart_session,
+        )
+        assert session.exitstatus == pytest.ExitCode.OK
+
+    def test_incomplete_run_does_not_mask_existing_failure(self) -> None:
+        session = MagicMock()
+        session.exitstatus = pytest.ExitCode.INTERRUPTED
+        rampart_session = RampartSession()
+        rampart_session.mark_incomplete(reason="worker gw1 crashed")
+        _enforce_incomplete_exit_status(
+            session=cast("pytest.Session", session),
+            rampart_session=rampart_session,
+        )
+        assert session.exitstatus == pytest.ExitCode.INTERRUPTED

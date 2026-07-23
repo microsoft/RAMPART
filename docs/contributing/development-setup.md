@@ -62,7 +62,7 @@ Install the project dependencies using uv:
 uv sync
 ```
 
-`uv sync` installs the project in editable mode and includes the default `dev` group from `pyproject.toml` — ruff, pyright, pytest-cov, pytest-xdist, and pre-commit — into a virtual environment managed by uv.
+`uv sync` installs the project in editable mode and includes the default `dev` group from `pyproject.toml` — ruff, ty, pytest-cov, pytest-xdist, and pre-commit — into a virtual environment managed by uv.
 
 If you also plan to build the documentation locally, include the `docs` group:
 
@@ -76,7 +76,7 @@ The `pre-commit` tool itself is already installed via `uv sync`. The steps below
 
 ### (Optional) Install the Git hook
 
-To have Ruff and Pyright run automatically on every `git commit`, install the pre-commit Git hook into `.git/hooks/pre-commit`:
+To have Ruff and ty run automatically on every `git commit`, install the pre-commit Git hook into `.git/hooks/pre-commit`:
 
 ```bash
 uv run pre-commit install
@@ -163,6 +163,6 @@ uv run mkdocs serve --strict
 
 ## (Recommended) VSCode IDE Setup
 
-RAMPART uses strict Pyright type checking (`typeCheckingMode = "strict"` in `pyproject.toml`). For the best editor experience in VS Code, install the [Pylance](https://marketplace.visualstudio.com/items?itemName=ms-python.vscode-pylance) extension — it picks up the project's Pyright settings automatically.
+RAMPART uses [ty](https://github.com/astral-sh/ty) for static type checking (configured under `[tool.ty]` in `pyproject.toml`). For the best editor experience in VS Code, install the [Pylance](https://marketplace.visualstudio.com/items?itemName=ms-python.vscode-pylance) extension — its inference is broadly compatible with ty's. A dedicated ty language-server is also available from Astral if you prefer to mirror CI's checker exactly.
 
 The repo also includes an `.editorconfig` file for consistent formatting across editors.

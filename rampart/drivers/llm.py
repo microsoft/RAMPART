@@ -32,12 +32,11 @@ import uuid
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-import yaml
-from jinja2 import Template
 from pyrit.exceptions import EmptyResponseException
 from pyrit.memory import CentralMemory
 from pyrit.prompt_normalizer import PromptNormalizer
 
+from rampart.common.templates import load_prompt_template
 from rampart.core.errors import DriverError
 from rampart.core.prompt_driver import PromptDecision
 from rampart.core.types import Payload, Request, Turn
@@ -52,17 +51,9 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 _PROMPTS_DIR = Path(__file__).resolve().parent / "prompts"
-
-
-def _load_prompt_template(name: str) -> Template:
-    """Load a YAML prompt template from the prompts directory as a Jinja2 Template."""
-    path = _PROMPTS_DIR / name
-    with path.open() as f:
-        data = yaml.safe_load(f)
-    return Template(data["value"])
-
-
-_SYSTEM_PROMPT_TEMPLATE = _load_prompt_template("llm_driver_system_prompt.yaml")
+_SYSTEM_PROMPT_TEMPLATE = load_prompt_template(
+    _PROMPTS_DIR / "llm_driver_system_prompt.yaml",
+)
 
 
 class LLMDriver:
@@ -154,6 +145,10 @@ class LLMDriver:
             persona: System-prompt identity.
             objective: Optional per-test goal.
             injections: Optional injection metadata for the system prompt.
+
+        Returns:
+            LLMDriver: A new instance bound to ``target`` with the
+                given persona, objective, and injections.
         """
         return cls(
             target=target,
@@ -168,6 +163,10 @@ class LLMDriver:
         Defers all PyRIT interaction to the first ``next_prompt_async``
         call, which is always async and always happens after
         ``initialize_pyrit_async`` has been called in test setup.
+
+        Raises:
+            DriverError: If neither an LLM config nor a pre-built target
+                was provided at construction time.
         """
         if self._initialized:
             return
@@ -253,6 +252,10 @@ class LLMDriver:
         completed agent-side turn. Divergence means the driver is being
         asked to continue a conversation it did not author — either it was
         reused across tests, or resumed from a history it did not replay.
+
+        Raises:
+            DriverError: If the driver-side user-turn count does not match
+                the agent-side history length.
         """
         memory = CentralMemory.get_memory_instance()
         messages = memory.get_conversation(
@@ -282,6 +285,10 @@ class LLMDriver:
 
         Injection metadata (id, format, description) is passed to the
         template. Raw payload content is never included.
+
+        Returns:
+            str: The rendered system prompt with persona, objective,
+                and injection metadata substituted.
         """
         injections = [
             {
@@ -298,12 +305,19 @@ class LLMDriver:
             injections=injections,
         )
 
-    def _build_user_message(self, *, history: list[Turn]) -> str:
+    @staticmethod
+    def _build_user_message(*, history: list[Turn]) -> str:
         """Build the user message for the driver-side conversation.
 
         Only sends newly-available information from the agent-side
         conversation — PyRIT maintains the full driver-side conversation
         via CentralMemory.
+
+        Returns:
+            str: On the first turn (empty history) the bootstrap prompt
+                ``"Begin. Send the first user prompt."``; otherwise the
+                latest agent response and (if present) the evaluator
+                outcome and rationale, joined by newlines.
         """
         if not history:
             return "Begin. Send the first user prompt."
@@ -319,7 +333,15 @@ class LLMDriver:
         return "\n".join(parts)
 
     async def _send_async(self, user_message: str) -> str:
-        """Send a user message on the driver-side conversation via PyRIT."""
+        """Send a user message on the driver-side conversation via PyRIT.
+
+        Returns:
+            str: The driving LLM's plain-text response.
+
+        Raises:
+            DriverError: If the driver has not been initialized via
+                ``_ensure_initialized`` before this call.
+        """
         if self._normalizer is None or self._target is None:
             msg = (
                 "LLMDriver: driver not initialized — call "

@@ -62,7 +62,8 @@ class TestSessionProtocol:
 class TestAgentAdapterProtocol:
     def test_structural_subtyping(self) -> None:
         class MyAdapter:
-            async def create_session_async(self) -> Session: ...
+            async def create_session_async(self) -> Session:
+                raise NotImplementedError
 
             @property
             def manifest(self) -> AppManifest:

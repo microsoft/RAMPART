@@ -54,12 +54,12 @@ class _StubAdapter:
 
     @property
     def manifest(self) -> AppManifest:
-        """Return a minimal manifest."""
+        """Minimal manifest."""
         return AppManifest(name="TestAgent")
 
     @property
     def observability_profile(self) -> ObservabilityLevel:
-        """Return tool-only observability."""
+        """Tool-only observability profile."""
         return ObservabilityLevel.TOOL_ONLY
 
 
@@ -68,7 +68,7 @@ class _SuccessExecution(BaseExecution):
 
     @property
     def strategy_name(self) -> str:
-        """Return test strategy name."""
+        """Test strategy name."""
         return "test_strategy"
 
     async def _execute_async(self, *, adapter: AgentAdapter) -> Result:
@@ -81,7 +81,7 @@ class _InfraErrorExecution(BaseExecution):
 
     @property
     def strategy_name(self) -> str:
-        """Return test strategy name."""
+        """Test strategy name."""
         return "infra_error"
 
     async def _execute_async(self, *, adapter: AgentAdapter) -> Result:
@@ -94,7 +94,7 @@ class _GenericErrorExecution(BaseExecution):
 
     @property
     def strategy_name(self) -> str:
-        """Return test strategy name."""
+        """Test strategy name."""
         return "generic_error"
 
     async def _execute_async(self, *, adapter: AgentAdapter) -> Result:
@@ -107,7 +107,7 @@ class _DriverErrorExecution(BaseExecution):
 
     @property
     def strategy_name(self) -> str:
-        """Return test strategy name."""
+        """Test strategy name."""
         return "driver_error"
 
     async def _execute_async(self, *, adapter: AgentAdapter) -> Result:
@@ -276,8 +276,9 @@ class TestDefaultHandlerFactory:
         )
 
         factory_handler = _RecordingHandler()
+        handlers: list[ExecutionEventHandler] = [factory_handler]
         try:
-            register_default_handler_factory(lambda: [factory_handler])
+            register_default_handler_factory(lambda: handlers)
             execution = _SuccessExecution()
 
             await execution.execute_async(adapter=_StubAdapter())
@@ -290,7 +291,7 @@ class TestDefaultHandlerFactory:
         from rampart.core.execution import register_default_handler_factory
 
         with pytest.raises(TypeError, match="callable"):
-            register_default_handler_factory("not a function")  # type: ignore[arg-type]
+            register_default_handler_factory("not a function")  # ty: ignore[invalid-argument-type]
 
 
 class TestDriverErrorHandling:
@@ -374,7 +375,7 @@ class TestEvaluateTurnAsync:
 
         captured_context = None
 
-        async def capture_eval(*, context: EvalContext) -> EvalResult:
+        def capture_eval(*, context: EvalContext) -> EvalResult:
             nonlocal captured_context
             captured_context = context
             return EvalResult(outcome=EvalOutcome.NOT_DETECTED)

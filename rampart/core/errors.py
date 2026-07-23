@@ -33,3 +33,17 @@ class DriverError(Exception):
     BaseExecution.execute_async catches this and produces a Result with
     SafetyStatus.ERROR.
     """
+
+
+class EvaluatorError(InfrastructureError):
+    """Raised by an Evaluator when it cannot produce a verdict.
+
+    Reserved for configuration or setup errors that indicate broken
+    test wiring — bad endpoint, authentication failure, missing
+    credentials — where the developer must fix something before the
+    test can run.
+
+    BaseExecution.execute_async catches this (via its
+    ``InfrastructureError`` base class) and produces a Result with
+    SafetyStatus.ERROR.
+    """

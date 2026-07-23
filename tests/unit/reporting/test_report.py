@@ -147,8 +147,8 @@ class TestPopulationSummary:
         assert stats.total_runs == 2
         assert stats.safe_count == 2
         assert stats.unsafe_count == 0
-        assert stats.attack_success_rate == 0.0
-        assert stats.safety_pass_rate == 1.0
+        assert stats.attack_success_rate == pytest.approx(0.0)
+        assert stats.safety_pass_rate == pytest.approx(1.0)
 
     def test_mixed_results(self) -> None:
         report = TestRunReport(
@@ -164,15 +164,15 @@ class TestPopulationSummary:
         assert stats.safe_count == 1
         assert stats.unsafe_count == 1
         assert stats.undetermined_count == 1
-        assert stats.attack_success_rate == pytest.approx(1 / 3)  # pyright: ignore[reportUnknownMemberType]
-        assert stats.safety_pass_rate == pytest.approx(1 / 3)  # pyright: ignore[reportUnknownMemberType]
+        assert stats.attack_success_rate == pytest.approx(1 / 3)
+        assert stats.safety_pass_rate == pytest.approx(1 / 3)
 
     def test_empty_results(self) -> None:
         report = TestRunReport()
 
         stats = report.population_summary()
         assert stats.total_runs == 0
-        assert stats.attack_success_rate == 0.0
+        assert stats.attack_success_rate == pytest.approx(0.0)
 
     def test_error_excluded_from_attack_success_rate(self) -> None:
         report = TestRunReport(
@@ -186,8 +186,8 @@ class TestPopulationSummary:
         stats = report.population_summary()
         assert stats.total_runs == 3
         assert stats.error_count == 1
-        assert stats.attack_success_rate == pytest.approx(1 / 2)  # pyright: ignore[reportUnknownMemberType]
-        assert stats.safety_pass_rate == pytest.approx(1 / 2)  # pyright: ignore[reportUnknownMemberType]
+        assert stats.attack_success_rate == pytest.approx(1 / 2)
+        assert stats.safety_pass_rate == pytest.approx(1 / 2)
 
     def test_all_errors(self) -> None:
         report = TestRunReport(
@@ -200,8 +200,8 @@ class TestPopulationSummary:
         stats = report.population_summary()
         assert stats.total_runs == 2
         assert stats.error_count == 2
-        assert stats.attack_success_rate == 0.0
-        assert stats.safety_pass_rate == 0.0
+        assert stats.attack_success_rate == pytest.approx(0.0)
+        assert stats.safety_pass_rate == pytest.approx(0.0)
 
     def test_filter_by_harm_category(self) -> None:
         report = TestRunReport(
@@ -268,7 +268,7 @@ class TestPopulationSummary:
 
         stats = report.population_summary(harm_category="nonexistent")
         assert stats.total_runs == 0
-        assert stats.attack_success_rate == 0.0
+        assert stats.attack_success_rate == pytest.approx(0.0)
 
 
 class TestPopulationSummaryProperties:
@@ -354,7 +354,7 @@ class TestTestRunReportDefaults:
         assert report.failed == 0
         assert report.undetermined == 0
         assert report.errors == 0
-        assert report.duration_seconds == 0.0
+        assert report.duration_seconds == pytest.approx(0.0)
         assert report.metadata == {}
 
     def test_not_collected_by_pytest(self) -> None:

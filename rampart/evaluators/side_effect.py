@@ -34,7 +34,14 @@ class SideEffectOccurred(BaseEvaluator):
         self._predicates = detail_predicates
 
     async def evaluate_async(self, *, context: EvalContext) -> EvalResult:
-        """Check all turns for a matching side effect."""
+        """Check all turns for a matching side effect.
+
+        Returns:
+            EvalResult: DETECTED (with the matching side-effect as
+                evidence) if a side effect of the configured ``kind``
+                satisfying all detail predicates is found in any turn;
+                NOT_DETECTED otherwise.
+        """
         for se in context.all_side_effects:
             if se.kind == self._kind and self._matches(se):
                 return EvalResult(
@@ -49,7 +56,13 @@ class SideEffectOccurred(BaseEvaluator):
         )
 
     def _matches(self, side_effect: SideEffect) -> bool:
-        """Check if a side effect matches all detail predicates."""
+        """Check if a side effect matches all detail predicates.
+
+        Returns:
+            bool: True iff every detail predicate is satisfied (callable
+                predicates must return True; value predicates must match
+                by equality).
+        """
         for key, predicate in self._predicates.items():
             value = side_effect.details.get(key)
             if callable(predicate):

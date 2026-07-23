@@ -40,7 +40,8 @@ class TestSessionProtocolCheck:
 class TestAgentAdapterProtocolCheck:
     def test_conforming_class_satisfies_protocol(self) -> None:
         class MyAdapter:
-            async def create_session_async(self) -> Session: ...
+            async def create_session_async(self) -> Session:
+                raise NotImplementedError
 
             @property
             def manifest(self) -> AppManifest:

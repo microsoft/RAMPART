@@ -73,18 +73,33 @@ class AppManifest:
     metadata: dict[str, Any] = field(default_factory=dict[str, Any])
 
     def declares_tool(self, name: str) -> bool:
-        """Check if a tool is declared in the manifest."""
+        """Check if a tool is declared in the manifest.
+
+        Returns:
+            bool: True if a tool with ``name`` exists in ``self.tools``.
+        """
         return any(t.name == name for t in self.tools)
 
     def get_tool(self, name: str) -> ToolDeclaration | None:
-        """Get a tool declaration by name, or None if not declared."""
+        """Get a tool declaration by name, or None if not declared.
+
+        Returns:
+            ToolDeclaration | None: The matching declaration, or None if
+                no tool with the given name is declared.
+        """
         for t in self.tools:
             if t.name == name:
                 return t
         return None
 
     def __str__(self) -> str:
-        """Human-readable summary of the agent's capabilities."""
+        """Human-readable summary of the agent's capabilities.
+
+        Returns:
+            str: A formatted multi-line string describing the agent
+                name, description, tools, and data sources — intended
+                for debugging and report output.
+        """
         sections: list[str] = [f"TARGET AGENT: {self.name}"]
 
         if self.description:

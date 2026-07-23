@@ -8,7 +8,7 @@ Public API re-exports for convenient top-level access.
 
 from rampart.attacks import Attacks
 from rampart.core.adapter import AgentAdapter, Session
-from rampart.core.errors import DriverError, InfrastructureError
+from rampart.core.errors import DriverError, EvaluatorError, InfrastructureError
 from rampart.core.evaluator import BaseEvaluator, Evaluator
 from rampart.core.execution import (
     BaseExecution,
@@ -42,6 +42,7 @@ from rampart.core.types import (
     Turn,
 )
 from rampart.drivers.llm import LLMDriver
+from rampart.evaluators import LLMJudge, TranscriptScope
 from rampart.probes import Probes
 from rampart.pytest_plugin._collection import record_result
 
@@ -57,6 +58,7 @@ __all__ = [
     "EvalOutcome",
     "EvalResult",
     "Evaluator",
+    "EvaluatorError",
     "ExecutionEvent",
     "ExecutionEventData",
     "ExecutionEventHandler",
@@ -65,6 +67,7 @@ __all__ = [
     "InjectionHandle",
     "InjectionRecord",
     "LLMDriver",
+    "LLMJudge",
     "ObservabilityLevel",
     "Payload",
     "PayloadFormat",
@@ -81,6 +84,7 @@ __all__ = [
     "Surface",
     "ToolCall",
     "ToolDeclaration",
+    "TranscriptScope",
     "Turn",
     "record_result",
     "resolve_as_attack",

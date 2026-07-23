@@ -1,16 +1,16 @@
 repos:
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: 5e2fb545eba1ea9dc051f6f962d52fe8f76a9794 # v0.15.13
+  rev: 01a675ea018f2fb714478a5ffb83fcea8374bb06 # v0.15.21
   hooks:
     - id: ruff-check
       args: [ --fix ]
     - id: ruff-format
 - repo: local
   hooks:
-    - id: pyright
-      name: pyright
-      entry: uv run pyright
+    - id: ty
+      name: ty
+      entry: uv run ty check
       language: system
       types: [python]
       pass_filenames: false

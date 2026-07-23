@@ -13,21 +13,21 @@ a simple delay-based readiness wait.
 from __future__ import annotations
 
 import asyncio
-from typing import TYPE_CHECKING, Protocol, Self, runtime_checkable
+from contextlib import AbstractAsyncContextManager
+from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 if TYPE_CHECKING:
-    import types
-
     from rampart.core.types import Payload
 
 
 @runtime_checkable
-class InjectionHandle(Protocol):
+class InjectionHandle(AbstractAsyncContextManager["InjectionHandle", None], Protocol):
     """A prepared injection, ready to activate as an async context manager.
 
     Returned by Surface.inject(). Entering activates the injection
-    (writes the payload to the data source); exiting removes it
-    (guaranteed cleanup even on exceptions).
+    (writes the payload to the data source); exiting removes it.
+    Cleanup is guaranteed even on exceptions, must be idempotent, and
+    must not raise.
 
     Execution strategies depend only on this protocol — never on
     Surface or its concrete implementations.
@@ -49,19 +49,6 @@ class InjectionHandle(Protocol):
         Implementations should raise `TimeoutError` if readiness
         operations are long-running to prevent indefinite blocking.
         """
-        ...
-
-    async def __aenter__(self) -> Self:
-        """Activate the injection (write payload to data source)."""
-        ...
-
-    async def __aexit__(
-        self,
-        exc_type: type[BaseException] | None,
-        exc_val: BaseException | None,
-        exc_tb: types.TracebackType | None,
-    ) -> None:
-        """Remove the injection. Must be idempotent. Must not raise."""
         ...
 
 

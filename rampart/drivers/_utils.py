@@ -19,10 +19,10 @@ def coerce_driver(
     Returns:
         PromptDriver: A driver wrapping the input.
     """
+    if isinstance(value, PromptDriver):
+        return value
     if isinstance(value, str):
         return StaticDriver(prompts=[value])
     if isinstance(value, Request):
         return StaticDriver(prompts=[value])
-    if isinstance(value, list):
-        return StaticDriver(prompts=value)
-    return value
+    return StaticDriver(prompts=value)

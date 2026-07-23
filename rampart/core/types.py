@@ -61,11 +61,11 @@ class PayloadFormat(Enum):
     @property
     def is_text(self) -> bool:
         """True if this format carries content as str."""
-        return self in (
+        return self in {
             PayloadFormat.TEXT,
             PayloadFormat.HTML,
             PayloadFormat.MARKDOWN,
-        )
+        }
 
     @property
     def is_binary(self) -> bool:
@@ -118,35 +118,41 @@ class Payload:
     metadata: dict[str, Any] = field(default_factory=dict[str, Any])
 
     def __post_init__(self) -> None:
-        """Validate content-format-artifact consistency."""
+        """Validate content-format-artifact consistency.
+
+        Raises:
+            TypeError: If a binary format is missing an ``artifact`` path,
+                or a text format was given an ``artifact``.
+            FileNotFoundError: If ``artifact`` is set but the file does
+                not exist on disk.
+        """
         if self.format.is_binary and self.artifact is None:
             msg = (
                 f"Binary format {self.format.value} requires an "
                 f"artifact path. Provide artifact=Path(...) or "
                 f"use a converter to render the payload."
             )
-            raise TypeError(
-                msg,
-            )
+            raise TypeError(msg)
         if self.format.is_text and self.artifact is not None:
             msg = (
                 f"Text format {self.format.value} delivers content "
                 f"directly — artifact must be None."
             )
-            raise TypeError(
-                msg,
-            )
+            raise TypeError(msg)
         if self.artifact is not None and not self.artifact.exists():
             msg = f"Artifact file does not exist: {self.artifact}"
-            raise FileNotFoundError(
-                msg,
-            )
+            raise FileNotFoundError(msg)
 
     def __str__(self) -> str:
-        """Human-readable preview of the payload."""
-        _preview_max_length = 200
-        truncated = self.content[:_preview_max_length]
-        suffix = "..." if len(self.content) > _preview_max_length else ""
+        """Human-readable preview of the payload.
+
+        Returns:
+            str: The first 200 characters of ``content``, with an
+                ellipsis suffix when truncated.
+        """
+        preview_max_length = 200
+        truncated = self.content[:preview_max_length]
+        suffix = "..." if len(self.content) > preview_max_length else ""
         return truncated + suffix
 
 
@@ -224,12 +230,14 @@ class Request:
     attachments: list[Payload] = field(default_factory=list[Payload])
 
     def __post_init__(self) -> None:
-        """Validate that the request carries some content."""
+        """Validate that the request carries some content.
+
+        Raises:
+            ValueError: If both ``prompt`` and ``attachments`` are empty.
+        """
         if self.prompt is None and not self.attachments:
             msg = "Request must include at least a prompt or attachments."
-            raise ValueError(
-                msg,
-            )
+            raise ValueError(msg)
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -320,7 +328,11 @@ class EvalContext:
 
     @property
     def current_turn(self) -> Turn:
-        """The most recent turn. Raises ValueError if no turns exist."""
+        """The most recent turn.
+
+        Raises:
+            ValueError: If no turns exist in this context.
+        """
         if not self.turns:
             msg = "No turns in context."
             raise ValueError(msg)

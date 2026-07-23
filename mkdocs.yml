@@ -163,6 +163,7 @@ nav:
       - Configuration: usage/configuration.md
       - pytest Markers & Fixtures: usage/pytest-integration.md
       - Results & Reporting: usage/results-and-reporting.md
+      - Parallel Execution: usage/xdist.md
       - CI Integration: usage/ci-integration.md
   - Contributing:
       - contributing/index.md

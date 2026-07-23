@@ -56,15 +56,30 @@ class BaseEvaluator(ABC):
         ...
 
     def __or__(self, other: Evaluator) -> _AnyEvaluator:
-        """Compose: self | other — DETECTED if either detects."""
+        """Compose: self | other — DETECTED if either detects.
+
+        Returns:
+            _AnyEvaluator: A composite evaluator with short-circuit OR
+                semantics over ``self`` and ``other``.
+        """
         return _AnyEvaluator(left=self, right=other)
 
     def __and__(self, other: Evaluator) -> _AllEvaluator:
-        """Compose: self & other — DETECTED only if both detect."""
+        """Compose: self & other — DETECTED only if both detect.
+
+        Returns:
+            _AllEvaluator: A composite evaluator with short-circuit AND
+                semantics over ``self`` and ``other``.
+        """
         return _AllEvaluator(left=self, right=other)
 
     def __invert__(self) -> _NotEvaluator:
-        """Invert: ~self — flips DETECTED <-> NOT_DETECTED."""
+        """Invert: ~self — flips DETECTED <-> NOT_DETECTED.
+
+        Returns:
+            _NotEvaluator: A wrapper that inverts the inner evaluator's
+                outcome (UNDETERMINED is preserved).
+        """
         return _NotEvaluator(inner=self)
 
 
@@ -81,6 +96,10 @@ class _AnyEvaluator(BaseEvaluator):
         Short-circuiting avoids unnecessary work when the left operand
         is a cheap deterministic evaluator and the right is an expensive
         LLM judge. Place the cheaper evaluator on the left side of |.
+
+        Returns:
+            EvalResult: DETECTED if either operand detects; otherwise
+                the right operand's result.
         """
         left_result = await self._left.evaluate_async(context=context)
 
@@ -100,7 +119,7 @@ class _AnyEvaluator(BaseEvaluator):
                 rationale=right_result.rationale,
             )
 
-        if EvalOutcome.UNDETERMINED in (left_result.outcome, right_result.outcome):
+        if EvalOutcome.UNDETERMINED in {left_result.outcome, right_result.outcome}:
             return EvalResult(
                 outcome=EvalOutcome.UNDETERMINED,
                 rationale="One or both operands undetermined",
@@ -125,6 +144,10 @@ class _AllEvaluator(BaseEvaluator):
         Short-circuiting avoids unnecessary work when the left operand
         can rule out the conjunction cheaply. Place the cheaper or more
         likely-to-fail evaluator on the left side of &.
+
+        Returns:
+            EvalResult: DETECTED with combined evidence if both operands
+                detect; otherwise the left operand's early-exit result.
         """
         left_result = await self._left.evaluate_async(context=context)
 
@@ -168,7 +191,14 @@ class _NotEvaluator(BaseEvaluator):
         self._inner = inner
 
     async def evaluate_async(self, *, context: EvalContext) -> EvalResult:
-        """Invert the inner evaluator's outcome."""
+        """Invert the inner evaluator's outcome.
+
+        Returns:
+            EvalResult: The inner result with DETECTED <-> NOT_DETECTED
+                flipped (UNDETERMINED preserved); confidence and evidence
+                are carried through and the rationale is prefixed with
+                ``NOT (...)``.
+        """
         result = await self._inner.evaluate_async(context=context)
 
         if result.outcome == EvalOutcome.UNDETERMINED:

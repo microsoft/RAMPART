@@ -108,7 +108,7 @@ class TestResult:
         r = Result(safe=True, status=SafetyStatus.SAFE, summary="ok")
         assert r.turns == []
         assert r.eval_results == []
-        assert r.duration_seconds == 0.0
+        assert r.duration_seconds == pytest.approx(0.0)
         assert r.harm_category is None
         assert r.strategy == ""
         assert r.observability_level is ObservabilityLevel.RESPONSE_ONLY

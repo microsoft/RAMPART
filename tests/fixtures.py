@@ -124,10 +124,10 @@ class MockAdapter:
 
     @property
     def manifest(self) -> AppManifest:
-        """Return the configured manifest."""
+        """Configured manifest."""
         return self._manifest_value
 
     @property
     def observability_profile(self) -> ObservabilityLevel:
-        """Return the configured observability level."""
+        """Configured observability level."""
         return self._observability_profile_value

@@ -1,12 +1,11 @@
 [build-system]
-requires = ["setuptools"]
-build-backend = "setuptools.build_meta"
+requires = ["hatchling>=1.30.1", "hatch-vcs>=0.5.0", "setuptools-scm>=10"]
+build-backend = "hatchling.build"
 
 [project]
 name = "RAMPART"
-version = "0.1.1.dev0"
 description = "A pytest-native safety testing framework for agentic AI applications"
-readme = "README.md"
+dynamic = ["readme", "version"]
 license = "MIT"
 requires-python = ">=3.11"
 authors = [
@@ -32,6 +31,7 @@ dependencies = [
     "pytest>=9.0.3",
     "pytest-asyncio>=1.3.0",
     "pyyaml>=6.0.3",
+    "typing-extensions>=4.16; python_version < '3.12'",
 ]
 
 [project.optional-dependencies]
@@ -42,11 +42,13 @@ onedrive = [
 
 [dependency-groups]
 dev = [
+    "hatch-vcs>=0.5.0",
+    "hatchling>=1.30.1",
     "pre-commit>=4.5.1",
-    "pyright>=1.1.390",
     "pytest-cov>=6.1.0",
     "pytest-xdist[psutil]>=3.8.0",
-    "ruff>=0.15.10",
+    "ruff>=0.15.20",
+    "ty>=0.0.56",
 ]
 docs = [
     "mkdocs>=1.6",
@@ -63,11 +65,18 @@ Issues = "https://github.com/microsoft/RAMPART/issues"
 [project.entry-points.pytest11]
 rampart = "rampart.pytest_plugin.plugin"
 
-[tool.setuptools.packages.find]
-exclude = ["site*", "docs*", "tests*", "scripts*"]
+[tool.hatch.metadata.hooks.custom]
+path = "scripts/hatch_build.py"
 
-[tool.setuptools.package-data]
-rampart = ["drivers/prompts/*.yaml"]
+[tool.hatch.version]
+source = "vcs"
+
+[tool.hatch.version.raw-options]
+version_scheme = "semver-pep440-release-branch"
+local_scheme = "no-local-version"
+
+[tool.hatch.build.targets.wheel]
+packages = ["rampart"]
 
 [tool.coverage.run]
 source = ["rampart"]
@@ -78,21 +87,14 @@ fail_under = 80
 show_missing = true
 skip_empty = true
 
-[tool.pyright]
-pythonVersion = "3.11"
-typeCheckingMode = "strict"
-include = ["rampart", "tests"]
-
-[[tool.pyright.executionEnvironments]]
-root = "tests"
-extraPaths = ["."]
-reportPrivateUsage = false
-
 [tool.pytest.ini_options]
+pythonpath = ["scripts"]
 asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "session"
 markers = [
     "harm(*categories): categorize test by harm type",
     "trial(n=, threshold=): statistical repetition of a test",
+    "slow: marks tests that spawn subprocess pytest runs; deselect with -m 'not slow'",
 ]
 filterwarnings = [
     "ignore:.*invalid escape sequence:DeprecationWarning:.*confusables.*",
@@ -101,16 +103,28 @@ filterwarnings = [
 
 [tool.ruff.lint]
 select = ["ALL"]
+preview = true
+
+extend-ignore = [
+    "COM812", # May conflict with formatting, see https://docs.astral.sh/ruff/formatter/#conflicting-lint-rules
+    "DOC502", # Allow extraneous exceptions in docstrings to deliberately document the caller-visible contract, even if they propagate from a delegated callee.
+]
 
 [tool.ruff.lint.per-file-ignores]
+"scripts/hatch_build.py" = [
+    "INP001",                                  # Top-level build hook
+]
 "tests/**" = [
     "S101",                                    # assert is pytest's API
     "D100", "D101", "D102", "D104", "D107",    # no docstrings needed
+    "DOC201", "DOC501",                        # docstring style doesn't add value for tests
     "ANN001", "ANN201", "ANN202", "ANN401",    # no type annotations needed
     "PLR2004",                                 # magic values in assertions are fine
+    "PLC1901",                                 # explicit `== ""` is intentional in assertions
     "ARG001", "ARG002",                        # unused args (fixtures, stubs)
     "PLC0415",                                 # imports inside functions for isolation
     "SLF001",                                  # testing private members is valid
+    "PLC2701",                                 # importing private names is fine
     "TRY003", "EM101", "EM102",                # exception message style
     "BLE001",                                  # catching Exception in tests
     "TRY301",                                  # raise in try blocks
@@ -118,6 +132,8 @@ select = ["ALL"]
     "PT017", "PT018",                          # assertion style
     "ASYNC240",                                # pathlib in async tests
     "PERF401", "RUF015", "PTH123",             # micro-optimizations / style
+    "PLR6301",                                 # allow pytest fixtures in tests
+    "PLW0717",                                 # try clause contains >5 statements
 ]
 
 [tool.ruff.lint.flake8-copyright]
@@ -131,6 +147,13 @@ convention = "google"
 
 [tool.ruff.lint.pylint]
 max-args = 10
+
+[tool.ty.environment]
+python-version = "3.11"
+extra-paths = ["scripts"]
+
+[tool.ty.src]
+include = ["rampart", "tests", "scripts"]
 
 [tool.uv.sources]
 pyrit = { git = "https://github.com/microsoft/PyRIT", rev = "6dc8b94139757390286bbce7d53c1f7e58e66e29" } # v0.13.0

@@ -39,19 +39,25 @@ class ResponseContains(BaseEvaluator):
         self._case_sensitive = case_sensitive
 
     async def evaluate_async(self, *, context: EvalContext) -> EvalResult:
-        """Check response text for the target pattern."""
+        """Check response text for the target pattern.
+
+        Returns:
+            EvalResult: DETECTED (with evidence) if the pattern is
+                found in the current response text; NOT_DETECTED otherwise.
+        """
         text = context.text
 
-        if callable(self._target):
-            found = self._target(text)
-        elif isinstance(self._target, re.Pattern):
+        found = False
+        if isinstance(self._target, re.Pattern):
             found = bool(self._target.search(text))
-        else:
+        elif isinstance(self._target, str):
             check_text = text if self._case_sensitive else text.lower()
             check_target = (
                 self._target if self._case_sensitive else self._target.lower()
             )
             found = check_target in check_text
+        elif callable(self._target):
+            found = self._target(text)
 
         if found:
             return EvalResult(

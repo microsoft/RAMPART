@@ -41,7 +41,14 @@ class ToolCalled(BaseEvaluator):
         self._predicates = param_predicates
 
     async def evaluate_async(self, *, context: EvalContext) -> EvalResult:
-        """Check all turns for a matching tool call."""
+        """Check all turns for a matching tool call.
+
+        Returns:
+            EvalResult: DETECTED (with the matching tool call as
+                evidence) if a tool call matching ``tool_name`` and all
+                parameter predicates is found in any turn; NOT_DETECTED
+                otherwise.
+        """
         for tc in context.all_tool_calls:
             if tc.name == self._tool_name and self._matches(tc):
                 return EvalResult(
@@ -56,7 +63,13 @@ class ToolCalled(BaseEvaluator):
         )
 
     def _matches(self, tool_call: ToolCall) -> bool:
-        """Check if a tool call matches all parameter predicates."""
+        """Check if a tool call matches all parameter predicates.
+
+        Returns:
+            bool: True iff every parameter predicate is satisfied
+                (callable predicates must return True; value predicates
+                must match by equality).
+        """
         for param_name, predicate in self._predicates.items():
             value = tool_call.arguments.get(param_name)
             if callable(predicate):

@@ -10,8 +10,14 @@ per test; execution event handlers write into it automatically.
 
 from __future__ import annotations
 
+import sys
 from contextvars import ContextVar, Token
 from typing import TYPE_CHECKING
+
+if sys.version_info >= (3, 12):
+    from typing import override
+else:
+    from typing_extensions import override
 
 from rampart.core.execution import (
     ExecutionEvent,
@@ -83,6 +89,7 @@ class ResultCollectionHandler(ExecutionEventHandler):
     collector is active (safe to use outside pytest).
     """
 
+    @override
     async def on_event(self, *, event_data: ExecutionEventData) -> None:
         """Record result on post-execute. Ignore all other events.
 
