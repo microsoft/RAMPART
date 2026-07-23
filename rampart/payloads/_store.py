@@ -26,7 +26,6 @@ from __future__ import annotations
 
 import json
 import logging
-import re
 import shutil
 import tempfile
 from pathlib import Path
@@ -35,7 +34,14 @@ from typing import Any
 from rampart.core.types import Payload, PayloadFormat
 
 logger = logging.getLogger(__name__)
-_COLLECTION_NAME_PATTERN = re.compile(r"^[A-Za-z0-9._-]{1,128}$")
+_WINDOWS_RESERVED_BASENAMES = {
+    "AUX",
+    "CON",
+    "NUL",
+    "PRN",
+    *(f"COM{number}" for number in range(1, 10)),
+    *(f"LPT{number}" for number in range(1, 10)),
+}
 
 
 class PayloadStore:
@@ -216,15 +222,23 @@ class PayloadStore:
 
     @staticmethod
     def _validate_collection_name(name: str) -> None:
-        """Reject names that would escape the store root.
+        """Reject names that would escape or alias another collection.
 
         Raises:
-            ValueError: If the name is not a filename-safe identifier.
+            ValueError: If the name is not a portable directory name.
         """
-        if not _COLLECTION_NAME_PATTERN.fullmatch(name) or name in {".", ".."}:
+        basename = name.partition(".")[0].upper()
+        is_unsafe_path = (
+            not name
+            or name in {".", ".."}
+            or any(separator in name for separator in ("/", "\\"))
+        )
+        is_windows_alias = (
+            name.endswith((".", " ")) or basename in _WINDOWS_RESERVED_BASENAMES
+        )
+        if is_unsafe_path or is_windows_alias:
             msg = (
-                f"Invalid collection name: {name!r}. Must be a filename-safe "
-                "identifier using letters, numbers, dots, underscores, or hyphens."
+                f"Invalid collection name: {name!r}. Must be a portable directory name."
             )
             raise ValueError(msg)
 

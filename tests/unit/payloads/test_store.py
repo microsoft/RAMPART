@@ -166,6 +166,44 @@ class TestPayloadStoreCollectionManagement:
         with pytest.raises(ValueError, match="Invalid collection name"):
             store.manifest("..")
 
+    @pytest.mark.parametrize("alias", ["victim.", "victim...", "victim "])
+    def test_delete_rejects_windows_trailing_alias(
+        self,
+        store: PayloadStore,
+        alias: str,
+    ) -> None:
+        store.save("victim", payloads=[Payload(content="safe", id="p1")])
+
+        with pytest.raises(ValueError, match="Invalid collection name"):
+            store.delete(alias)
+
+        assert store.exists("victim")
+
+    @pytest.mark.parametrize("name", ["CON", "NUL", "COM1", "LPT9", "CON.txt"])
+    def test_save_rejects_windows_reserved_basename(
+        self,
+        store: PayloadStore,
+        name: str,
+    ) -> None:
+        with pytest.raises(ValueError, match="Invalid collection name"):
+            store.save(name, payloads=[Payload(content="x", id="p1")])
+
+    @pytest.mark.parametrize("name", ["team payloads", "チーム", "x" * 129])
+    def test_existing_collection_name_compatibility(
+        self,
+        store: PayloadStore,
+        name: str,
+    ) -> None:
+        store.save(name, payloads=[Payload(content="x", id="p1")])
+
+        assert name in store.list_collections()
+        assert store.exists(name)
+        assert store.load(name)[0].content == "x"
+        assert store.manifest(name)["collection"] == name
+
+        store.delete(name)
+        assert not store.exists(name)
+
 
 class TestPayloadStorePathPayload:
     def test_path_based_payload_roundtrip(
