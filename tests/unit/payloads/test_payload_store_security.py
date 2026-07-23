@@ -11,7 +11,7 @@ import pytest
 from rampart.payloads._store import PayloadStore
 
 
-def _write_collection_record(collection_dir: Path, artifact: str) -> None:
+def _write_collection_record(collection_dir: Path, artifact: object) -> None:
     collection_dir.mkdir(parents=True, exist_ok=True)
     record: dict[str, object] = {
         "id": "safe-id",
@@ -38,6 +38,23 @@ def test_payload_store_rejects_deserialized_artifact_escape(
     artifact: str,
 ) -> None:
     """Serialized artifact paths must stay under the collection artifacts dir."""
+    collection_dir = tmp_path / "store" / "collection"
+    _write_collection_record(collection_dir, artifact)
+
+    store = PayloadStore(root=tmp_path / "store")
+    with pytest.raises(ValueError, match="Invalid artifact path"):
+        store.load("collection")
+
+
+@pytest.mark.parametrize(
+    "artifact",
+    [None, 7, ["artifacts/file.pdf"], {"path": "artifacts/file.pdf"}],
+)
+def test_payload_store_rejects_non_string_deserialized_artifact(
+    tmp_path: Path,
+    artifact: object,
+) -> None:
+    """Serialized artifact references must be strings."""
     collection_dir = tmp_path / "store" / "collection"
     _write_collection_record(collection_dir, artifact)
 

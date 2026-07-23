@@ -29,7 +29,7 @@ import logging
 import shutil
 import tempfile
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from rampart.core.types import Payload, PayloadFormat
 
@@ -338,7 +338,11 @@ class PayloadStore:
         directory: Path,
         description: str,
     ) -> None:
-        """Raise if a resolved path escapes a required directory."""
+        """Raise if a resolved path escapes a required directory.
+
+        Raises:
+            ValueError: If the resolved path is outside the directory.
+        """
         resolved_path = path.resolve(strict=False)
         resolved_directory = directory.resolve(strict=False)
         if not resolved_path.is_relative_to(resolved_directory):
@@ -346,10 +350,20 @@ class PayloadStore:
             raise ValueError(msg)
 
     @staticmethod
-    def _resolve_artifact_path(*, collection_dir: Path, artifact: str) -> Path:
-        """Resolve a serialized artifact path inside collection artifacts/."""
+    def _resolve_artifact_path(*, collection_dir: Path, artifact: object) -> Path:
+        """Resolve a serialized artifact path inside collection artifacts/.
+
+        Returns:
+            Path: The validated artifact path.
+
+        Raises:
+            ValueError: If the artifact reference is not a contained string path.
+        """
         msg = f"Invalid artifact path: {artifact!r}. Must be under artifacts/."
-        artifact_path = Path(artifact)
+        try:
+            artifact_path = Path(cast("str", artifact))
+        except TypeError as exc:
+            raise ValueError(msg) from exc
         if artifact_path.is_absolute() or ".." in artifact_path.parts:
             raise ValueError(msg)
         try:
