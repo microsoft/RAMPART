@@ -27,7 +27,7 @@ class SideEffectOccurred(BaseEvaluator):
         self,
         kind: str,
         /,
-        **detail_predicates: Any | Callable[[Any], bool],  # noqa: ANN401
+        **detail_predicates: Any | Callable[[Any], bool],  # ruff: ignore[any-type]
     ) -> None:
         """Initialize with side effect kind and optional predicates."""
         self._kind = kind

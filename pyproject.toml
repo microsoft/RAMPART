@@ -39,23 +39,6 @@ dependencies = [
 onedrive = [
     "msgraph-sdk>=1.57.0",
     "azure-identity>=1.25.3"
- ]
-
-[dependency-groups]
-dev = [
-    "hatch-vcs>=0.5.0",
-    "hatchling>=1.30.1",
-    "pre-commit>=4.5.1",
-    "pytest-cov>=6.1.0",
-    "pytest-xdist[psutil]>=3.8.0",
-    "ruff>=0.15.20",
-    "ty>=0.0.56",
-]
-docs = [
-    "mkdocs>=1.6",
-    "mkdocs-material>=9.5",
-    "mkdocs-git-revision-date-localized-plugin>=1.5.2",
-    "mkdocstrings[python]>=1.0.4",
 ]
 
 [project.urls]
@@ -65,6 +48,23 @@ Issues = "https://github.com/microsoft/RAMPART/issues"
 
 [project.entry-points.pytest11]
 rampart = "rampart.pytest_plugin.plugin"
+
+[dependency-groups]
+dev = [
+    "hatch-vcs>=0.5.0",
+    "hatchling>=1.30.1",
+    "pre-commit>=4.5.1",
+    "pytest-cov>=6.1.0",
+    "pytest-xdist[psutil]>=3.8.0",
+    "ruff>=0.16.0",
+    "ty>=0.0.56",
+]
+docs = [
+    "mkdocs>=1.6",
+    "mkdocs-material>=9.5",
+    "mkdocs-git-revision-date-localized-plugin>=1.5.2",
+    "mkdocstrings[python]>=1.0.4",
+]
 
 [tool.hatch.metadata.hooks.custom]
 path = "scripts/hatch_build.py"
@@ -106,35 +106,49 @@ filterwarnings = [
 select = ["ALL"]
 preview = true
 
-extend-ignore = [
-    "COM812", # May conflict with formatting, see https://docs.astral.sh/ruff/formatter/#conflicting-lint-rules
-    "DOC502", # Allow extraneous exceptions in docstrings to deliberately document the caller-visible contract, even if they propagate from a delegated callee.
+ignore = [
+    "missing-trailing-comma", # May conflict with formatting, see https://docs.astral.sh/ruff/formatter/#conflicting-lint-rules
+    "docstring-extraneous-exception", # Allow extraneous exceptions in docstrings to deliberately document the caller-visible contract, even if they propagate from a delegated callee.
 ]
 
 [tool.ruff.lint.per-file-ignores]
 "scripts/hatch_build.py" = [
-    "INP001",                                  # Top-level build hook
+  "implicit-namespace-package", # Top-level build hook
 ]
 "tests/**" = [
-    "S101",                                    # assert is pytest's API
-    "D100", "D101", "D102", "D104", "D107",    # no docstrings needed
-    "DOC201", "DOC501",                        # docstring style doesn't add value for tests
-    "ANN001", "ANN201", "ANN202", "ANN401",    # no type annotations needed
-    "PLR2004",                                 # magic values in assertions are fine
-    "PLC1901",                                 # explicit `== ""` is intentional in assertions
-    "ARG001", "ARG002",                        # unused args (fixtures, stubs)
-    "PLC0415",                                 # imports inside functions for isolation
-    "SLF001",                                  # testing private members is valid
-    "PLC2701",                                 # importing private names is fine
-    "TRY003", "EM101", "EM102",                # exception message style
-    "BLE001",                                  # catching Exception in tests
-    "TRY301",                                  # raise in try blocks
-    "S108",                                    # /tmp usage
-    "PT017", "PT018",                          # assertion style
-    "ASYNC240",                                # pathlib in async tests
-    "PERF401", "RUF015", "PTH123",             # micro-optimizations / style
-    "PLR6301",                                 # allow pytest fixtures in tests
-    "PLW0717",                                 # try clause contains >5 statements
+  "any-type",                                          # no type annotations needed
+  "assert",                                            # assert is pytest's API
+  "blind-except",                                      # catching Exception in tests
+  "blocking-path-method-in-async-function",            # pathlib in async tests
+  "builtin-open",                                      # micro-optimizations / style
+  "compare-to-empty-string",                           # explicit `== ""` is intentional in assertions
+  "docstring-missing-exception",                       # docstring style doesn't add value for tests
+  "docstring-missing-returns",
+  "f-string-in-exception",                             # exception message style
+  "hardcoded-temp-file",                               # /tmp usage
+  "import-outside-top-level",                          # imports inside functions for isolation
+  "import-private-name",                               # importing private names is fine
+  "magic-value-comparison",                            # magic values in assertions are fine
+  "manual-list-comprehension",
+  "missing-return-type-private-function",
+  "missing-return-type-undocumented-public-function",
+  "missing-type-function-argument",
+  "no-self-use",                                       # allow pytest fixtures in tests
+  "private-member-access",                             # testing private members is valid
+  "pytest-assert-in-except",
+  "pytest-composite-assertion",                        # assertion style
+  "raise-vanilla-args",
+  "raise-within-try",                                  # raise in try blocks
+  "raw-string-in-exception",
+  "too-many-statements-in-try-clause",                 # try clause contains >5 statements
+  "undocumented-public-class",
+  "undocumented-public-init",                          # no docstrings needed
+  "undocumented-public-method",
+  "undocumented-public-module",
+  "undocumented-public-package",
+  "unnecessary-iterable-allocation-for-first-element",
+  "unused-function-argument",
+  "unused-method-argument",                            # unused args (fixtures, stubs)
 ]
 
 [tool.ruff.lint.flake8-copyright]

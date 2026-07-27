@@ -198,12 +198,12 @@ def _strip_ansi(*, text: str) -> str:
     return _strip_ansi_impl(text)
 
 
-def _sanitize(  # noqa: PLR0911
+def _sanitize(  # ruff: ignore[too-many-return-statements]
     *,
-    value: Any,  # noqa: ANN401
+    value: Any,  # ruff: ignore[any-type]
     depth: int = 0,
     strip_ansi: bool = False,
-) -> Any:  # noqa: ANN401
+) -> Any:  # ruff: ignore[any-type]
     """Coerce a value to a JSON-safe form.
 
     Walks dicts and lists up to ``MAX_METADATA_DEPTH``. Values not in
@@ -246,7 +246,7 @@ def _sanitize(  # noqa: PLR0911
     return repr(value)
 
 
-def _is_json_passthrough(value: Any) -> bool:  # noqa: ANN401
+def _is_json_passthrough(value: Any) -> bool:  # ruff: ignore[any-type]
     """True if a value would pass through ``_sanitize`` unchanged.
 
     Returns:
@@ -1280,13 +1280,13 @@ def _unwrap_fixture_function(candidate: object) -> Callable[..., object] | None:
     as fallbacks). Returns the recovered function, or None when
     ``candidate`` is not a fixture wrapper we can unwrap.
     """
-    import inspect  # noqa: PLC0415
+    import inspect  # ruff: ignore[import-outside-top-level]
 
     getter = getattr(candidate, "_get_wrapped_function", None)
     if callable(getter):
         try:
             wrapped = getter()
-        except Exception:  # noqa: BLE001 — defensive across pytest versions
+        except Exception:  # ruff: ignore[blind-except] — defensive across pytest versions
             wrapped = None
         if inspect.isfunction(wrapped):
             return wrapped
@@ -1325,7 +1325,7 @@ def _resolve_sink_candidate(
         KeyboardInterrupt: If the function is interrupted by the user.
         SystemExit: If the function attempts to exit the program.
     """
-    import inspect  # noqa: PLC0415
+    import inspect  # ruff: ignore[import-outside-top-level]
 
     plugin_name = getattr(plugin, "__name__", repr(plugin))
     if isinstance(candidate, list):
@@ -1367,7 +1367,7 @@ def _resolve_sink_candidate(
         value = func()
     except (KeyboardInterrupt, SystemExit):
         raise
-    except Exception as exc:  # noqa: BLE001 — broad on purpose: user code
+    except Exception as exc:  # ruff: ignore[blind-except] — broad on purpose: user code
         logger.warning(
             "rampart_sinks in %s raised during controller-side discovery: %s",
             plugin_name,

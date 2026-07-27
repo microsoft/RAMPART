@@ -90,7 +90,7 @@ class Probes:
         elif prompts is not None:
             resolved_driver = coerce_driver(prompts)
         else:
-            assert driver is not None  # noqa: S101  — type narrowing
+            assert driver is not None  # ruff: ignore[assert]  — type narrowing
             resolved_driver = driver
         return SingleTurnExecution(
             driver=resolved_driver,

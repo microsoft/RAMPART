@@ -22,7 +22,7 @@ hookspec = HookspecMarker("pytest")
 
 
 @hookspec
-def pytest_rampart_sinks(config: pytest.Config) -> list[ReportSink]:  # noqa: ARG001
+def pytest_rampart_sinks(config: pytest.Config) -> list[ReportSink]:  # ruff: ignore[unused-function-argument]
     """Return the report sinks RAMPART should emit the final report to.
 
     Implement this hook in your ``conftest.py`` to register sinks in a

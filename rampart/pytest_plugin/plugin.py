@@ -298,8 +298,8 @@ def _create_trial_clones(
 
         clone = type(item).from_parent(parent=parent, **from_parent_kwargs)
         # pytest.Item supports arbitrary user attributes for cross-hook state.
-        clone._rampart_trial_index = i  # ty: ignore[unresolved-attribute]  # noqa: SLF001
-        clone._rampart_trial_base = item.nodeid  # ty: ignore[unresolved-attribute]  # noqa: SLF001
+        clone._rampart_trial_index = i  # ty: ignore[unresolved-attribute]  # ruff: ignore[private-member-access]
+        clone._rampart_trial_base = item.nodeid  # ty: ignore[unresolved-attribute]  # ruff: ignore[private-member-access]
 
         _copy_markers_to_clone(source=item, clone=clone)
         clone.add_marker(
@@ -685,7 +685,7 @@ def _enforce_incomplete_exit_status(
 
 def pytest_sessionfinish(
     session: pytest.Session,
-    exitstatus: int,  # noqa: ARG001  — pytest hook signature
+    exitstatus: int,  # ruff: ignore[unused-function-argument]  — pytest hook signature
 ) -> None:
     """Aggregate trial results, evaluate gates, and emit sinks.
 
@@ -918,7 +918,7 @@ def _write_incomplete_warning(
 
 def pytest_terminal_summary(
     terminalreporter: TerminalReporter,
-    exitstatus: int,  # noqa: ARG001  — pytest hook signature
+    exitstatus: int,  # ruff: ignore[unused-function-argument]  — pytest hook signature
     config: pytest.Config,
 ) -> None:
     """Append RAMPART harm-category summary after pytest's standard output.

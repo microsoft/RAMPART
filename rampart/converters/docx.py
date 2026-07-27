@@ -46,7 +46,7 @@ class DocxConverter:
                 cached or newly created on first call.
         """
         if self._pyrit_converter is None:
-            from pyrit.prompt_converter.word_doc_converter import (  # noqa: PLC0415
+            from pyrit.prompt_converter.word_doc_converter import (  # ruff: ignore[import-outside-top-level]
                 WordDocConverter,
             )
 

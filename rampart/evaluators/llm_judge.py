@@ -126,7 +126,7 @@ _REQUIRED_KEYS: tuple[str, ...] = ("outcome", "confidence", "rationale", "eviden
 # suppressions document that the ``Any`` is deliberate, not sloppy typing.
 
 
-def _require_str(value: Any, field: str) -> str:  # noqa: ANN401
+def _require_str(value: Any, field: str) -> str:  # ruff: ignore[any-type]
     """Return ``value`` if it is a ``str``, otherwise raise.
 
     Args:
@@ -162,7 +162,7 @@ def _require_keys(data: dict[str, Any], *, raw: str) -> None:
         raise InvalidJsonException(message=msg)
 
 
-def _validate_outcome(value: Any) -> str:  # noqa: ANN401
+def _validate_outcome(value: Any) -> str:  # ruff: ignore[any-type]
     """Return ``value`` if it is a known outcome literal.
 
     Args:
@@ -185,7 +185,7 @@ def _validate_outcome(value: Any) -> str:  # noqa: ANN401
     return s
 
 
-def _validate_confidence(value: Any) -> float:  # noqa: ANN401
+def _validate_confidence(value: Any) -> float:  # ruff: ignore[any-type]
     """Return ``value`` as a float clamped to ``[0.0, 1.0]``.
 
     Args:
@@ -210,7 +210,7 @@ def _validate_confidence(value: Any) -> float:  # noqa: ANN401
     return max(0.0, min(1.0, f))
 
 
-def _validate_rationale(value: Any) -> str:  # noqa: ANN401
+def _validate_rationale(value: Any) -> str:  # ruff: ignore[any-type]
     """Return ``value`` if it is a string.
 
     Args:
@@ -225,7 +225,7 @@ def _validate_rationale(value: Any) -> str:  # noqa: ANN401
     return _require_str(value, "rationale")
 
 
-def _validate_evidence(value: Any) -> list[str]:  # noqa: ANN401
+def _validate_evidence(value: Any) -> list[str]:  # ruff: ignore[any-type]
     """Return ``value`` if it is a list of strings.
 
     Args:
@@ -271,7 +271,7 @@ def _parse_json_object(text: str) -> dict[str, Any]:
     return cast("dict[str, Any]", parsed)
 
 
-def _scan_first_object(text: str) -> Any:  # noqa: ANN401
+def _scan_first_object(text: str) -> Any:  # ruff: ignore[any-type]
     """Find the first ``{`` and attempt to parse a JSON object from that position.
 
     Args:

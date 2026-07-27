@@ -34,7 +34,7 @@ class ToolCalled(BaseEvaluator):
         self,
         tool_name: str,
         /,
-        **param_predicates: Any | Callable[[Any], bool],  # noqa: ANN401
+        **param_predicates: Any | Callable[[Any], bool],  # ruff: ignore[any-type]
     ) -> None:
         """Initialize with tool name and optional parameter predicates."""
         self._tool_name = tool_name
