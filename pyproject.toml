@@ -102,6 +102,11 @@ filterwarnings = [
     "ignore:.*invalid escape sequence:SyntaxWarning:.*confusables.*",
 ]
 
+[tool.ruff.format]
+exclude = [
+    "docs/**/*.md",
+]
+
 [tool.ruff.lint]
 select = ["ALL"]
 preview = true

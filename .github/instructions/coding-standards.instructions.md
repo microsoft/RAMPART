@@ -56,12 +56,11 @@ Use parenthesized multi-line imports when importing 3+ names from the same modul
 
 ```python
 # CORRECT
-async def send_request_async(self, *, payload: str) -> Response:
-    ...
+async def send_request_async(self, *, payload: str) -> Response: ...
+
 
 # INCORRECT
-async def send_request(self, *, payload: str) -> Response:
-    ...
+async def send_request(self, *, payload: str) -> Response: ...
 ```
 
 ### Private Methods
@@ -70,12 +69,11 @@ async def send_request(self, *, payload: str) -> Response:
 
 ```python
 # CORRECT
-def _validate_input(self, data: dict[str, Any]) -> None:
-    ...
+def _validate_input(self, data: dict[str, Any]) -> None: ...
+
 
 # INCORRECT
-def validate_input(self, data: dict[str, Any]) -> None:
-    ...
+def validate_input(self, data: dict[str, Any]) -> None: ...
 ```
 
 ## Type Annotations
@@ -89,12 +87,11 @@ def validate_input(self, data: dict[str, Any]) -> None:
 
 ```python
 # CORRECT
-def process_items(self, *, items: list[str], limit: int = 10) -> dict[str, Any]:
-    ...
+def process_items(self, *, items: list[str], limit: int = 10) -> dict[str, Any]: ...
+
 
 # INCORRECT
-def process_items(self, items, limit=10):
-    ...
+def process_items(self, items, limit=10): ...
 ```
 
 ## Function Signatures
@@ -112,12 +109,11 @@ def __init__(
     client: ServiceClient,
     config: Config,
     max_retries: int = 3,
-) -> None:
-    ...
+) -> None: ...
+
 
 # INCORRECT
-def __init__(self, client: ServiceClient, config: Config, max_retries: int = 3):
-    ...
+def __init__(self, client: ServiceClient, config: Config, max_retries: int = 3): ...
 ```
 
 ### Single Parameter Functions
@@ -125,8 +121,7 @@ def __init__(self, client: ServiceClient, config: Config, max_retries: int = 3):
 
 ```python
 # CORRECT
-def process(self, data: str) -> str:
-    ...
+def process(self, data: str) -> str: ...
 ```
 
 ## Data Structures
@@ -156,8 +151,7 @@ class Record:
 ```python
 @runtime_checkable
 class Handler(Protocol):
-    async def handle_async(self, *, context: Context) -> Result:
-        ...
+    async def handle_async(self, *, context: Context) -> Result: ...
 ```
 
 ## Documentation Standards
@@ -217,20 +211,23 @@ async def process_async(
 # CORRECT
 from enum import Enum, StrEnum
 
+
 class Status(Enum):
     PENDING = "pending"
     COMPLETE = "complete"
     FAILED = "failed"
 
+
 class Category(StrEnum):
     NETWORK = "network"
     STORAGE = "storage"
 
+
 # INCORRECT
 from typing import Literal
 
-def classify(self, *, status: Literal["pending", "complete", "failed"]) -> None:
-    ...
+
+def classify(self, *, status: Literal["pending", "complete", "failed"]) -> None: ...
 ```
 
 ## Module Exports
@@ -269,6 +266,7 @@ class DataProcessor(BaseProcessor):
     DEFAULT_MAX_RETRIES: int = 5
     MIN_CONFIDENCE_THRESHOLD: float = 0.7
 
+
 # INCORRECT
 DEFAULT_BATCH_SIZE = 32  # Should be inside class
 DEFAULT_MAX_RETRIES = 5
@@ -294,10 +292,12 @@ async def execute_task_async(self, *, context: TaskContext) -> TaskResult:
 
     return result
 
+
 def _validate_context(self, context: TaskContext) -> None:
     """Validate the task context."""
     if not context.objective:
         raise ValueError("Context must have an objective")
+
 
 # INCORRECT - Too long and doing too many things
 async def execute_task_async(self, *, context: TaskContext) -> TaskResult:
@@ -341,7 +341,6 @@ from myapp.validators import (
 # Incorrect (if exposed from package root)
 from myapp.clients.http.http_client import HttpClient
 from myapp.clients.grpc.grpc_client import GrpcClient
-
 ```
 
 ## Error Handling
@@ -382,6 +381,7 @@ def process_items(self, *, items: list[str]) -> list[str]:
 
     # Main logic for multiple items
     return [self._process_single(item) for item in items]
+
 
 # INCORRECT - Excessive nesting
 def process_items(self, *, items: list[str]) -> list[str]:
@@ -424,6 +424,7 @@ async with self._get_client() as client:
 # For custom resources
 from contextlib import asynccontextmanager
 
+
 @asynccontextmanager
 async def temporary_config(self, **kwargs):
     old_config = self._config.copy()
@@ -445,6 +446,7 @@ async def __aenter__(self) -> Self:
     self._session = await self._create_session()
     return self
 
+
 async def __aexit__(self, *exc: object) -> None:
     try:
         await self._session.close()
@@ -462,6 +464,7 @@ async def __aexit__(self, *exc: object) -> None:
 def is_complete(self) -> bool:
     """Check if the task is complete."""
     return self._status == TaskStatus.COMPLETE
+
 
 # INCORRECT - Too complex for property
 @property
@@ -485,11 +488,12 @@ class TaskExecutor:
         *,
         client: ServiceClient,
         scorer: Scorer,
-        logger: logging.Logger | None = None
+        logger: logging.Logger | None = None,
     ) -> None:
         self._client = client
         self._scorer = scorer
         self._logger = logger or logging.getLogger(__name__)
+
 
 # INCORRECT
 class TaskExecutor:
@@ -508,6 +512,7 @@ def calculate_score(response: str, objective: str) -> float:
     """Pure function for score calculation."""
     # Logic without side effects
     return score
+
 
 async def evaluate_response_async(self, *, response: str) -> Score:
     """I/O function that uses the pure function."""
@@ -528,6 +533,7 @@ def process_large_dataset(self, *, file_path: Path) -> Generator[Result, None, N
     with open(file_path) as f:
         for line in f:
             yield self._process_line(line)
+
 
 # INCORRECT
 def process_large_dataset(self, *, file_path: Path) -> list[Result]:

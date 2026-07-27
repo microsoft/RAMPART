@@ -62,6 +62,7 @@ def _make_context(text: str) -> Context:
         items=[Item(id="test", content=text)],
     )
 
+
 def _make_record(*, status: Status = Status.PENDING) -> Record:
     """Build a Record with sensible defaults."""
     return Record(id="r1", status=status, metadata={})
