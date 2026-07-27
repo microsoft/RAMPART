@@ -21,7 +21,7 @@ from __future__ import annotations
 
 from collections.abc import Hashable
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Annotated, TypeAlias, TypeVar
+from typing import TYPE_CHECKING, Annotated, TypeAlias, TypeVar, final
 
 import yaml
 from jinja2 import (
@@ -98,14 +98,30 @@ class TemplateParameterError(ValueError):
         super().__init__(msg)
 
 
-@dataclass(frozen=True, kw_only=True, slots=True)
+@final
+@dataclass(
+    frozen=True,
+    kw_only=True,
+    slots=True,
+    init=False,
+    eq=False,
+)
 class PromptTemplate:
     """Compiled prompt template with metadata and an explicit render contract."""
 
     name: str
     description: str | None
     parameter_keys: tuple[str, ...]
-    _template: Template = field(repr=False, compare=False)
+    _template: Template = field(repr=False)
+
+    def __init__(self) -> None:
+        """Reject construction that bypasses template validation.
+
+        Raises:
+            TypeError: Always. Use :meth:`from_yaml` to construct an instance.
+        """
+        msg = "Use PromptTemplate.from_yaml()"
+        raise TypeError(msg)
 
     @classmethod
     def from_yaml(cls, path: Path) -> Self:
@@ -127,12 +143,31 @@ class PromptTemplate:
                 a valid prompt template.
         """
         definition = _load_yaml_definition(path)
-        return cls(
-            name=definition.name,
-            description=definition.description,
-            parameter_keys=tuple(definition.parameters),
-            _template=_compile_template(definition, path=path),
+        return cls._from_validated_definition(definition=definition, path=path)
+
+    @classmethod
+    def _from_validated_definition(
+        cls,
+        *,
+        definition: _PromptTemplateYaml,
+        path: Path,
+    ) -> Self:
+        compiled = _compile_template(definition, path=path)
+
+        instance = object.__new__(cls)
+        object.__setattr__(instance, "name", definition.name)  # ruff:ignore[unnecessary-dunder-call]
+        object.__setattr__(  # ruff:ignore[unnecessary-dunder-call]
+            instance,
+            "description",
+            definition.description,
         )
+        object.__setattr__(  # ruff:ignore[unnecessary-dunder-call]
+            instance,
+            "parameter_keys",
+            tuple(definition.parameters),
+        )
+        object.__setattr__(instance, "_template", compiled)  # ruff:ignore[unnecessary-dunder-call]
+        return instance
 
     def render(self, **kwargs: object) -> str:
         """Render with exactly the declared keyword arguments.

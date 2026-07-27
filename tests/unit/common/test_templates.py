@@ -3,16 +3,20 @@
 
 from pathlib import Path
 from textwrap import dedent
+from typing import TYPE_CHECKING, cast
 
 import pytest
 import yaml
-from jinja2 import TemplateError
+from jinja2 import Template, TemplateError
 
 from rampart.common.templates import (
     PromptTemplate,
     PromptTemplateDefinitionError,
     TemplateParameterError,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 
 def _write_yaml(tmp_path: Path, data: object) -> Path:
@@ -35,6 +39,32 @@ def _write_template(tmp_path: Path, **overrides: object) -> Path:
     }
     definition.update(overrides)
     return _write_yaml(tmp_path, definition)
+
+
+class TestPromptTemplateInitialization:
+    def test_rejects_direct_construction(self) -> None:
+        with pytest.raises(TypeError, match=r"Use PromptTemplate\.from_yaml\(\)"):
+            PromptTemplate()
+
+    def test_rejects_generated_constructor_arguments(self) -> None:
+        constructor = cast("Callable[..., PromptTemplate]", PromptTemplate)
+
+        with pytest.raises(TypeError):
+            constructor(
+                name="x",
+                description=None,
+                parameter_keys=("declared",),
+                _template=Template("{{ actual }}"),
+            )
+
+    def test_uses_identity_equality_and_hashing(self, tmp_path: Path) -> None:
+        path = _write_template(tmp_path)
+
+        first = PromptTemplate.from_yaml(path)
+        second = PromptTemplate.from_yaml(path)
+
+        assert first != second
+        assert len({first, second}) == 2
 
 
 class TestPromptTemplateFromYaml:
