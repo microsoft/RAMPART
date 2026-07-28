@@ -29,7 +29,7 @@ import logging
 import shutil
 import tempfile
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
 
 from rampart.core.types import Payload, PayloadFormat
 
@@ -360,10 +360,9 @@ class PayloadStore:
             ValueError: If the artifact reference is not a contained string path.
         """
         msg = f"Invalid artifact path: {artifact!r}. Must be under artifacts/."
-        try:
-            artifact_path = Path(cast("str", artifact))
-        except TypeError as exc:
-            raise ValueError(msg) from exc
+        if not isinstance(artifact, str):
+            raise ValueError(msg)  # noqa: TRY004 - stable deserialization error
+        artifact_path = Path(artifact)
         if artifact_path.is_absolute() or ".." in artifact_path.parts:
             raise ValueError(msg)
         try:
@@ -406,6 +405,7 @@ class PayloadStore:
 
         Raises:
             FileNotFoundError: If a referenced artifact is missing.
+            ValueError: If a referenced artifact path is invalid.
         """
         fmt = PayloadFormat(data["format"])
 
