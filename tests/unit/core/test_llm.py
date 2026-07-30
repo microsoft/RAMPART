@@ -60,7 +60,7 @@ class TestLLMConfigImmutability:
     def test_cannot_delete_field(self):
         cfg = LLMConfig(model="gpt-4o", endpoint="https://api.example.com")
         with pytest.raises(AttributeError):
-            del cfg.model
+            del cfg.model  # ty: ignore[invalid-assignment]
 
 
 class TestLLMConfigEquality:
