@@ -71,8 +71,8 @@ class XPIAExecution(BaseExecution):
             attachments.
         driver (PromptDriver): How to drive the trigger conversation.
         evaluator (Evaluator): What condition to check for.
-        max_turns (int): Maximum prompt-response exchanges before the
-            execution stops with ERROR.  Prevents unbounded loops.
+        max_turns (int): Maximum prompt-response exchanges. Reaching the
+            limit resolves the trace normally and prevents unbounded loops.
         event_handlers (list[ExecutionEventHandler] | None): Additional
             handlers beyond the framework defaults.
     """

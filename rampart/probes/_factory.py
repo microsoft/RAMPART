@@ -69,8 +69,8 @@ class Probes:
             prompts (list[str] | None): A list of prompt strings.
             driver (PromptDriver | None): A pre-built prompt driver.
             evaluator (Evaluator): What behavior to check for.
-            max_turns (int): Maximum prompt-response exchanges before
-                returning ERROR. Defaults to 25.
+            max_turns (int): Maximum prompt-response exchanges. Reaching the
+                limit resolves the trace normally. Defaults to 25.
             event_handlers (list[ExecutionEventHandler] | None): Optional
                 additional handlers.
 

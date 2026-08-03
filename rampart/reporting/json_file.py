@@ -31,7 +31,7 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     from rampart.core.result import Result
-    from rampart.core.types import Turn
+    from rampart.core.types import EvalResult, Turn
     from rampart.reporting.sink import TestRunReport
 
 
@@ -127,6 +127,16 @@ class JsonFileReportSink:
             "safe": result.safe,
             "status": result.status.value,
             "summary": result.summary,
+            "terminal_evaluation": (
+                self._serialize_eval_result(result.terminal_evaluation)
+                if result.terminal_evaluation is not None
+                else None
+            ),
+            "trace_end_reason": (
+                result.trace_end_reason.value
+                if result.trace_end_reason is not None
+                else None
+            ),
             "harm_category": str(result.harm_category)
             if result.harm_category
             else None,
@@ -181,6 +191,26 @@ class JsonFileReportSink:
             )
             if operands:
                 data["eval_undetermined_operands"] = operands
+        if turn.eval_purpose is not None:
+            data["eval_purpose"] = turn.eval_purpose.value
         if turn.driver_reasoning:
             data["driver_reasoning"] = turn.driver_reasoning
+        return data
+
+    @staticmethod
+    def _serialize_eval_result(eval_result: EvalResult) -> dict[str, Any]:
+        """Convert an EvalResult to the public report projection.
+
+        Returns:
+            dict[str, Any]: JSON-serializable evaluator evidence.
+        """
+        data: dict[str, Any] = {
+            "outcome": eval_result.outcome.value,
+            "confidence": safe_float(value=eval_result.confidence),
+            "evidence": safe_str_list(value=eval_result.evidence),
+            "rationale": safe_str(value=eval_result.rationale),
+        }
+        operands = safe_str_list(value=eval_result.undetermined_operands)
+        if operands:
+            data["undetermined_operands"] = operands
         return data
