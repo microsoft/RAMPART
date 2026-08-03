@@ -71,6 +71,8 @@ class MyAdapter:
 | `TOOL_ONLY` | Reports tool calls but not side effects | API returns tool call data |
 | `RESPONSE_ONLY` | Reports only text responses | Black-box agent |
 
+Declare the level honestly. An evaluator that needs data your adapter does not report returns `UNDETERMINED` instead of `NOT_DETECTED`, so a gap in the adapter does not come back as a passing test. Evidence the adapter does report still counts either way, so declaring a lower level cannot hide a real detection.
+
 ---
 
 ## Choosing Evaluators
@@ -95,8 +97,8 @@ ToolCalled(
 )
 ```
 
-!!! warning
-    `ToolCalled` requires `TOOL_ONLY` or `TOOL_AND_SIDE_EFFECTS` observability. With `RESPONSE_ONLY`, it always returns `NOT_DETECTED`.
+!!! note
+    `ToolCalled` needs `TOOL_ONLY` or `TOOL_AND_SIDE_EFFECTS` observability. With `RESPONSE_ONLY` it returns `UNDETERMINED`, because an adapter that does not report tool calls cannot tell you the tool was not called.
 
 ### [`ResponseContains`][rampart.evaluators.response_contains.ResponseContains] — Detect Text Patterns
 
@@ -128,6 +130,9 @@ SideEffectOccurred("http_request")
 # POST request to a specific host
 SideEffectOccurred("http_request", method="POST", host="evil.com")
 ```
+
+!!! note
+    `SideEffectOccurred` needs `TOOL_AND_SIDE_EFFECTS` observability. With `TOOL_ONLY` or `RESPONSE_ONLY` it returns `UNDETERMINED`, since those adapters do not report side effects at all.
 
 ### [`LLMJudge`][rampart.evaluators.llm_judge.LLMJudge] — Detect Language-Level Signals
 

@@ -402,6 +402,34 @@ class TestEvaluateTurnAsync:
         assert captured_context.turns[0].request.prompt == "prev"
         assert captured_context.turns[1].request.prompt == "current"
 
+    async def test_passes_observability_level_to_context_async(self) -> None:
+        from unittest.mock import AsyncMock
+
+        from rampart.core.execution import evaluate_turn_async
+        from rampart.core.types import EvalOutcome, Request, Response
+
+        captured_context = None
+
+        def capture_eval(*, context: EvalContext) -> EvalResult:
+            nonlocal captured_context
+            captured_context = context
+            return EvalResult(outcome=EvalOutcome.NOT_DETECTED)
+
+        evaluator = AsyncMock()
+        evaluator.evaluate_async.side_effect = capture_eval
+
+        await evaluate_turn_async(
+            evaluator=evaluator,
+            history=[],
+            request=Request(prompt="hello"),
+            response=Response(text="world"),
+            turn_number=0,
+            observability_level=ObservabilityLevel.RESPONSE_ONLY,
+        )
+
+        assert captured_context is not None
+        assert captured_context.observability_level is ObservabilityLevel.RESPONSE_ONLY
+
     async def test_preserves_driver_reasoning_async(self) -> None:
         from unittest.mock import AsyncMock
 

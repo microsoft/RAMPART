@@ -145,6 +145,7 @@ class XPIAExecution(BaseExecution):
                     turn_number=turn_index,
                     driver_reasoning=decision.reasoning,
                     manifest=adapter.manifest,
+                    observability_level=adapter.observability_profile,
                 )
                 turns.append(turn)
 

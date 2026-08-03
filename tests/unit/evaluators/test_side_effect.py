@@ -6,6 +6,7 @@
 from rampart.core.types import (
     EvalContext,
     EvalOutcome,
+    ObservabilityLevel,
     Request,
     Response,
     SideEffect,
@@ -14,7 +15,10 @@ from rampart.core.types import (
 from rampart.evaluators import SideEffectOccurred
 
 
-def _ctx_with_side_effects(*effects: SideEffect) -> EvalContext:
+def _ctx_with_side_effects(
+    *effects: SideEffect,
+    observability: ObservabilityLevel = ObservabilityLevel.TOOL_AND_SIDE_EFFECTS,
+) -> EvalContext:
     """Build a single-turn EvalContext with the given side effects."""
     return EvalContext(
         turns=[
@@ -23,6 +27,7 @@ def _ctx_with_side_effects(*effects: SideEffect) -> EvalContext:
                 response=Response(text="ok", side_effects=list(effects)),
             ),
         ],
+        observability_level=observability,
     )
 
 
@@ -79,3 +84,36 @@ class TestSideEffectOccurredDetailPredicates:
             url=lambda u: "evil.com" in str(u),
         ).evaluate_async(context=ctx)
         assert result.outcome is EvalOutcome.NOT_DETECTED
+
+
+class TestSideEffectOccurredObservability:
+    """A missing side effect is only evidence when the adapter reports them."""
+
+    async def test_undetermined_when_side_effects_not_reported(self) -> None:
+        ctx = _ctx_with_side_effects(observability=ObservabilityLevel.TOOL_ONLY)
+        result = await SideEffectOccurred("http_request").evaluate_async(context=ctx)
+        assert result.outcome is EvalOutcome.UNDETERMINED
+
+    async def test_undetermined_for_response_only(self) -> None:
+        ctx = _ctx_with_side_effects(observability=ObservabilityLevel.RESPONSE_ONLY)
+        result = await SideEffectOccurred("http_request").evaluate_async(context=ctx)
+        assert result.outcome is EvalOutcome.UNDETERMINED
+
+    async def test_undetermined_rationale_names_the_level_and_kind(self) -> None:
+        ctx = _ctx_with_side_effects(observability=ObservabilityLevel.TOOL_ONLY)
+        result = await SideEffectOccurred("http_request").evaluate_async(context=ctx)
+        assert "tool_only" in result.rationale
+        assert "http_request" in result.rationale
+
+    async def test_not_detected_when_side_effects_are_reported(self) -> None:
+        ctx = _ctx_with_side_effects()
+        result = await SideEffectOccurred("http_request").evaluate_async(context=ctx)
+        assert result.outcome is EvalOutcome.NOT_DETECTED
+
+    async def test_reported_effect_still_detected_below_declared_level(self) -> None:
+        ctx = _ctx_with_side_effects(
+            SideEffect(kind="http_request"),
+            observability=ObservabilityLevel.TOOL_ONLY,
+        )
+        result = await SideEffectOccurred("http_request").evaluate_async(context=ctx)
+        assert result.outcome is EvalOutcome.DETECTED

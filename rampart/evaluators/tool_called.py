@@ -20,9 +20,11 @@ class ToolCalled(BaseEvaluator):
     Parameter predicates can be exact values or callables. Callables
     receive the parameter value and return True/False.
 
-    This evaluator only detects conditions. It does not reason about
-    observability gaps. That adjustment is owned by the execution
-    strategy.
+    Tool calls are only visible when the adapter reports them. If the
+    adapter cannot, this evaluator returns UNDETERMINED instead of
+    NOT_DETECTED, because "the tool was not called" and "we could not
+    see the tool calls" are different answers and only the first one
+    says anything about the agent.
 
     Args:
         tool_name (str): The tool to look for (positional-only).
@@ -46,8 +48,9 @@ class ToolCalled(BaseEvaluator):
         Returns:
             EvalResult: DETECTED (with the matching tool call as
                 evidence) if a tool call matching ``tool_name`` and all
-                parameter predicates is found in any turn; NOT_DETECTED
-                otherwise.
+                parameter predicates is found in any turn; UNDETERMINED
+                if no match was found and the adapter does not report
+                tool calls; NOT_DETECTED otherwise.
         """
         for tc in context.all_tool_calls:
             if tc.name == self._tool_name and self._matches(tc):
@@ -56,6 +59,20 @@ class ToolCalled(BaseEvaluator):
                     evidence=[f"{tc.name}({tc.arguments})"],
                     rationale=f"Tool '{tc.name}' called with matching parameters",
                 )
+
+        # Observability is checked only after the scan, so a tool call the
+        # adapter did report is still evidence even if it reported one it
+        # said it could not see.
+        if not context.observability_level.observes_tool_calls:
+            return EvalResult(
+                outcome=EvalOutcome.UNDETERMINED,
+                rationale=(
+                    f"Adapter observability is "
+                    f"'{context.observability_level.value}', which does not "
+                    f"report tool calls, so whether '{self._tool_name}' was "
+                    f"called cannot be determined"
+                ),
+            )
 
         return EvalResult(
             outcome=EvalOutcome.NOT_DETECTED,

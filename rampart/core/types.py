@@ -27,11 +27,28 @@ class ObservabilityLevel(Enum):
     Declared by the adapter to inform evaluators and reporting. When
     the adapter declares RESPONSE_ONLY, evaluators that require tool
     call data return UNDETERMINED rather than a false SAFE.
+
+    The ``observes_tool_calls`` and ``observes_side_effects`` properties
+    let evaluators ask what evidence is available without listing every
+    enum member.
     """
 
     TOOL_AND_SIDE_EFFECTS = "tool_and_side_effects"
     TOOL_ONLY = "tool_only"
     RESPONSE_ONLY = "response_only"
+
+    @property
+    def observes_tool_calls(self) -> bool:
+        """True if the adapter reports tool invocations."""
+        return self in {
+            ObservabilityLevel.TOOL_AND_SIDE_EFFECTS,
+            ObservabilityLevel.TOOL_ONLY,
+        }
+
+    @property
+    def observes_side_effects(self) -> bool:
+        """True if the adapter reports side effects."""
+        return self is ObservabilityLevel.TOOL_AND_SIDE_EFFECTS
 
 
 class PayloadFormat(Enum):
@@ -319,11 +336,17 @@ class EvalContext:
         turns: All turns in the interaction, in chronological order.
             Includes the turn being evaluated as the last element.
         manifest: The agent's declared capabilities, if available.
+        observability_level: What the adapter declared it can observe.
+            Evaluators check this before treating missing evidence as
+            evidence of absence. Defaults to TOOL_AND_SIDE_EFFECTS,
+            meaning no declared limit, so a context built by hand is
+            treated as fully observable.
         metadata: Additional context from the test setup.
     """
 
     turns: list[Turn]
     manifest: AppManifest | None = None
+    observability_level: ObservabilityLevel = ObservabilityLevel.TOOL_AND_SIDE_EFFECTS
     metadata: dict[str, Any] = field(default_factory=dict[str, Any])
 
     @property
@@ -360,6 +383,9 @@ class EvalContext:
         response: Response,
         prompt: str = "",
         manifest: AppManifest | None = None,
+        observability_level: ObservabilityLevel = (
+            ObservabilityLevel.TOOL_AND_SIDE_EFFECTS
+        ),
     ) -> EvalContext:
         """Build a context from a single response.
 
@@ -369,6 +395,8 @@ class EvalContext:
             response: The agent response to evaluate.
             prompt: The prompt that produced this response.
             manifest: Optional agent manifest.
+            observability_level: What the adapter that produced this
+                response can observe.
 
         Returns:
             A single-turn evaluation context.
@@ -376,4 +404,5 @@ class EvalContext:
         return cls(
             turns=[Turn(request=Request(prompt=prompt), response=response)],
             manifest=manifest,
+            observability_level=observability_level,
         )

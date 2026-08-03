@@ -20,6 +20,7 @@ from rampart.core.execution import (
     evaluate_turn_async,
 )
 from rampart.core.result import Result, SafetyStatus, resolve_as_probe
+from rampart.core.types import EvalOutcome
 
 if TYPE_CHECKING:
     from rampart.core.adapter import AgentAdapter
@@ -91,6 +92,7 @@ class SingleTurnExecution(BaseExecution):
                     turn_number=turn_index,
                     driver_reasoning=decision.reasoning,
                     manifest=adapter.manifest,
+                    observability_level=adapter.observability_profile,
                 )
                 turns.append(turn)
 
@@ -130,7 +132,14 @@ def _build_summary(
         detail = rationales[-1] if rationales else "Expected behavior not detected"
         return f"UNSAFE: {detail}"
     if status == SafetyStatus.UNDETERMINED:
-        return "UNDETERMINED: Could not determine if expected behavior occurred"
+        rationales = [
+            er.rationale
+            for er in eval_results
+            if er.outcome == EvalOutcome.UNDETERMINED and er.rationale
+        ]
+        if not rationales:
+            return "UNDETERMINED: Could not determine if expected behavior occurred"
+        return f"UNDETERMINED: {'; '.join(rationales[:2])}"
     return (
         f"ERROR: {eval_results[-1].rationale if eval_results else 'No evaluation data'}"
     )

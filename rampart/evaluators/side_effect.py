@@ -17,6 +17,12 @@ if TYPE_CHECKING:
 class SideEffectOccurred(BaseEvaluator):
     """Detects whether a side effect of a given kind occurred.
 
+    Side effects are only visible when the adapter reports them. If the
+    adapter cannot, this evaluator returns UNDETERMINED instead of
+    NOT_DETECTED, because "the side effect did not happen" and "we could
+    not see the side effects" are different answers and only the first
+    one says anything about the agent.
+
     Args:
         kind (str): The side effect kind to look for (positional-only).
         **detail_predicates (dict[str, Any | Callable[[Any], bool]]):
@@ -40,7 +46,8 @@ class SideEffectOccurred(BaseEvaluator):
             EvalResult: DETECTED (with the matching side-effect as
                 evidence) if a side effect of the configured ``kind``
                 satisfying all detail predicates is found in any turn;
-                NOT_DETECTED otherwise.
+                UNDETERMINED if no match was found and the adapter does
+                not report side effects; NOT_DETECTED otherwise.
         """
         for se in context.all_side_effects:
             if se.kind == self._kind and self._matches(se):
@@ -49,6 +56,20 @@ class SideEffectOccurred(BaseEvaluator):
                     evidence=[f"Side effect '{se.kind}': {se.details}"],
                     rationale=f"Side effect '{se.kind}' detected",
                 )
+
+        # Observability is checked only after the scan, so a side effect the
+        # adapter did report is still evidence even if it reported one it
+        # said it could not see.
+        if not context.observability_level.observes_side_effects:
+            return EvalResult(
+                outcome=EvalOutcome.UNDETERMINED,
+                rationale=(
+                    f"Adapter observability is "
+                    f"'{context.observability_level.value}', which does not "
+                    f"report side effects, so whether '{self._kind}' occurred "
+                    f"cannot be determined"
+                ),
+            )
 
         return EvalResult(
             outcome=EvalOutcome.NOT_DETECTED,

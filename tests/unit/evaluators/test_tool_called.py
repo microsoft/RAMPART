@@ -6,6 +6,7 @@
 from rampart.core.types import (
     EvalContext,
     EvalOutcome,
+    ObservabilityLevel,
     Request,
     Response,
     ToolCall,
@@ -14,7 +15,10 @@ from rampart.core.types import (
 from rampart.evaluators import ToolCalled
 
 
-def _ctx_with_tool_calls(*tool_calls: ToolCall) -> EvalContext:
+def _ctx_with_tool_calls(
+    *tool_calls: ToolCall,
+    observability: ObservabilityLevel = ObservabilityLevel.TOOL_AND_SIDE_EFFECTS,
+) -> EvalContext:
     """Build an EvalContext with a single turn containing the given tool calls."""
     return EvalContext(
         turns=[
@@ -23,6 +27,7 @@ def _ctx_with_tool_calls(*tool_calls: ToolCall) -> EvalContext:
                 response=Response(text="ok", tool_calls=list(tool_calls)),
             ),
         ],
+        observability_level=observability,
     )
 
 
@@ -124,6 +129,34 @@ class TestToolCalledMultiTurn:
         assert result.outcome is EvalOutcome.NOT_DETECTED
 
 
+class TestToolCalledObservability:
+    """A missing tool call is only evidence when the adapter reports tool calls."""
+
+    async def test_undetermined_when_tool_calls_not_reported(self) -> None:
+        ctx = _ctx_with_tool_calls(observability=ObservabilityLevel.RESPONSE_ONLY)
+        result = await ToolCalled("send_email").evaluate_async(context=ctx)
+        assert result.outcome is EvalOutcome.UNDETERMINED
+
+    async def test_undetermined_rationale_names_the_level_and_tool(self) -> None:
+        ctx = _ctx_with_tool_calls(observability=ObservabilityLevel.RESPONSE_ONLY)
+        result = await ToolCalled("send_email").evaluate_async(context=ctx)
+        assert "response_only" in result.rationale
+        assert "send_email" in result.rationale
+
+    async def test_not_detected_when_tool_calls_are_reported(self) -> None:
+        ctx = _ctx_with_tool_calls(observability=ObservabilityLevel.TOOL_ONLY)
+        result = await ToolCalled("send_email").evaluate_async(context=ctx)
+        assert result.outcome is EvalOutcome.NOT_DETECTED
+
+    async def test_reported_tool_call_still_detected_below_declared_level(self) -> None:
+        ctx = _ctx_with_tool_calls(
+            ToolCall(name="send_email"),
+            observability=ObservabilityLevel.RESPONSE_ONLY,
+        )
+        result = await ToolCalled("send_email").evaluate_async(context=ctx)
+        assert result.outcome is EvalOutcome.DETECTED
+
+
 class TestToolCalledComposition:
     async def test_composable_with_or_async(self) -> None:
         tc = ToolCall(name="send_email")
@@ -131,3 +164,9 @@ class TestToolCalledComposition:
         composed = ToolCalled("send_email") | ToolCalled("delete_file")
         result = await composed.evaluate_async(context=ctx)
         assert result.outcome is EvalOutcome.DETECTED
+
+    async def test_undetermined_propagates_through_or(self) -> None:
+        ctx = _ctx_with_tool_calls(observability=ObservabilityLevel.RESPONSE_ONLY)
+        composed = ToolCalled("send_email") | ToolCalled("delete_file")
+        result = await composed.evaluate_async(context=ctx)
+        assert result.outcome is EvalOutcome.UNDETERMINED

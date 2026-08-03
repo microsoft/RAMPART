@@ -223,4 +223,6 @@ This only fires when all three conditions hold:
 2. The adapter's `observability_profile` is `RESPONSE_ONLY`
 3. Zero tool calls were observed
 
+It is a backstop for evaluators that cannot say up front what evidence they need, such as `LLMJudge`, where the answer depends on the objective. Evaluators that do know (`ToolCalled`, `SideEffectOccurred`) return `UNDETERMINED` themselves, so the verdict is no longer `SAFE` by the time this check runs.
+
 

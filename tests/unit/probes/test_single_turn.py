@@ -20,15 +20,21 @@ from rampart.core.types import (
     ToolCall,
 )
 from rampart.drivers.static import StaticDriver
+from rampart.evaluators import ToolCalled
 from rampart.probes import Probes
 from tests.fixtures import MockAdapter
 
 
-def _adapter(*, responses: list[Response]) -> MockAdapter:
+def _adapter(
+    *,
+    responses: list[Response],
+    observability: ObservabilityLevel = ObservabilityLevel.TOOL_AND_SIDE_EFFECTS,
+) -> MockAdapter:
     """Build a MockAdapter for testing."""
     return MockAdapter(
         responses=responses,
         manifest=AppManifest(name="test-agent"),
+        observability_profile=observability,
     )
 
 
@@ -44,6 +50,13 @@ class _NeverDetects(BaseEvaluator):
 
     async def evaluate_async(self, *, context: EvalContext) -> EvalResult:
         return EvalResult(outcome=EvalOutcome.NOT_DETECTED, rationale="never detected")
+
+
+class _UndeterminedWithoutRationale(BaseEvaluator):
+    """Evaluator stub that gives up without explaining why."""
+
+    async def evaluate_async(self, *, context: EvalContext) -> EvalResult:
+        return EvalResult(outcome=EvalOutcome.UNDETERMINED)
 
 
 class _DetectsToolCall(BaseEvaluator):
@@ -89,6 +102,83 @@ class TestProbePolarity:
 
         assert result.safe is False
         assert result.status == SafetyStatus.UNSAFE
+
+
+class TestProbeEvaluatorObservability:
+    """A probe does not fail the agent for evidence the adapter cannot report."""
+
+    async def test_tool_evaluator_undetermined_under_response_only_async(self) -> None:
+        adapter = _adapter(
+            responses=[Response(text="done")],
+            observability=ObservabilityLevel.RESPONSE_ONLY,
+        )
+
+        result = await Probes.behavior(
+            prompt="test",
+            evaluator=ToolCalled("audit_log"),
+        ).execute_async(adapter=adapter)
+
+        assert result.safe is False
+        assert result.status is SafetyStatus.UNDETERMINED
+
+    async def test_undetermined_summary_explains_the_gap_async(self) -> None:
+        adapter = _adapter(
+            responses=[Response(text="done")],
+            observability=ObservabilityLevel.RESPONSE_ONLY,
+        )
+
+        result = await Probes.behavior(
+            prompt="test",
+            evaluator=ToolCalled("audit_log"),
+        ).execute_async(adapter=adapter)
+
+        assert "response_only" in result.summary
+        assert "audit_log" in result.summary
+
+    async def test_undetermined_summary_falls_back_without_rationale_async(
+        self,
+    ) -> None:
+        adapter = _adapter(responses=[Response(text="done")])
+
+        result = await Probes.behavior(
+            prompt="test",
+            evaluator=_UndeterminedWithoutRationale(),
+        ).execute_async(adapter=adapter)
+
+        assert result.status is SafetyStatus.UNDETERMINED
+        assert result.summary == (
+            "UNDETERMINED: Could not determine if expected behavior occurred"
+        )
+
+    async def test_tool_evaluator_unsafe_when_tool_calls_reported_async(self) -> None:
+        adapter = _adapter(
+            responses=[Response(text="done")],
+            observability=ObservabilityLevel.TOOL_ONLY,
+        )
+
+        result = await Probes.behavior(
+            prompt="test",
+            evaluator=ToolCalled("audit_log"),
+        ).execute_async(adapter=adapter)
+
+        assert result.safe is False
+        assert result.status is SafetyStatus.UNSAFE
+
+    async def test_tool_evaluator_safe_when_tool_was_called_async(self) -> None:
+        adapter = _adapter(
+            responses=[
+                Response(text="done", tool_calls=[ToolCall(name="audit_log")]),
+            ],
+            observability=ObservabilityLevel.TOOL_ONLY,
+        )
+
+        result = await Probes.behavior(
+            prompt="test",
+            evaluator=ToolCalled("audit_log"),
+        ).execute_async(adapter=adapter)
+
+        assert result.safe is True
+        assert result.status is SafetyStatus.SAFE
 
 
 class TestProbeStrategyName:
