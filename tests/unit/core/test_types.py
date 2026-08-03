@@ -12,12 +12,14 @@ from rampart.core.types import (
     EvalContext,
     EvalOutcome,
     EvalResult,
+    EvaluationRole,
     ObservabilityLevel,
     Payload,
     PayloadFormat,
     Request,
     Response,
     SideEffect,
+    TerminationReason,
     ToolCall,
     Turn,
 )
@@ -112,6 +114,7 @@ class TestTurn:
         assert t.timestamp is None
         assert t.driver_reasoning == ""
         assert t.eval_result is None
+        assert t.eval_role is None
 
     def test_eval_result_round_trips(self):
         er = EvalResult(outcome=EvalOutcome.DETECTED, rationale="found it")
@@ -122,6 +125,14 @@ class TestTurn:
         )
         assert t.eval_result is er
         assert t.eval_result is not None and t.eval_result.detected is True
+
+    def test_eval_role_round_trips(self):
+        t = Turn(
+            request=Request(prompt="p"),
+            response=Response(text="r"),
+            eval_role=EvaluationRole.STOP_CONDITION,
+        )
+        assert t.eval_role is EvaluationRole.STOP_CONDITION
 
     def test_frozen_prevents_mutation(self):
         t = Turn(request=Request(prompt="p"), response=Response(text="r"))
@@ -148,6 +159,40 @@ class TestEvalResult:
         assert er.evidence == []
         assert er.rationale == ""
         assert er.undetermined_operands == []
+
+
+class TestExecutionMetadataEnums:
+    def test_evaluation_role_value(self) -> None:
+        assert EvaluationRole.STOP_CONDITION == "stop_condition"
+
+    def test_termination_reason_values(self) -> None:
+        assert TerminationReason.DRIVER_EXHAUSTED == "driver_exhausted"
+        assert TerminationReason.MAX_TURNS == "max_turns"
+        assert TerminationReason.STOP_CONDITION == "stop_condition"
+
+    def test_role_and_reason_remain_distinct_types(self) -> None:
+        assert EvaluationRole.STOP_CONDITION is not TerminationReason.STOP_CONDITION
+
+
+def test_new_contract_is_available_from_top_level_package() -> None:
+    """The additive contract is importable from the documented public API."""
+    from rampart import (
+        EvaluationRole as TopLevelEvaluationRole,
+    )
+    from rampart import (
+        TerminationReason as TopLevelTerminationReason,
+    )
+    from rampart import (
+        resolve_attack_verdict as top_level_attack_resolver,
+    )
+    from rampart import (
+        resolve_probe_verdict as top_level_probe_resolver,
+    )
+
+    assert TopLevelEvaluationRole is EvaluationRole
+    assert TopLevelTerminationReason is TerminationReason
+    assert top_level_attack_resolver is not None
+    assert top_level_probe_resolver is not None
 
 
 class TestEvalContext:

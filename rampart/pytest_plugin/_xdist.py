@@ -474,10 +474,12 @@ def _serialize_injection_record(*, injection: InjectionRecord) -> dict[str, Any]
 def _serialize_result(*, result: Result, nodeid: str) -> dict[str, Any]:
     """Serialize a Result to a JSON-safe dict for the xdist transport.
 
-    This is the full-fidelity transport projection: it round-trips back
-    to a ``Result`` via :func:`_deserialize_result`, and intentionally
-    differs from the flatter public report shape produced by
-    ``JsonFileReportSink._serialize_result``. The two projections are
+    This is the transport projection used to rebuild a ``Result`` via
+    :func:`_deserialize_result`. The additive ``evaluation``,
+    ``termination_reason``, and turn ``eval_role`` fields are introduced in
+    the result model before the following serialization layer carries them.
+    This projection intentionally differs from the flatter public report
+    shape produced by ``JsonFileReportSink._serialize_result``. The two projections are
     deliberately separate (different fields, sanitization, and size
     handling) and must not be naively merged into one serializer.
 
