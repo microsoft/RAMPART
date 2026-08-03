@@ -117,6 +117,45 @@ ResponseContains(re.compile(r"ssh-rsa\s+[A-Za-z0-9+/]+"))
 ResponseContains(lambda text: "secret" in text.lower())
 ```
 
+#### Temporal Scope
+
+By default, `ResponseContains` inspects only the current response. For a
+multi-turn transcript, pass an explicit
+[`ResponseScope`][rampart.evaluators.response_contains.ResponseScope]:
+
+```python
+from rampart.evaluators import ResponseContains, ResponseScope
+
+# Detect if the pattern appeared at any point in the conversation
+ResponseContains("id_rsa", scope=ResponseScope.ANY_TURN)
+
+# Detect only if every response contained the pattern
+ResponseContains("Paris", scope=ResponseScope.ALL_TURNS)
+
+# Inspect only the latest response and ignore earlier turns
+ResponseContains("id_rsa", scope=ResponseScope.CURRENT_TURN)
+```
+
+| Existing use | Intended meaning | Explicit form |
+|---|---|---|
+| attack, `ResponseContains(p)` | some turn contains `p` | `ResponseContains(p, scope=ResponseScope.ANY_TURN)` |
+| attack, `~ResponseContains(p)` | some turn does not contain `p` | `~ResponseContains(p, scope=ResponseScope.ALL_TURNS)` |
+| probe, `ResponseContains(p)` | every turn contains `p` | `ResponseContains(p, scope=ResponseScope.ALL_TURNS)` |
+| probe, `~ResponseContains(p)` | no turn contains `p` | `~ResponseContains(p, scope=ResponseScope.ANY_TURN)` |
+
+!!! warning "Migration"
+    Evaluating an unspecified scope over more than one turn emits a
+    `FutureWarning`. Single-turn evaluation is unchanged. Pass
+    `ResponseScope.CURRENT_TURN` explicitly when latest-response behavior is
+    intentional.
+
+    This is a preparatory API change. Executions continue to evaluate growing
+    prefixes until final-trace verdict cadence ships. In particular, probes
+    still stop on the first detected prefix, so `ALL_TURNS` and negated
+    `ANY_TURN` cannot yet enforce requirements on prompts that were never
+    sent. Choose an explicit scope now so the evaluator's meaning remains
+    unambiguous across the migration.
+
 ### [`SideEffectOccurred`][rampart.evaluators.side_effect.SideEffectOccurred] — Detect Side Effects
 
 ```python
@@ -171,6 +210,10 @@ judge = LLMJudge(
     scope=TranscriptScope.CURRENT_TURN,
 )
 ```
+
+Use `TranscriptScope.FULL` when evidence from any earlier turn must affect the
+final verdict. Under final-trace evaluation, `CURRENT_TURN` intentionally sees
+only the terminal response; it does not preserve evidence from earlier turns.
 
 **Custom persona.** The default judge identity is [`NEUTRAL_EVALUATOR`][rampart.evaluators.personas.NEUTRAL_EVALUATOR] — an impartial, literal evaluator. Override it when a different lens is useful:
 
