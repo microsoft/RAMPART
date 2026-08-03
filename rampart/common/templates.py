@@ -102,7 +102,7 @@ class PromptTemplate:
 
     __slots__ = ("_description", "_name", "_parameter_keys", "_template")
 
-    def __init__(self, yaml_path: Path) -> None:
+    def __init__(self, *, path: Path) -> None:
         """Load and compile a prompt template from YAML.
 
         ``name``, ``parameters``, and ``value`` are required. ``description``
@@ -110,15 +110,15 @@ class PromptTemplate:
         referenced by the Jinja template.
 
         Args:
-            yaml_path: Path to the YAML template file.
+            path: Path to the YAML template file.
 
         Raises:
-            FileNotFoundError: If *yaml_path* does not exist.
+            FileNotFoundError: If *path* does not exist.
             PromptTemplateDefinitionError: If the file contents do not define
                 a valid prompt template.
         """
-        definition = _load_yaml_definition(yaml_path)
-        template = _compile_template(definition, path=yaml_path)
+        definition = _load_yaml_definition(path)
+        template = _compile_template(definition, path=path)
 
         self._name = definition.name
         self._description = definition.description

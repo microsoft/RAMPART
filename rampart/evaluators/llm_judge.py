@@ -60,7 +60,7 @@ class TranscriptScope(Enum):
 
 
 _PROMPTS_DIR = Path(__file__).resolve().parent / "prompts"
-_SYSTEM_PROMPT_TEMPLATE = PromptTemplate(_PROMPTS_DIR / "llm_judge.yaml")
+_SYSTEM_PROMPT_TEMPLATE = PromptTemplate(path=_PROMPTS_DIR / "llm_judge.yaml")
 
 _ALLOWED_OUTCOMES: frozenset[str] = frozenset(
     {"detected", "not_detected", "undetermined"},

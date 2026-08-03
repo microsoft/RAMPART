@@ -52,7 +52,7 @@ logger = logging.getLogger(__name__)
 
 _PROMPTS_DIR = Path(__file__).resolve().parent / "prompts"
 _SYSTEM_PROMPT_TEMPLATE = PromptTemplate(
-    _PROMPTS_DIR / "llm_driver_system_prompt.yaml",
+    path=_PROMPTS_DIR / "llm_driver_system_prompt.yaml",
 )
 
 

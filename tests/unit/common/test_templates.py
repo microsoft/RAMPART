@@ -42,6 +42,12 @@ def _write_template(tmp_path: Path, **overrides: object) -> Path:
 
 
 class TestPromptTemplateInitialization:
+    def test_requires_path_keyword(self, tmp_path: Path) -> None:
+        constructor = cast("Callable[..., PromptTemplate]", PromptTemplate)
+
+        with pytest.raises(TypeError):
+            constructor(_write_template(tmp_path))
+
     def test_rejects_component_construction(self) -> None:
         constructor = cast("Callable[..., PromptTemplate]", PromptTemplate)
 
@@ -62,21 +68,21 @@ class TestPromptTemplateInitialization:
         tmp_path: Path,
         attribute: str,
     ) -> None:
-        template = PromptTemplate(_write_template(tmp_path))
+        template = PromptTemplate(path=_write_template(tmp_path))
 
         with pytest.raises(AttributeError):
             setattr(template, attribute, "changed")
 
     def test_prevents_unknown_attributes(self, tmp_path: Path) -> None:
-        template = PromptTemplate(_write_template(tmp_path))
+        template = PromptTemplate(path=_write_template(tmp_path))
 
         assert not hasattr(template, "__dict__")
 
     def test_uses_identity_equality_and_hashing(self, tmp_path: Path) -> None:
         path = _write_template(tmp_path)
 
-        first = PromptTemplate(path)
-        second = PromptTemplate(path)
+        first = PromptTemplate(path=path)
+        second = PromptTemplate(path=path)
 
         assert first != second
         assert len({first, second}) == 2
@@ -85,7 +91,7 @@ class TestPromptTemplateInitialization:
         self,
         tmp_path: Path,
     ) -> None:
-        template = PromptTemplate(_write_template(tmp_path))
+        template = PromptTemplate(path=_write_template(tmp_path))
 
         assert repr(template) == (
             "PromptTemplate(name='Greeting', description=None, "
@@ -108,7 +114,7 @@ class TestPromptTemplateInitialization:
             ),
         )
 
-        template = PromptTemplate(path)
+        template = PromptTemplate(path=path)
 
         assert template.name == "Greeting"
         assert template.description == "Greets a subject across\nmultiple lines.\n"
@@ -128,7 +134,7 @@ class TestPromptTemplateInitialization:
         )
 
         with pytest.raises(PromptTemplateDefinitionError) as exc_info:
-            PromptTemplate(path)
+            PromptTemplate(path=path)
 
         assert isinstance(exc_info.value.__cause__, yaml.YAMLError)
 
@@ -147,7 +153,7 @@ class TestPromptTemplateInitialization:
         path = _write_raw_yaml(tmp_path, content)
 
         with pytest.raises(PromptTemplateDefinitionError) as exc_info:
-            PromptTemplate(path)
+            PromptTemplate(path=path)
 
         assert exc_info.value.path == path
         assert exc_info.value.__cause__ is not None
@@ -155,7 +161,7 @@ class TestPromptTemplateInitialization:
     def test_loads_metadata_and_renders_successfully(self, tmp_path: Path) -> None:
         path = _write_template(tmp_path, description="Greets a subject.")
 
-        template = PromptTemplate(path)
+        template = PromptTemplate(path=path)
 
         assert isinstance(template, PromptTemplate)
         assert template.name == "Greeting"
@@ -164,12 +170,12 @@ class TestPromptTemplateInitialization:
         assert template.render(subject="Ada") == "Hello, Ada!"
 
     def test_optional_description_defaults_to_none(self, tmp_path: Path) -> None:
-        template = PromptTemplate(_write_template(tmp_path))
+        template = PromptTemplate(path=_write_template(tmp_path))
 
         assert template.description is None
 
     def test_rejects_missing_parameter(self, tmp_path: Path) -> None:
-        template = PromptTemplate(_write_template(tmp_path))
+        template = PromptTemplate(path=_write_template(tmp_path))
 
         with pytest.raises(TemplateParameterError) as exc_info:
             template.render()
@@ -179,7 +185,7 @@ class TestPromptTemplateInitialization:
         assert exc_info.value.unexpected == ()
 
     def test_rejects_unexpected_parameter(self, tmp_path: Path) -> None:
-        template = PromptTemplate(_write_template(tmp_path))
+        template = PromptTemplate(path=_write_template(tmp_path))
 
         with pytest.raises(TemplateParameterError) as exc_info:
             template.render(subject="Ada", subejct="typo")
@@ -197,13 +203,13 @@ class TestPromptTemplateInitialization:
             PromptTemplateDefinitionError,
             match=r"missing=\('subject',\), unused=\('declared_but_unused',\)",
         ):
-            PromptTemplate(path)
+            PromptTemplate(path=path)
 
     def test_wraps_invalid_jinja_syntax(self, tmp_path: Path) -> None:
         path = _write_template(tmp_path, value="{{ subject")
 
         with pytest.raises(PromptTemplateDefinitionError) as exc_info:
-            PromptTemplate(path)
+            PromptTemplate(path=path)
 
         assert isinstance(exc_info.value.__cause__, TemplateError)
 
@@ -212,7 +218,7 @@ class TestPromptTemplateInitialization:
         path.write_bytes(b"\xff")
 
         with pytest.raises(PromptTemplateDefinitionError) as exc_info:
-            PromptTemplate(path)
+            PromptTemplate(path=path)
 
         assert isinstance(exc_info.value.__cause__, UnicodeDecodeError)
 
@@ -220,7 +226,7 @@ class TestPromptTemplateInitialization:
         path = tmp_path / "missing.yaml"
 
         with pytest.raises(FileNotFoundError):
-            PromptTemplate(path)
+            PromptTemplate(path=path)
 
     @pytest.mark.parametrize(
         ("definition", "error_fragment"),
@@ -265,7 +271,7 @@ class TestPromptTemplateInitialization:
         path = _write_yaml(tmp_path, definition)
 
         with pytest.raises(PromptTemplateDefinitionError) as exc_info:
-            PromptTemplate(path)
+            PromptTemplate(path=path)
 
         assert exc_info.value.path == path
         assert error_fragment in str(exc_info.value)
