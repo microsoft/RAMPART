@@ -3,16 +3,20 @@
 
 from pathlib import Path
 from textwrap import dedent
+from typing import TYPE_CHECKING, cast
 
 import pytest
 import yaml
-from jinja2 import TemplateError
+from jinja2 import Template, TemplateError
 
 from rampart.common.templates import (
     PromptTemplate,
     PromptTemplateDefinitionError,
     TemplateParameterError,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 
 def _write_yaml(tmp_path: Path, data: object) -> Path:
@@ -37,7 +41,57 @@ def _write_template(tmp_path: Path, **overrides: object) -> Path:
     return _write_yaml(tmp_path, definition)
 
 
-class TestPromptTemplateFromYaml:
+class TestPromptTemplateInitialization:
+    def test_rejects_component_construction(self) -> None:
+        constructor = cast("Callable[..., PromptTemplate]", PromptTemplate)
+
+        with pytest.raises(TypeError):
+            constructor(
+                name="Greeting",
+                description=None,
+                parameter_keys=("subject",),
+                _template=Template("Hello, {{ subject }}!"),
+            )
+
+    @pytest.mark.parametrize(
+        "attribute",
+        ["name", "description", "parameter_keys"],
+    )
+    def test_metadata_properties_are_read_only(
+        self,
+        tmp_path: Path,
+        attribute: str,
+    ) -> None:
+        template = PromptTemplate(_write_template(tmp_path))
+
+        with pytest.raises(AttributeError):
+            setattr(template, attribute, "changed")
+
+    def test_prevents_unknown_attributes(self, tmp_path: Path) -> None:
+        template = PromptTemplate(_write_template(tmp_path))
+
+        assert not hasattr(template, "__dict__")
+
+    def test_uses_identity_equality_and_hashing(self, tmp_path: Path) -> None:
+        path = _write_template(tmp_path)
+
+        first = PromptTemplate(path)
+        second = PromptTemplate(path)
+
+        assert first != second
+        assert len({first, second}) == 2
+
+    def test_representation_contains_only_public_metadata(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        template = PromptTemplate(_write_template(tmp_path))
+
+        assert repr(template) == (
+            "PromptTemplate(name='Greeting', description=None, "
+            "parameter_keys=('subject',))"
+        )
+
     def test_loads_raw_yaml_block_scalars(self, tmp_path: Path) -> None:
         path = _write_raw_yaml(
             tmp_path,
@@ -54,7 +108,7 @@ class TestPromptTemplateFromYaml:
             ),
         )
 
-        template = PromptTemplate.from_yaml(path)
+        template = PromptTemplate(path)
 
         assert template.name == "Greeting"
         assert template.description == "Greets a subject across\nmultiple lines.\n"
@@ -74,7 +128,7 @@ class TestPromptTemplateFromYaml:
         )
 
         with pytest.raises(PromptTemplateDefinitionError) as exc_info:
-            PromptTemplate.from_yaml(path)
+            PromptTemplate(path)
 
         assert isinstance(exc_info.value.__cause__, yaml.YAMLError)
 
@@ -93,7 +147,7 @@ class TestPromptTemplateFromYaml:
         path = _write_raw_yaml(tmp_path, content)
 
         with pytest.raises(PromptTemplateDefinitionError) as exc_info:
-            PromptTemplate.from_yaml(path)
+            PromptTemplate(path)
 
         assert exc_info.value.path == path
         assert exc_info.value.__cause__ is not None
@@ -101,7 +155,7 @@ class TestPromptTemplateFromYaml:
     def test_loads_metadata_and_renders_successfully(self, tmp_path: Path) -> None:
         path = _write_template(tmp_path, description="Greets a subject.")
 
-        template = PromptTemplate.from_yaml(path)
+        template = PromptTemplate(path)
 
         assert isinstance(template, PromptTemplate)
         assert template.name == "Greeting"
@@ -110,12 +164,12 @@ class TestPromptTemplateFromYaml:
         assert template.render(subject="Ada") == "Hello, Ada!"
 
     def test_optional_description_defaults_to_none(self, tmp_path: Path) -> None:
-        template = PromptTemplate.from_yaml(_write_template(tmp_path))
+        template = PromptTemplate(_write_template(tmp_path))
 
         assert template.description is None
 
     def test_rejects_missing_parameter(self, tmp_path: Path) -> None:
-        template = PromptTemplate.from_yaml(_write_template(tmp_path))
+        template = PromptTemplate(_write_template(tmp_path))
 
         with pytest.raises(TemplateParameterError) as exc_info:
             template.render()
@@ -125,7 +179,7 @@ class TestPromptTemplateFromYaml:
         assert exc_info.value.unexpected == ()
 
     def test_rejects_unexpected_parameter(self, tmp_path: Path) -> None:
-        template = PromptTemplate.from_yaml(_write_template(tmp_path))
+        template = PromptTemplate(_write_template(tmp_path))
 
         with pytest.raises(TemplateParameterError) as exc_info:
             template.render(subject="Ada", subejct="typo")
@@ -143,13 +197,13 @@ class TestPromptTemplateFromYaml:
             PromptTemplateDefinitionError,
             match=r"missing=\('subject',\), unused=\('declared_but_unused',\)",
         ):
-            PromptTemplate.from_yaml(path)
+            PromptTemplate(path)
 
     def test_wraps_invalid_jinja_syntax(self, tmp_path: Path) -> None:
         path = _write_template(tmp_path, value="{{ subject")
 
         with pytest.raises(PromptTemplateDefinitionError) as exc_info:
-            PromptTemplate.from_yaml(path)
+            PromptTemplate(path)
 
         assert isinstance(exc_info.value.__cause__, TemplateError)
 
@@ -158,7 +212,7 @@ class TestPromptTemplateFromYaml:
         path.write_bytes(b"\xff")
 
         with pytest.raises(PromptTemplateDefinitionError) as exc_info:
-            PromptTemplate.from_yaml(path)
+            PromptTemplate(path)
 
         assert isinstance(exc_info.value.__cause__, UnicodeDecodeError)
 
@@ -166,7 +220,7 @@ class TestPromptTemplateFromYaml:
         path = tmp_path / "missing.yaml"
 
         with pytest.raises(FileNotFoundError):
-            PromptTemplate.from_yaml(path)
+            PromptTemplate(path)
 
     @pytest.mark.parametrize(
         ("definition", "error_fragment"),
@@ -211,7 +265,7 @@ class TestPromptTemplateFromYaml:
         path = _write_yaml(tmp_path, definition)
 
         with pytest.raises(PromptTemplateDefinitionError) as exc_info:
-            PromptTemplate.from_yaml(path)
+            PromptTemplate(path)
 
         assert exc_info.value.path == path
         assert error_fragment in str(exc_info.value)

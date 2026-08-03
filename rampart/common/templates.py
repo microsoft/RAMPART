@@ -20,8 +20,7 @@ render call before evaluating Jinja markup.
 from __future__ import annotations
 
 from collections.abc import Hashable
-from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Annotated, TypeAlias, TypeVar
+from typing import TYPE_CHECKING, Annotated, TypeAlias, TypeVar, final
 
 import yaml
 from jinja2 import (
@@ -43,7 +42,6 @@ __all__ = [
 if TYPE_CHECKING:
     from collections.abc import Collection
     from pathlib import Path
-    from typing import Self
 
 
 _JINJA_ENVIRONMENT = Environment(
@@ -98,17 +96,13 @@ class TemplateParameterError(ValueError):
         super().__init__(msg)
 
 
-@dataclass(frozen=True, kw_only=True, slots=True)
+@final
 class PromptTemplate:
-    """Compiled prompt template with metadata and an explicit render contract."""
+    """Compiled YAML prompt template with an explicit render contract."""
 
-    name: str
-    description: str | None
-    parameter_keys: tuple[str, ...]
-    _template: Template = field(repr=False, compare=False)
+    __slots__ = ("_description", "_name", "_parameter_keys", "_template")
 
-    @classmethod
-    def from_yaml(cls, path: Path) -> Self:
+    def __init__(self, yaml_path: Path) -> None:
         """Load and compile a prompt template from YAML.
 
         ``name``, ``parameters``, and ``value`` are required. ``description``
@@ -116,23 +110,35 @@ class PromptTemplate:
         referenced by the Jinja template.
 
         Args:
-            path: Path to the YAML template file.
-
-        Returns:
-            Self: A structured, compiled prompt template.
+            yaml_path: Path to the YAML template file.
 
         Raises:
-            FileNotFoundError: If *path* does not exist.
+            FileNotFoundError: If *yaml_path* does not exist.
             PromptTemplateDefinitionError: If the file contents do not define
                 a valid prompt template.
         """
-        definition = _load_yaml_definition(path)
-        return cls(
-            name=definition.name,
-            description=definition.description,
-            parameter_keys=tuple(definition.parameters),
-            _template=_compile_template(definition, path=path),
-        )
+        definition = _load_yaml_definition(yaml_path)
+        template = _compile_template(definition, path=yaml_path)
+
+        self._name = definition.name
+        self._description = definition.description
+        self._parameter_keys = tuple(definition.parameters)
+        self._template = template
+
+    @property
+    def name(self) -> str:
+        """Human-readable template name."""
+        return self._name
+
+    @property
+    def description(self) -> str | None:
+        """Human-readable template purpose, when provided."""
+        return self._description
+
+    @property
+    def parameter_keys(self) -> tuple[str, ...]:
+        """Keyword names accepted by :meth:`render`."""
+        return self._parameter_keys
 
     def render(self, **kwargs: object) -> str:
         """Render with exactly the declared keyword arguments.
@@ -158,6 +164,14 @@ class PromptTemplate:
                 unexpected=unexpected,
             )
         return self._template.render(**kwargs)
+
+    def __repr__(self) -> str:
+        """Return a representation containing the public template metadata."""
+        return (
+            f"PromptTemplate(name={self.name!r}, "
+            f"description={self.description!r}, "
+            f"parameter_keys={self.parameter_keys!r})"
+        )
 
 
 _UniqueItemT = TypeVar("_UniqueItemT", bound=Hashable)
