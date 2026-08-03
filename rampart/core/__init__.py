@@ -33,6 +33,12 @@ from rampart.core.result import (
     resolve_attack_verdict,
     resolve_probe_verdict,
 )
+from rampart.core.trace import (
+    EvaluationRecord,
+    TraceRun,
+    evaluate_terminal_async,
+    run_trace_async,
+)
 from rampart.core.types import (
     EvalContext,
     EvalOutcome,
@@ -59,6 +65,7 @@ __all__ = [
     "EvalContext",
     "EvalOutcome",
     "EvalResult",
+    "EvaluationRecord",
     "EvaluationRole",
     "Evaluator",
     "ExecutionEvent",
@@ -87,10 +94,13 @@ __all__ = [
     "TerminationReason",
     "ToolCall",
     "ToolDeclaration",
+    "TraceRun",
     "Turn",
+    "evaluate_terminal_async",
     "evaluate_turn_async",
     "resolve_as_attack",
     "resolve_as_probe",
     "resolve_attack_verdict",
     "resolve_probe_verdict",
+    "run_trace_async",
 ]
