@@ -25,6 +25,7 @@ class Probes:
         *,
         prompt: str,
         evaluator: Evaluator,
+        stop_when: Evaluator | None = None,
         max_turns: int = 25,
         event_handlers: list[ExecutionEventHandler] | None = None,
     ) -> BaseExecution: ...
@@ -35,6 +36,7 @@ class Probes:
         *,
         prompts: list[str],
         evaluator: Evaluator,
+        stop_when: Evaluator | None = None,
         max_turns: int = 25,
         event_handlers: list[ExecutionEventHandler] | None = None,
     ) -> BaseExecution: ...
@@ -45,6 +47,7 @@ class Probes:
         *,
         driver: PromptDriver,
         evaluator: Evaluator,
+        stop_when: Evaluator | None = None,
         max_turns: int = 25,
         event_handlers: list[ExecutionEventHandler] | None = None,
     ) -> BaseExecution: ...
@@ -56,6 +59,7 @@ class Probes:
         prompts: list[str] | None = None,
         driver: PromptDriver | None = None,
         evaluator: Evaluator,
+        stop_when: Evaluator | None = None,
         max_turns: int = 25,
         event_handlers: list[ExecutionEventHandler] | None = None,
     ) -> BaseExecution:
@@ -69,6 +73,8 @@ class Probes:
             prompts (list[str] | None): A list of prompt strings.
             driver (PromptDriver | None): A pre-built prompt driver.
             evaluator (Evaluator): What behavior to check for.
+            stop_when (Evaluator | None): Optional online condition that stops
+                the trace when detected. Defaults to None.
             max_turns (int): Maximum prompt-response exchanges. Reaching the
                 limit resolves the trace normally. Defaults to 25.
             event_handlers (list[ExecutionEventHandler] | None): Optional
@@ -95,6 +101,7 @@ class Probes:
         return SingleTurnExecution(
             driver=resolved_driver,
             evaluator=evaluator,
+            stop_when=stop_when,
             max_turns=max_turns,
             event_handlers=event_handlers,
         )

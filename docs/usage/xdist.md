@@ -104,6 +104,10 @@ Worker payloads cross a process boundary via `execnet` and may contain attacker-
 - **Terminal/log injection** — ANSI escape sequences are stripped from free-form text at the deserialization boundary.
 - **Path traversal** — worker-local artifact paths are stored as opaque strings in metadata; the controller never accesses worker files.
 
+The private worker envelope is `rampart.xdist.v3`. Version 3 marks the change
+from prefix-folded probe status to terminal-trace status. Controllers reject
+v2 payloads rather than interpreting their status under the wrong semantics.
+
 ### Size cap
 
 The default 16 MiB cap can be overridden via the pytest CLI option or an ini setting:

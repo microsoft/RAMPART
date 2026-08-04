@@ -673,9 +673,9 @@ class TestDeserializationValidation:
         with pytest.raises(SchemaVersionError, match="does not match"):
             deserialize_report_data(data=payload, report_nodeid="n")
 
-    def test_rejects_legacy_schema_version(self) -> None:
+    def test_rejects_previous_schema_version(self) -> None:
         payload: dict[str, Any] = {
-            "schema": "rampart.xdist.v1",
+            "schema": "rampart.xdist.v2",
             "nodeid": "n",
             "results": [],
         }
@@ -1140,8 +1140,8 @@ class TestHandleTestnodedown:
         node = MagicMock()
         node.gateway.id = "gw1"
         node.workeroutput = {
-            "rampart_xdist_v1": {
-                "schema": "rampart.xdist.v1",
+            "rampart_xdist_v2": {
+                "schema": "rampart.xdist.v2",
                 "streamed_result_count": 0,
             },
         }
@@ -1541,11 +1541,11 @@ class TestConstants:
     def test_default_size_limit_is_16mb(self) -> None:
         assert DEFAULT_SIZE_LIMIT_BYTES == 16 * 1024 * 1024
 
-    def test_schema_version_is_v2(self) -> None:
-        assert SCHEMA_VERSION == "rampart.xdist.v2"
+    def test_schema_version_is_v3(self) -> None:
+        assert SCHEMA_VERSION == "rampart.xdist.v3"
 
     def test_workeroutput_key_namespaced(self) -> None:
-        assert WORKEROUTPUT_KEY == "rampart_xdist_v2"
+        assert WORKEROUTPUT_KEY == "rampart_xdist_v3"
 
 
 class TestTestRunReportTestable:

@@ -58,7 +58,7 @@ A single test run flows from your pytest test, through a RAMPART attack or probe
 
 *Request / response cycle for a single test run.*
 
-Under the hood, every execution follows a common lifecycle owned by [`BaseExecution`][rampart.core.execution.BaseExecution], which drives the per-turn loop between the strategy, your adapter, and the evaluator:
+Under the hood, every execution follows a common lifecycle owned by [`BaseExecution`][rampart.core.execution.BaseExecution]. The strategy drives requests through your adapter. Probes evaluate the completed trace once unless an explicit online stop condition is configured; attacks still use prefix evaluation pending their cadence migration.
 
 ```mermaid
 sequenceDiagram
@@ -76,10 +76,15 @@ sequenceDiagram
         Strat->>Strat: driver.next_prompt_async(history)
         Strat->>Adapter: session.send_async(request)
         Adapter-->>Strat: Response
-        Strat->>Eval: evaluate_async(context)
-        Eval-->>Strat: EvalResult
-        Note over Strat: Early stop if detected
+        opt Explicit online stop condition
+            Strat->>Eval: evaluate_async(prefix context)
+            Eval-->>Strat: stop EvalResult
+            Note over Strat: Stop if detected
+        end
     end
+
+    Strat->>Eval: evaluate_async(terminal context)
+    Eval-->>Strat: final EvalResult
 
     Strat-->>Exec: Result
     Exec->>Exec: fire ON_POST_EXECUTE
@@ -112,7 +117,7 @@ Evaluators are **polarity-free**. They answer "did X happen?" — not "is X good
 - In an **attack**, detection means the attack objective was achieved → **UNSAFE**
 - In a **probe**, detection means the expected behavior is present → **SAFE**
 
-The [`Attacks`][rampart.attacks.Attacks] and [`Probes`][rampart.probes.Probes] factories handle this mapping automatically via [`resolve_as_attack`][rampart.core.result.resolve_as_attack] and [`resolve_as_probe`][rampart.core.result.resolve_as_probe].
+The [`Attacks`][rampart.attacks.Attacks] and [`Probes`][rampart.probes.Probes] factories handle this mapping automatically. Probes use [`resolve_probe_verdict`][rampart.core.result.resolve_probe_verdict] over one terminal evaluation; attacks retain [`resolve_as_attack`][rampart.core.result.resolve_as_attack] until their cadence migration.
 
 You can reuse the same evaluator in both contexts. A [`ToolCalled`][rampart.evaluators.tool_called.ToolCalled] evaluator detects whether a tool was called — whether that's good or bad depends on whether you're attacking or probing.
 
