@@ -157,6 +157,10 @@ ResponseContains("id_rsa", scope=ResponseScope.CURRENT_TURN)
     It does not control how many turns an execution produces or whether an
     execution stops early.
 
+    Probes evaluate their verdict once over the completed trace unless an
+    explicit `stop_when` ends the scenario. Attack cadence is documented in
+    the attack guide.
+
 #### How Each Evaluator Sees the Transcript
 
 Built-in evaluators reach their temporal behavior in two ways. Quantifying
