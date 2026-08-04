@@ -138,8 +138,8 @@ When adding a new attack, test:
 
 1. **Execution lifecycle** — the attack calls `BaseExecution.execute_async` correctly
 2. **Phase orchestration** — injection, session creation, prompt driving, evaluation happen in order
-3. **Result resolution** — `resolve_as_attack` is applied (detected → UNSAFE, not detected → SAFE)
-4. **Edge cases** — empty handles, max turns reached, early stopping on detection
+3. **Result resolution** — `resolve_attack_verdict` maps one terminal evaluation (detected → UNSAFE, not detected → SAFE)
+4. **Edge cases** — empty handles, max turns reached, automatic/explicit/disabled stopping
 5. **Error handling** — infrastructure errors produce `SafetyStatus.ERROR`
 
 ### Testing a New Probe
