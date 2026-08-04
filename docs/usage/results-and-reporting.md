@@ -60,6 +60,11 @@ populate it when final-trace verdict cadence is enabled; legacy and manually
 constructed results may leave it as `None`. `Result.eval_results` continues to
 return only evaluations attached to turns.
 
+Behavioral probes do not perform online evaluation by default. Their
+`Result.evaluation` contains the verdict evidence, while `Result.eval_results`
+is normally empty and turn-level `eval_*` fields are absent from JSON reports.
+Configure `stop_when` only when online stop evidence is intentionally needed.
+
 `termination_reason` distinguishes normal trace endings such as driver
 exhaustion, reaching the turn budget, and an online stop condition. It is not
 an exception category; infrastructure failures remain available through result

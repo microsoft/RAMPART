@@ -10,9 +10,10 @@ Use behavioral probes for regression testing: ensure your agent still does the r
 
 1. **Create session** — Open a fresh session with the agent
 2. **Send prompts** — Drive the conversation via a prompt driver
-3. **Evaluate** — Check each turn for the expected behavior. Early-stops on detection.
-4. **Clean up** — Close the session
-5. **Result** — Produce a [`Result`][rampart.core.result.Result] via `resolve_as_probe` semantics
+3. **Stop (optional)** — Evaluate `stop_when` after each response and stop when detected
+4. **Evaluate** — Check the expected behavior once over the completed trace
+5. **Clean up** — Close the session
+6. **Result** — Map the final evaluation using probe semantics
 
 No injection phase.
 
@@ -77,8 +78,17 @@ result = await Probes.behavior(
     [Temporal Scope table](../usage/authoring-tests.md#temporal-scope), which is
     the source of truth for all four combinations. Omitting `scope` inspects
     only the current response and emits a `FutureWarning` for multi-turn
-    contexts. Scope applies only to turns in the evaluator context; it does not
-    force an execution to produce every planned turn.
+    contexts.
+
+    Probes do not stop early unless `stop_when` is configured. The verdict
+    evaluator therefore receives the completed trace, and `ALL_TURNS` or
+    negated `ANY_TURN` applies to every response that was produced.
+
+!!! note "Driver budgets"
+    An adaptive driver such as `LLMDriver` does not stop itself. Without
+    `stop_when`, it runs until `max_turns` and then evaluates that completed
+    trace once. Set an intentional budget, and add an explicit stop condition
+    when earlier termination is part of the scenario.
 
 ---
 
@@ -92,6 +102,7 @@ See [`Probes.behavior()`][rampart.probes.Probes.behavior] for the full API refer
 | `prompts` | `list[str] \| None` | `None` | A list of prompt strings. |
 | `driver` | [`PromptDriver`][rampart.core.prompt_driver.PromptDriver] `\| None` | `None` | A pre-built prompt driver. |
 | `evaluator` | [`Evaluator`][rampart.core.evaluator.Evaluator] | required | What behavior to detect. |
+| `stop_when` | [`Evaluator`][rampart.core.evaluator.Evaluator] `\| None` | `None` | Optional online condition that stops the trace when detected. |
 | `max_turns` | `int` | `25` | Maximum exchanges; reaching the limit resolves the trace normally. |
 
 !!! warning
