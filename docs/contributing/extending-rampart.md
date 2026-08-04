@@ -39,9 +39,9 @@ from rampart.core import (
     ExecutionEventHandler,
     PromptDriver,
     Result,
-    Turn,
-    evaluate_turn_async,
-    resolve_as_attack,
+    evaluate_terminal_async,
+    resolve_attack_verdict,
+    run_trace_async,
 )
 
 
@@ -51,6 +51,7 @@ class MyAttackExecution(BaseExecution):
     Args:
         driver (PromptDriver): How to drive the conversation.
         evaluator (Evaluator): What condition to check for.
+        stop_when (Evaluator | None): Optional online stop condition.
         max_turns (int): Maximum prompt-response exchanges.
         event_handlers (list[ExecutionEventHandler] | None): Additional handlers.
     """
@@ -60,12 +61,14 @@ class MyAttackExecution(BaseExecution):
         *,
         driver: PromptDriver,
         evaluator: Evaluator,
+        stop_when: Evaluator | None = None,
         max_turns: int = 25,
         event_handlers: list[ExecutionEventHandler] | None = None,
     ) -> None:
         super().__init__(event_handlers=event_handlers)
         self._driver = driver
         self._evaluator = evaluator
+        self._stop_when = stop_when
         self._max_turns = max_turns
 
     @property
@@ -82,38 +85,28 @@ class MyAttackExecution(BaseExecution):
         Returns:
             Result: Safety verdict.
         """
-        turns: list[Turn] = []
-
         async with await adapter.create_session_async() as session:
-            for turn_index in range(self._max_turns):
-                decision = await self._driver.next_prompt_async(history=turns)
-                if decision is None:
-                    break
+            run = await run_trace_async(
+                session=session,
+                driver=self._driver,
+                max_turns=self._max_turns,
+                observability_level=adapter.observability_profile,
+                stop_when=self._stop_when,
+                manifest=adapter.manifest,
+            )
+            evaluation = await evaluate_terminal_async(
+                evaluator=self._evaluator,
+                run=run,
+            )
 
-                response = await session.send_async(decision.request)
-                turn = await evaluate_turn_async(
-                    evaluator=self._evaluator,
-                    history=turns,
-                    request=decision.request,
-                    response=response,
-                    turn_number=turn_index,
-                    driver_reasoning=decision.reasoning,
-                    manifest=adapter.manifest,
-                    observability_level=adapter.observability_profile,
-                )
-                turns.append(turn)
-
-                if turn.eval_result and turn.eval_result.detected:
-                    break
-
-        # Use resolve_as_attack: detected → UNSAFE
-        eval_results = [t.eval_result for t in turns if t.eval_result is not None]
-        status = resolve_as_attack(eval_results=eval_results)
+        status = resolve_attack_verdict(evaluation=evaluation)
 
         return Result(
             status=status,
             summary="...",
-            turns=turns,
+            evaluation=evaluation,
+            turns=run.turns,
+            termination_reason=run.termination_reason,
             strategy=self.strategy_name,
             observability_level=adapter.observability_profile,
         )
@@ -124,8 +117,8 @@ Key points:
 - **Subclass `BaseExecution`** — it owns the lifecycle skeleton (event dispatch, timing, error handling)
 - **Implement `_execute_async`** — this is your strategy-specific logic
 - **Implement `strategy_name`** — a short identifier used in `Result.strategy`
-- **Use `resolve_as_attack`** — this maps evaluator outcomes to safety verdicts with attack semantics (detected = UNSAFE)
-- **Pass `observability_level`** so evaluators can tell missing evidence apart from an evidence channel the adapter does not report. It is required on both `evaluate_turn_async` and `Result`, so leaving it out is a `TypeError` rather than a wrong assumption buried in a report.
+- **Use `resolve_attack_verdict`** — this maps one terminal evaluation to attack semantics (detected = UNSAFE)
+- **Pass `observability_level`** so evaluators can tell missing evidence apart from a channel the adapter does not report. It is required on both `run_trace_async` and `Result`, so leaving it out is a `TypeError` rather than a wrong assumption buried in a report.
 - **Don't wrap `_execute_async` in a broad `try/except`** — `BaseExecution.execute_async` already catches every exception from `_execute_async` and converts it to a `SafetyStatus.ERROR` result.
 
 ### 2. Add a Factory Method to `Attacks`
@@ -181,7 +174,7 @@ The process mirrors the [Attack](#attack) walkthrough. The differences are summa
 |---|---|---|
 | **Location** | `rampart/attacks/_name.py` | `rampart/probes/_name.py` |
 | **Factory class** | `Attacks` | `Probes` |
-| **Resolution function** | `resolve_as_attack` (pending cadence migration) | `resolve_probe_verdict` |
+| **Resolution function** | `resolve_attack_verdict` | `resolve_probe_verdict` |
 | **Detected means** | UNSAFE | SAFE |
 | **Injection phase** | Often yes | No |
 

@@ -68,6 +68,8 @@ class ResponseContains(BaseEvaluator):
         self._target = target
         self._case_sensitive = case_sensitive
         self._scope = scope
+        self._detected_absorbing = scope is ResponseScope.ANY_TURN
+        self._not_detected_absorbing = scope is ResponseScope.ALL_TURNS
 
     async def evaluate_async(self, *, context: EvalContext) -> EvalResult:
         """Check response text for the target pattern within the scope.

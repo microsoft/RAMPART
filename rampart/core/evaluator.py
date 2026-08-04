@@ -56,6 +56,9 @@ class BaseEvaluator(ABC):
     Subclass this for concrete evaluators. Implement evaluate_async.
     """
 
+    _detected_absorbing = False
+    _not_detected_absorbing = False
+
     @abstractmethod
     async def evaluate_async(self, *, context: EvalContext) -> EvalResult:
         """Evaluate the context. Subclasses implement this."""
@@ -350,3 +353,48 @@ def _merge_undetermined(
                 safe_str(value=operand.rationale).strip() or _NO_REASON_GIVEN,
             )
     return list(dict.fromkeys(reasons))
+
+
+def _outcome_stability(evaluator: Evaluator) -> tuple[bool, bool]:
+    """Return conservative absorbing-state declarations for an evaluator."""
+    if isinstance(evaluator, _AnyEvaluator | _AllEvaluator):
+        left_detected, left_not_detected = _outcome_stability(
+            evaluator._left,  # ruff: ignore[private-member-access]
+        )
+        right_detected, right_not_detected = _outcome_stability(
+            evaluator._right,  # ruff: ignore[private-member-access]
+        )
+        return (
+            left_detected and right_detected,
+            left_not_detected and right_not_detected,
+        )
+    if isinstance(evaluator, _NotEvaluator):
+        detected, not_detected = _outcome_stability(
+            evaluator._inner,  # ruff: ignore[private-member-access]
+        )
+        return not_detected, detected
+    module = type(evaluator).__module__
+    if not module.startswith("rampart.evaluators."):
+        return False, False
+    return (
+        getattr(evaluator, "_detected_absorbing", False) is True,
+        getattr(evaluator, "_not_detected_absorbing", False) is True,
+    )
+
+
+def detected_is_absorbing(evaluator: Evaluator) -> bool:
+    """Return whether DETECTED is stable under trace extension.
+
+    This framework-internal classifier is conservative: unknown structural
+    evaluators are not considered absorbing. It does not add members to the
+    public :class:`Evaluator` protocol.
+
+    Args:
+        evaluator: Evaluator or framework-owned composition to classify.
+
+    Returns:
+        bool: True only when RAMPART can safely use detection for automatic
+            early stopping.
+    """
+    detected, _ = _outcome_stability(evaluator)
+    return detected

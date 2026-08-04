@@ -14,9 +14,13 @@ Attacks use the following mapping from evaluator outcomes to safety verdicts:
 | `NOT_DETECTED` | `SAFE` | The attack failed — the agent resisted |
 | `UNDETERMINED` | `UNDETERMINED` | The evaluator could not determine whether the attack succeeded |
 
-Precedence when multiple turns are evaluated: `DETECTED` > `UNDETERMINED` > `NOT_DETECTED`. If any turn detected the attack objective, the agent is compromised regardless of other turns.
+The evaluator runs once over the terminal trace, and the outcome maps directly
+to the verdict. This logic lives in
+[`resolve_attack_verdict`][rampart.core.result.resolve_attack_verdict].
 
-This logic lives in [`resolve_as_attack`][rampart.core.result.resolve_as_attack].
+Attack factories may evaluate a separate online `stop_when` condition while
+the trace is being produced. XPIA's `"auto"` default reuses the verdict
+evaluator only when detection is known to be stable as turns are appended.
 
 ---
 
@@ -27,9 +31,10 @@ All attack executions share this lifecycle:
 1. **Inject** (optional) — Place payloads into the agent's data sources via [surfaces](../api/core-protocols.md)
 2. **Wait** — Allow time for indexing or propagation
 3. **Trigger** — Send prompts that cause the agent to process the injected content
-4. **Evaluate** — Check whether the attack objective was achieved
-5. **Clean up** — Remove injected content (guaranteed, even on failure)
-6. **Report** — Produce a [`Result`][rampart.core.result.Result]
+4. **Stop (optional)** — Check an online condition after each response
+5. **Evaluate** — Check the terminal trace once for the attack objective
+6. **Clean up** — Remove injected content (guaranteed, even on failure)
+7. **Report** — Produce a [`Result`][rampart.core.result.Result]
 
 The injection phase is optional — inline attacks attach payloads directly to the trigger prompt.
 

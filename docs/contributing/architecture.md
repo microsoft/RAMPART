@@ -41,8 +41,8 @@ When adding a new attack or probe, you add a static factory method — not a new
 
 Evaluators are **polarity-free**. They report whether a condition was detected, not whether it's good or bad. The attack/probe factory applies the correct polarity:
 
-- `resolve_as_attack`: detected → UNSAFE
-- `resolve_as_probe`: detected → SAFE
+- `resolve_attack_verdict`: detected → UNSAFE
+- `resolve_probe_verdict`: detected → SAFE
 
 This allows the same evaluator (e.g., `ToolCalled`) to be used in both attack and probe contexts.
 
