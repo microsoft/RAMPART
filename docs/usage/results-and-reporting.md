@@ -60,10 +60,15 @@ stops, not simply the last online evaluation. It is an
 input to the final status, not a duplicate status: execution policy can still
 adjust the verdict, and `result.status` remains authoritative.
 
-This layer makes terminal provenance durable before changing execution
-cadence. Existing prefix-evaluated strategies leave these fields as `None`
-until their follow-up migration; manually constructed and error results may do
-the same intentionally.
+Behavioral probes evaluate the complete terminal trace by default. Their
+`Result.terminal_evaluation` contains the verdict evidence, while
+`Result.turn_evaluations` and the compatibility view `Result.eval_results` are
+normally empty. Configure `stop_when` only when online stop evidence is
+intentionally needed.
+
+Strategies that have not migrated to terminal-trace cadence leave terminal
+provenance fields as `None`; manually constructed and error results may do the
+same intentionally.
 
 Online evaluations attached to turns are available as
 `result.turn_evaluations`; this list excludes the terminal evaluation.

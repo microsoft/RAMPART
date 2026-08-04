@@ -55,8 +55,8 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-SCHEMA_VERSION: str = "rampart.xdist.v2"
-WORKEROUTPUT_KEY: str = "rampart_xdist_v2"
+SCHEMA_VERSION: str = "rampart.xdist.v3"
+WORKEROUTPUT_KEY: str = "rampart_xdist_v3"
 REPORT_RESULTS_ATTR: str = "_rampart_results"
 SIZE_LIMIT_OPTION: str = "rampart_xdist_max_bytes"
 DEFAULT_SIZE_LIMIT_BYTES: int = 16 * 1024 * 1024
