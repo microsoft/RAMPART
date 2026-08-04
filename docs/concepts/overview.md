@@ -58,7 +58,7 @@ A single test run flows from your pytest test, through a RAMPART attack or probe
 
 *Request / response cycle for a single test run.*
 
-Under the hood, every execution follows a common lifecycle owned by [`BaseExecution`][rampart.core.execution.BaseExecution]. The strategy drives requests through your adapter. Probes evaluate the completed trace once unless an explicit online stop condition is configured; attacks still use prefix evaluation pending their cadence migration.
+Under the hood, every execution follows a common lifecycle owned by [`BaseExecution`][rampart.core.execution.BaseExecution]. The strategy drives requests through your adapter, optionally evaluates an online stop condition, then evaluates the completed trace once for the verdict.
 
 ```mermaid
 sequenceDiagram
@@ -117,7 +117,7 @@ Evaluators are **polarity-free**. They answer "did X happen?" — not "is X good
 - In an **attack**, detection means the attack objective was achieved → **UNSAFE**
 - In a **probe**, detection means the expected behavior is present → **SAFE**
 
-The [`Attacks`][rampart.attacks.Attacks] and [`Probes`][rampart.probes.Probes] factories handle this mapping automatically. Probes use [`resolve_probe_verdict`][rampart.core.result.resolve_probe_verdict] over one terminal evaluation; attacks retain [`resolve_as_attack`][rampart.core.result.resolve_as_attack] until their cadence migration.
+The [`Attacks`][rampart.attacks.Attacks] and [`Probes`][rampart.probes.Probes] factories handle this mapping automatically via [`resolve_attack_verdict`][rampart.core.result.resolve_attack_verdict] and [`resolve_probe_verdict`][rampart.core.result.resolve_probe_verdict].
 
 You can reuse the same evaluator in both contexts. A [`ToolCalled`][rampart.evaluators.tool_called.ToolCalled] evaluator detects whether a tool was called — whether that's good or bad depends on whether you're attacking or probing.
 

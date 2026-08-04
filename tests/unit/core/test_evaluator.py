@@ -5,7 +5,7 @@
 
 import pytest
 
-from rampart.core.evaluator import BaseEvaluator, Evaluator
+from rampart.core.evaluator import BaseEvaluator, Evaluator, detected_is_absorbing
 from rampart.core.types import (
     EvalContext,
     EvalOutcome,
@@ -14,6 +14,12 @@ from rampart.core.types import (
     Request,
     Response,
     Turn,
+)
+from rampart.evaluators import (
+    ResponseContains,
+    ResponseScope,
+    SideEffectOccurred,
+    ToolCalled,
 )
 
 
@@ -82,6 +88,67 @@ class TestEvaluatorProtocol:
     def test_base_evaluator_satisfies_protocol(self) -> None:
         stub = _StubEvaluator(outcome=EvalOutcome.DETECTED)
         assert isinstance(stub, Evaluator)
+
+
+class TestAbsorbingDetectionClassification:
+    def test_known_existential_evaluators_are_absorbing(self) -> None:
+        assert detected_is_absorbing(ToolCalled("send")) is True
+        assert detected_is_absorbing(SideEffectOccurred("write")) is True
+        assert (
+            detected_is_absorbing(
+                ResponseContains("secret", scope=ResponseScope.ANY_TURN),
+            )
+            is True
+        )
+
+    def test_current_and_all_turn_response_scopes_are_not_detected_absorbing(
+        self,
+    ) -> None:
+        assert (
+            detected_is_absorbing(
+                ResponseContains("secret", scope=ResponseScope.CURRENT_TURN),
+            )
+            is False
+        )
+        assert (
+            detected_is_absorbing(
+                ResponseContains("secret", scope=ResponseScope.ALL_TURNS),
+            )
+            is False
+        )
+
+    def test_composition_is_conservative(self) -> None:
+        absorbing = ToolCalled("a") | SideEffectOccurred("b")
+        mixed = ToolCalled("a") | _StubEvaluator(
+            outcome=EvalOutcome.DETECTED,
+        )
+        absorbing_and = ToolCalled("a") & SideEffectOccurred("b")
+        mixed_and = ToolCalled("a") & _StubEvaluator(
+            outcome=EvalOutcome.DETECTED,
+        )
+
+        assert detected_is_absorbing(absorbing) is True
+        assert detected_is_absorbing(mixed) is False
+        assert detected_is_absorbing(absorbing_and) is True
+        assert detected_is_absorbing(mixed_and) is False
+        assert detected_is_absorbing(~absorbing) is False
+
+    def test_negation_swaps_absorbing_outcomes(self) -> None:
+        any_turn = ResponseContains("secret", scope=ResponseScope.ANY_TURN)
+        all_turns = ResponseContains("secret", scope=ResponseScope.ALL_TURNS)
+
+        assert detected_is_absorbing(~any_turn) is False
+        assert detected_is_absorbing(~all_turns) is True
+
+    def test_unknown_structural_evaluator_is_not_absorbing(self) -> None:
+        class StructuralEvaluator:
+            async def evaluate_async(self, *, context: EvalContext) -> EvalResult:
+                return EvalResult(outcome=EvalOutcome.DETECTED)
+
+        assert detected_is_absorbing(StructuralEvaluator()) is False
+
+    def test_unspecified_response_scope_is_not_absorbing(self) -> None:
+        assert detected_is_absorbing(ResponseContains("secret")) is False
 
 
 class TestOrComposition:
