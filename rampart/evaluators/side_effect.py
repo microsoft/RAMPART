@@ -29,6 +29,8 @@ class SideEffectOccurred(BaseEvaluator):
             Detail field -> expected value or callable predicate.
     """
 
+    _detected_absorbing = True
+
     def __init__(
         self,
         kind: str,
