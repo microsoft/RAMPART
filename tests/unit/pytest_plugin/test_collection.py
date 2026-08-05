@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from unittest.mock import MagicMock
 
 from rampart.core.execution import ExecutionEvent, ExecutionEventData
@@ -15,6 +16,7 @@ from rampart.pytest_plugin._collection import (
     _active_collector,
     activate_collector,
     deactivate_collector,
+    get_active_collector,
     record_result,
 )
 
@@ -190,3 +192,49 @@ class TestActivateDeactivateCollector:
         assert len(outer.results) == 1
 
         deactivate_collector(outer_token)
+
+
+class TestGetActiveCollector:
+    """get_active_collector exposes the ContextVar-scoped collector."""
+
+    def test_returns_none_when_inactive(self) -> None:
+        token = _active_collector.set(None)
+        try:
+            assert get_active_collector() is None
+        finally:
+            _active_collector.reset(token)
+
+    def test_returns_active_collector(self) -> None:
+        collector = ResultCollector()
+        token = activate_collector(collector)
+        try:
+            assert get_active_collector() is collector
+        finally:
+            deactivate_collector(token)
+
+    def test_returns_none_after_deactivate(self) -> None:
+        baseline = _active_collector.set(None)
+        try:
+            collector = ResultCollector()
+            token = activate_collector(collector)
+            deactivate_collector(token)
+            assert get_active_collector() is None
+        finally:
+            _active_collector.reset(baseline)
+
+    async def test_sees_results_from_child_task_async(self) -> None:
+        collector = ResultCollector()
+        token = activate_collector(collector)
+
+        async def _body() -> None:
+            await asyncio.sleep(0)
+            record_result(result=_make_result(summary="child"))
+
+        try:
+            await asyncio.create_task(_body())
+            active = get_active_collector()
+            assert active is collector
+            assert len(active.results) == 1
+            assert active.results[0].summary == "child"
+        finally:
+            deactivate_collector(token)

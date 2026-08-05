@@ -58,6 +58,16 @@ def deactivate_collector(token: Token[ResultCollector | None]) -> None:
     _active_collector.reset(token)
 
 
+def get_active_collector() -> ResultCollector | None:
+    """Return the collector active for the current test, if any.
+
+    Returns:
+        ResultCollector | None: The active collector, or None when no
+            test collector is installed on the current context.
+    """
+    return _active_collector.get()
+
+
 class ResultCollector:
     """Accumulates Result objects produced during a single test.
 

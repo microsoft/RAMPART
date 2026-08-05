@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any, cast
 from unittest.mock import AsyncMock, MagicMock
 
@@ -12,9 +13,16 @@ import pytest
 
 from rampart.core.result import Result, SafetyStatus
 from rampart.core.types import ObservabilityLevel
-from rampart.pytest_plugin._collection import ResultCollectionHandler, ResultCollector
+from rampart.pytest_plugin._collection import (
+    ResultCollectionHandler,
+    ResultCollector,
+    _active_collector,
+    activate_collector,
+    deactivate_collector,
+)
 from rampart.pytest_plugin._session import RampartSession
 from rampart.pytest_plugin.plugin import (
+    _call_results_key,
     _emit_sinks,
     _enforce_incomplete_exit_status,
     _evaluate_gates,
@@ -26,6 +34,7 @@ from rampart.pytest_plugin.plugin import (
     _write_trial_group_lines,
     pytest_collection_modifyitems,
     pytest_configure,
+    pytest_runtest_makereport,
     pytest_sessionfinish,
     pytest_terminal_summary,
     pytest_unconfigure,
@@ -969,3 +978,111 @@ class TestIncompleteExitStatus:
             rampart_session=rampart_session,
         )
         assert session.exitstatus == pytest.ExitCode.INTERRUPTED
+
+
+def _make_result(*, summary: str = "result") -> Result:
+    """Build a minimal Result for makereport tests."""
+    return Result(status=SafetyStatus.SAFE, summary=summary)
+
+
+def _make_reporting_item(*, worker: bool = True) -> Any:
+    """Build a mock pytest.Item backed by a real Stash.
+
+    Defaults to a worker-like config so the call-phase snapshot fires;
+    pass worker=False for a single-process or controller config.
+    """
+    item = MagicMock()
+    item.stash = pytest.Stash()
+    if worker:
+        item.config = SimpleNamespace(workerinput={"workerid": "gw0"})
+    else:
+        item.config = SimpleNamespace()
+    return item
+
+
+def _drive_makereport(*, item: Any, when: str, report: Any = None) -> Any:
+    """Drive the makereport wrapper generator and return its result."""
+    call = MagicMock()
+    call.when = when
+    sent = report if report is not None else MagicMock()
+    gen = pytest_runtest_makereport(
+        item=cast("pytest.Item", item),
+        call=cast("pytest.CallInfo[None]", call),
+    )
+    next(gen)
+    try:
+        gen.send(sent)
+    except StopIteration as stop:
+        return stop.value
+    raise AssertionError("makereport wrapper did not return")
+
+
+class TestPytestRuntestMakereport:
+    """The makereport hook snapshots collector results at the call phase."""
+
+    def test_snapshots_results_at_call_phase(self) -> None:
+        item = _make_reporting_item()
+        collector = ResultCollector()
+        collector.record(result=_make_result(summary="captured"))
+        token = activate_collector(collector)
+        try:
+            _drive_makereport(item=item, when="call")
+        finally:
+            deactivate_collector(token)
+
+        snapshot = item.stash[_call_results_key]
+        assert len(snapshot) == 1
+        assert snapshot[0].summary == "captured"
+
+    def test_snapshots_empty_list_when_no_results(self) -> None:
+        item = _make_reporting_item()
+        collector = ResultCollector()
+        token = activate_collector(collector)
+        try:
+            _drive_makereport(item=item, when="call")
+        finally:
+            deactivate_collector(token)
+
+        assert item.stash[_call_results_key] == []
+
+    def test_no_snapshot_at_setup_phase(self) -> None:
+        item = _make_reporting_item()
+        collector = ResultCollector()
+        collector.record(result=_make_result())
+        token = activate_collector(collector)
+        try:
+            _drive_makereport(item=item, when="setup")
+        finally:
+            deactivate_collector(token)
+
+        assert _call_results_key not in item.stash
+
+    def test_no_snapshot_when_no_collector_active(self) -> None:
+        item = _make_reporting_item()
+        token = _active_collector.set(None)
+        try:
+            _drive_makereport(item=item, when="call")
+        finally:
+            _active_collector.reset(token)
+
+        assert _call_results_key not in item.stash
+
+    def test_no_snapshot_when_not_xdist_worker(self) -> None:
+        item = _make_reporting_item(worker=False)
+        collector = ResultCollector()
+        collector.record(result=_make_result())
+        token = activate_collector(collector)
+        try:
+            _drive_makereport(item=item, when="call")
+        finally:
+            deactivate_collector(token)
+
+        assert _call_results_key not in item.stash
+
+    def test_returns_report_unchanged(self) -> None:
+        item = _make_reporting_item()
+        report = object()
+
+        returned = _drive_makereport(item=item, when="call", report=report)
+
+        assert returned is report

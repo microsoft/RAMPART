@@ -41,6 +41,7 @@ from rampart.pytest_plugin._collection import (
     ResultCollector,
     activate_collector,
     deactivate_collector,
+    get_active_collector,
 )
 from rampart.pytest_plugin._session import RampartSession
 from rampart.pytest_plugin._xdist import (
@@ -69,14 +70,19 @@ __all__ = [
     "pytest_addoption",
     "pytest_collection_modifyitems",
     "pytest_configure",
+    "pytest_runtest_makereport",
     "pytest_sessionfinish",
     "pytest_terminal_summary",
     "pytest_testnodedown",
     "pytest_unconfigure",
 ]
 
+# Config-scoped stash keys: one entry per pytest session.
 _rampart_key = pytest.StashKey[RampartSession]()
 _session_start_key = pytest.StashKey[float]()
+
+# Item-scoped stash key: a per-test snapshot consumed by xdist streaming.
+_call_results_key = pytest.StashKey[list[Result]]()
 
 # Module-level constants are an acceptable exception in a hook-based
 # plugin module where there is no natural owning class.
@@ -452,6 +458,42 @@ def _rampart_collect(  # pytest discovers this via autouse=True
             "did you forget record_result() or assert result?",
             node.nodeid,
         )
+
+
+@pytest.hookimpl(wrapper=True)
+def pytest_runtest_makereport(
+    item: pytest.Item,
+    call: pytest.CallInfo[None],
+) -> Generator[None, pytest.TestReport, pytest.TestReport]:
+    """Snapshot the active collector's results at the call phase.
+
+    On xdist workers, copies the per-test results onto the item stash
+    while the collector is still active — before the autouse fixture's
+    teardown drains and deactivates it. Downstream xdist streaming reads
+    this snapshot to deliver results per test rather than in a single
+    end-of-worker batch.
+
+    Restricted to worker processes: single-process and controller runs
+    never consume the snapshot, so skipping it there keeps those paths
+    allocation-free and byte-identical to their pre-snapshot behavior.
+
+    Runs as a wrapper so it is never skipped by the firstresult builtin
+    and always returns the report unchanged.
+
+    Args:
+        item (pytest.Item): The test item being reported.
+        call (pytest.CallInfo[None]): The call phase information.
+
+    Returns:
+        Generator[None, pytest.TestReport, pytest.TestReport]: The
+            unchanged report produced by downstream hookimpls.
+    """
+    report = yield
+    if call.when == "call" and is_xdist_worker(config=item.config):
+        collector = get_active_collector()
+        if collector is not None:
+            item.stash[_call_results_key] = collector.results
+    return report
 
 
 def _has_sink_hook_impl(*, config: pytest.Config) -> bool:
