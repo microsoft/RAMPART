@@ -1,27 +1,18 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT license.
 
-"""YAML prompt-template loader shared by drivers and evaluators.
+"""Source-neutral prompt-template definition, compilation, and YAML loading.
 
-RAMPART keeps prompt text in YAML files under per-package ``prompts/``
-directories. Each file uses this schema:
-
-- ``name`` (required): Human-readable template name.
-- ``parameters`` (required): Exact keyword names accepted by ``render()``.
-- ``value`` (required): Jinja2 template source.
-- ``description`` (optional): Human-readable purpose; defaults to ``None``.
-
-Unknown keys and type coercion are rejected. Parameter names must be unique.
-The loader maps ``parameters`` to :attr:`PromptTemplate.parameter_keys`,
-compiles ``value``, and returns a structured template that validates every
-render call before evaluating Jinja markup.
+``PromptTemplate`` accepts only a validated ``PromptTemplateDefinition`` and
+compiles its Jinja source internally. ``PromptTemplate.from_yaml`` is the
+filesystem and YAML adapter used by RAMPART's built-in drivers and evaluators.
+Every render call must provide exactly the definition's declared parameters.
 """
 
 from __future__ import annotations
 
 from collections.abc import Hashable
-from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Annotated, TypeAlias, TypeVar
+from typing import TYPE_CHECKING, Annotated, TypeAlias, TypeVar, final
 
 import yaml
 from jinja2 import (
@@ -29,13 +20,22 @@ from jinja2 import (
     StrictUndefined,
     Template,
     TemplateError,
+    TemplateSyntaxError,
     meta,
     select_autoescape,
 )
-from pydantic import AfterValidator, BaseModel, ConfigDict, ValidationError
+from pydantic import (
+    AfterValidator,
+    BaseModel,
+    BeforeValidator,
+    ConfigDict,
+    Field,
+    ValidationError,
+)
 
 __all__ = [
     "PromptTemplate",
+    "PromptTemplateDefinition",
     "PromptTemplateDefinitionError",
     "TemplateParameterError",
 ]
@@ -53,18 +53,58 @@ _JINJA_ENVIRONMENT = Environment(
 
 
 class PromptTemplateDefinitionError(ValueError):
-    """Raised when file contents do not define a valid prompt template."""
+    """Raised when data does not define a valid prompt template."""
 
-    def __init__(self, *, path: Path, details: str) -> None:
+    def __init__(
+        self,
+        *,
+        details: str,
+        template_name: str | None = None,
+        template_line: int | None = None,
+        path: Path | None = None,
+    ) -> None:
         """Initialize an invalid-definition error.
 
         Args:
-            path: Path to the invalid YAML template.
             details: Human-readable failure details.
+            template_name: Human-readable template name, when available.
+            template_line: Line within the template value, when available.
+            path: Path from which the definition was loaded, when applicable.
         """
         self.path = path
-        msg = f"Prompt template {path} is invalid:\n{details}"
-        super().__init__(msg)
+        self.details = details
+        self.template_name = template_name
+        self.template_line = template_line
+        super().__init__(self._format_message())
+
+    def add_path(self, path: Path) -> None:
+        """Add adapter context while preserving this exception instance.
+
+        Args:
+            path: Path from which the invalid definition was loaded.
+        """
+        self.path = path
+        self.args = (self._format_message(),)
+
+    def _format_message(self) -> str:
+        """Format the error from its structured fields.
+
+        Returns:
+            str: Human-readable error message.
+        """
+        if self.template_name is not None:
+            subject = f"Prompt template {self.template_name!r}"
+            if self.path is not None:
+                subject += f" loaded from {self.path}"
+        elif self.path is not None:
+            subject = f"Prompt template {self.path}"
+        else:
+            subject = "Prompt template"
+
+        location = ""
+        if self.template_line is not None:
+            location = f" (template value line {self.template_line})"
+        return f"{subject} is invalid{location}:\n{self.details}"
 
 
 class TemplateParameterError(ValueError):
@@ -98,14 +138,24 @@ class TemplateParameterError(ValueError):
         super().__init__(msg)
 
 
-@dataclass(frozen=True, kw_only=True, slots=True)
+@final
 class PromptTemplate:
     """Compiled prompt template with metadata and an explicit render contract."""
 
-    name: str
-    description: str | None
-    parameter_keys: tuple[str, ...]
-    _template: Template = field(repr=False, compare=False)
+    __slots__ = ("_description", "_name", "_parameter_keys", "_template")
+
+    def __init__(self, *, definition: PromptTemplateDefinition) -> None:
+        """Compile a validated prompt template definition.
+
+        Args:
+            definition: Source-neutral prompt template definition.
+        """
+        template = _compile_template(definition)
+
+        self._name = definition.name
+        self._description = definition.description
+        self._parameter_keys = definition.parameters
+        self._template = template
 
     @classmethod
     def from_yaml(cls, path: Path) -> Self:
@@ -127,12 +177,26 @@ class PromptTemplate:
                 a valid prompt template.
         """
         definition = _load_yaml_definition(path)
-        return cls(
-            name=definition.name,
-            description=definition.description,
-            parameter_keys=tuple(definition.parameters),
-            _template=_compile_template(definition, path=path),
-        )
+        try:
+            return cls(definition=definition)
+        except PromptTemplateDefinitionError as exc:
+            exc.add_path(path)
+            raise
+
+    @property
+    def name(self) -> str:
+        """Human-readable template name."""
+        return self._name
+
+    @property
+    def description(self) -> str | None:
+        """Human-readable template purpose, when provided."""
+        return self._description
+
+    @property
+    def parameter_keys(self) -> tuple[str, ...]:
+        """Keyword names accepted by :meth:`render`."""
+        return self._parameter_keys
 
     def render(self, **kwargs: object) -> str:
         """Render with exactly the declared keyword arguments.
@@ -159,18 +223,42 @@ class PromptTemplate:
             )
         return self._template.render(**kwargs)
 
+    def __repr__(self) -> str:
+        """Return a representation containing only public metadata."""
+        return (
+            f"PromptTemplate(name={self.name!r}, "
+            f"description={self.description!r}, "
+            f"parameter_keys={self.parameter_keys!r})"
+        )
+
 
 _UniqueItemT = TypeVar("_UniqueItemT", bound=Hashable)
 
 
-def _require_unique(values: list[_UniqueItemT]) -> list[_UniqueItemT]:
+def _convert_list_to_tuple(values: object) -> object:
+    """Convert a serialized list to its immutable domain representation.
+
+    Args:
+        values: Raw value to normalize.
+
+    Returns:
+        object: A tuple for list input; otherwise the original value.
+    """
+    if isinstance(values, list):
+        return tuple(values)
+    return values
+
+
+def _require_unique(
+    values: tuple[_UniqueItemT, ...],
+) -> tuple[_UniqueItemT, ...]:
     """Reject duplicate values.
 
     Args:
         values: Values to validate.
 
     Returns:
-        list[_UniqueItemT]: The validated values in their original order.
+        tuple[_UniqueItemT, ...]: The validated values in their original order.
 
     Raises:
         ValueError: If any value appears more than once.
@@ -181,14 +269,22 @@ def _require_unique(values: list[_UniqueItemT]) -> list[_UniqueItemT]:
     return values
 
 
-_UniqueList: TypeAlias = Annotated[
-    list[_UniqueItemT],
+_UniqueTuple: TypeAlias = Annotated[
+    tuple[_UniqueItemT, ...],
+    BeforeValidator(_convert_list_to_tuple),
     AfterValidator(_require_unique),
 ]
 
 
-class _PromptTemplateYaml(BaseModel):
-    """Strict schema for the serialized YAML representation."""
+class PromptTemplateDefinition(BaseModel):
+    """Strict, source-neutral definition of a prompt template.
+
+    Attributes:
+        name: Human-readable template name.
+        parameters: Ordered, unique keyword names accepted by ``render()``.
+        value: Jinja template source, omitted from the representation.
+        description: Human-readable purpose, when provided.
+    """
 
     model_config = ConfigDict(
         extra="forbid",
@@ -198,19 +294,19 @@ class _PromptTemplateYaml(BaseModel):
     )
 
     name: str
-    parameters: _UniqueList[str]
-    value: str
+    parameters: _UniqueTuple[str]
+    value: str = Field(repr=False)
     description: str | None = None
 
 
-def _load_yaml_definition(path: Path) -> _PromptTemplateYaml:
+def _load_yaml_definition(path: Path) -> PromptTemplateDefinition:
     """Load and validate the serialized YAML representation.
 
     Args:
         path: Path to the YAML template file.
 
     Returns:
-        _PromptTemplateYaml: The validated YAML definition.
+        PromptTemplateDefinition: The validated template definition.
 
     Raises:
         FileNotFoundError: If *path* does not exist.
@@ -224,21 +320,18 @@ def _load_yaml_definition(path: Path) -> _PromptTemplateYaml:
         raise PromptTemplateDefinitionError(path=path, details=str(exc)) from exc
 
     try:
-        return _PromptTemplateYaml.model_validate(data)
+        return PromptTemplateDefinition.model_validate(data)
     except ValidationError as exc:
         raise PromptTemplateDefinitionError(path=path, details=str(exc)) from exc
 
 
 def _compile_template(
-    definition: _PromptTemplateYaml,
-    *,
-    path: Path,
+    definition: PromptTemplateDefinition,
 ) -> Template:
     """Compile a validated definition after checking its parameter contract.
 
     Args:
-        definition: Validated YAML template definition.
-        path: Source path used in Jinja diagnostics.
+        definition: Validated source-neutral template definition.
 
     Returns:
         Template: The compiled Jinja template.
@@ -248,26 +341,43 @@ def _compile_template(
             declared parameters do not match its variables.
     """
     try:
-        parsed = _JINJA_ENVIRONMENT.parse(
-            definition.value,
-            name=definition.name,
-            filename=str(path),
-        )
+        parsed = _JINJA_ENVIRONMENT.parse(definition.value)
         referenced_keys = meta.find_undeclared_variables(parsed)
+    except TemplateSyntaxError as exc:
+        raise PromptTemplateDefinitionError(
+            details=exc.message or str(exc),
+            template_name=definition.name,
+            template_line=exc.lineno,
+        ) from exc
     except TemplateError as exc:
-        raise PromptTemplateDefinitionError(path=path, details=str(exc)) from exc
+        raise PromptTemplateDefinitionError(
+            details=str(exc),
+            template_name=definition.name,
+        ) from exc
 
     declared_keys = set(definition.parameters)
     if referenced_keys != declared_keys:
         missing = tuple(sorted(referenced_keys - declared_keys))
         unused = tuple(sorted(declared_keys - referenced_keys))
-        msg = (
-            f"Prompt template {definition.name!r} parameters do not match its "
-            f"Jinja variables: missing={missing!r}, unused={unused!r}"
+        details = (
+            "parameters do not match Jinja variables: "
+            f"missing={missing!r}, unused={unused!r}"
         )
-        raise PromptTemplateDefinitionError(path=path, details=msg)
+        raise PromptTemplateDefinitionError(
+            details=details,
+            template_name=definition.name,
+        )
 
     try:
         return _JINJA_ENVIRONMENT.from_string(parsed)
+    except TemplateSyntaxError as exc:
+        raise PromptTemplateDefinitionError(
+            details=exc.message or str(exc),
+            template_name=definition.name,
+            template_line=exc.lineno,
+        ) from exc
     except TemplateError as exc:
-        raise PromptTemplateDefinitionError(path=path, details=str(exc)) from exc
+        raise PromptTemplateDefinitionError(
+            details=str(exc),
+            template_name=definition.name,
+        ) from exc
