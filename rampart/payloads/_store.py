@@ -145,6 +145,14 @@ class PayloadStore:
                 msg,
             )
 
+        collection_dir = payloads_path.parent
+        artifacts_dir = collection_dir / "artifacts"
+        self._ensure_within_directory(
+            path=artifacts_dir,
+            directory=collection_dir,
+            description="artifacts directory",
+        )
+
         payloads: list[Payload] = []
         with payloads_path.open("r", encoding="utf-8") as f:
             for raw_line in f:
@@ -153,7 +161,7 @@ class PayloadStore:
                     continue
                 payload = self._deserialize(
                     data=json.loads(line),
-                    collection_dir=payloads_path.parent,
+                    artifacts_dir=artifacts_dir,
                 )
                 if format_filter is None or payload.format == format_filter:
                     payloads.append(payload)
@@ -350,14 +358,14 @@ class PayloadStore:
             raise ValueError(msg)
 
     @staticmethod
-    def _resolve_artifact_path(*, collection_dir: Path, artifact: object) -> Path:
-        """Resolve a serialized artifact path inside collection artifacts/.
+    def _validate_artifact_reference(artifact: object) -> Path:
+        """Validate and normalize a serialized artifact reference.
 
         Returns:
-            Path: The validated artifact path.
+            Path: The artifact path relative to the artifacts directory.
 
         Raises:
-            ValueError: If the artifact reference is not a contained string path.
+            ValueError: If the reference is not a relative path under artifacts/.
         """
         msg = f"Invalid artifact path: {artifact!r}. Must be under artifacts/."
         if not isinstance(artifact, str):
@@ -372,14 +380,20 @@ class PayloadStore:
 
         if not artifact_relative.parts:
             raise ValueError(msg)
+        return artifact_relative
 
-        artifacts_dir = collection_dir / "artifacts"
-        PayloadStore._ensure_within_directory(
-            path=artifacts_dir,
-            directory=collection_dir,
-            description="artifacts directory",
-        )
-        resolved = collection_dir / artifact_path
+    @staticmethod
+    def _resolve_artifact_path(*, artifacts_dir: Path, artifact: object) -> Path:
+        """Resolve a serialized artifact path inside the artifacts directory.
+
+        Returns:
+            Path: The validated artifact path.
+
+        Raises:
+            ValueError: If the artifact reference escapes the artifacts directory.
+        """
+        artifact_relative = PayloadStore._validate_artifact_reference(artifact)
+        resolved = artifacts_dir / artifact_relative
         PayloadStore._ensure_within_directory(
             path=resolved,
             directory=artifacts_dir,
@@ -391,14 +405,13 @@ class PayloadStore:
     def _deserialize(
         *,
         data: dict[str, Any],
-        collection_dir: Path,
+        artifacts_dir: Path,
     ) -> Payload:
         """Deserialize a JSON record back to a Payload.
 
         Args:
             data (dict[str, Any]): JSON record from JSONL.
-            collection_dir (Path): Collection directory for resolving
-                artifact paths.
+            artifacts_dir (Path): Directory for resolving artifact paths.
 
         Returns:
             Payload: Reconstituted Payload.
@@ -412,7 +425,7 @@ class PayloadStore:
         artifact: Path | None = None
         if "artifact" in data:
             artifact_path = PayloadStore._resolve_artifact_path(
-                collection_dir=collection_dir,
+                artifacts_dir=artifacts_dir,
                 artifact=data["artifact"],
             )
             if not artifact_path.exists():
