@@ -368,8 +368,9 @@ class PayloadStore:
             ValueError: If the reference is not a relative path under artifacts/.
         """
         msg = f"Invalid artifact path: {artifact!r}. Must be under artifacts/."
-        if not isinstance(artifact, str):
-            raise ValueError(msg)  # noqa: TRY004 - stable deserialization error
+        is_string_reference = isinstance(artifact, str)
+        if not is_string_reference:
+            raise ValueError(msg)
         artifact_path = Path(artifact)
         if artifact_path.is_absolute() or ".." in artifact_path.parts:
             raise ValueError(msg)
@@ -378,7 +379,7 @@ class PayloadStore:
         except ValueError as exc:
             raise ValueError(msg) from exc
 
-        if not artifact_relative.parts:
+        if artifact_relative == Path():
             raise ValueError(msg)
         return artifact_relative
 

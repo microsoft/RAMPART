@@ -20,7 +20,10 @@ def _write_collection_record(collection_dir: Path, artifact: object) -> None:
         "metadata": {},
         "artifact": artifact,
     }
-    (collection_dir / "payloads.jsonl").write_text(json.dumps(record) + "\n")
+    (collection_dir / "payloads.jsonl").write_text(
+        json.dumps(record) + "\n",
+        encoding="utf-8",
+    )
 
 
 class TestPayloadStoreArtifactContainment:
