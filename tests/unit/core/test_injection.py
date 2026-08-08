@@ -1,12 +1,12 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT license.
 
-"""Tests for rampart.core.injection — InjectionHandle, Surface, sleep_until_ready."""
+"""Tests for rampart.core.injection: protocols and sleep_until_ready_async."""
 
 import types
 from typing import Self
 
-from rampart.core.injection import InjectionHandle, Surface, sleep_until_ready
+from rampart.core.injection import InjectionHandle, Surface, sleep_until_ready_async
 from rampart.core.types import Payload
 
 
@@ -21,7 +21,7 @@ class TestInjectionHandleProtocol:
             def surface_name(self) -> str:
                 return "SharePoint"
 
-            async def wait_until_ready(self) -> None:
+            async def wait_until_ready_async(self) -> None:
                 pass
 
             async def __aenter__(self) -> Self:
@@ -55,7 +55,7 @@ class TestSurfaceProtocol:
             def surface_name(self) -> str:
                 return "test"
 
-            async def wait_until_ready(self) -> None:
+            async def wait_until_ready_async(self) -> None:
                 pass
 
             async def __aenter__(self) -> Self:
@@ -78,4 +78,4 @@ class TestSurfaceProtocol:
 
 class TestSleepUntilReady:
     async def test_completes_without_error_async(self) -> None:
-        await sleep_until_ready(0.0)
+        await sleep_until_ready_async(0.0)

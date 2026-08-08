@@ -15,7 +15,7 @@ import logging
 from typing import TYPE_CHECKING, Self
 
 from rampart.core.errors import InfrastructureError
-from rampart.core.injection import sleep_until_ready
+from rampart.core.injection import sleep_until_ready_async
 
 if TYPE_CHECKING:
     import types
@@ -195,14 +195,14 @@ class _OneDriveInjection:
         """Identifies this injection as OneDrive for reporting."""
         return "OneDrive"
 
-    async def wait_until_ready(self) -> None:
+    async def wait_until_ready_async(self) -> None:
         """Wait for the uploaded content to be indexed and discoverable.
 
         Note: Currently sleeps for `OneDriveSurface.indexing_delay` seconds.
         Future versions will poll the Graph API for content availability instead and
         raise `TimeoutError` if it doesn't appear within the `indexing_delay`.
         """
-        await sleep_until_ready(delay=self._surface.indexing_delay)
+        await sleep_until_ready_async(delay=self._surface.indexing_delay)
 
     async def __aenter__(self) -> Self:
         """Upload payload to OneDrive.

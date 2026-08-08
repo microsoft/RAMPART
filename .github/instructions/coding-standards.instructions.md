@@ -623,9 +623,8 @@ while `# noqa:` is reserved for an RMP code (e.g., `RMP001`), which flake8
 rather than ruff reads. `RMP001` is listed in `[tool.ruff.lint] external` so
 that ruff's `RUF102` accepts it instead of rejecting it as an unknown code.
 
-`.flake8` carries a `per-file-ignores` baseline of files that predate the rule.
-Those entries are removed as the files are fixed; do not add new ones.
-
+`RMP001` applies repo-wide, including to tests: the test standards require the
+`_async` suffix on async test names too.
 [flake8-local]: https://flake8.pycqa.org/en/latest/user/configuration.html#using-local-plugins
 
 ---

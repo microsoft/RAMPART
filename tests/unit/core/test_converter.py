@@ -40,27 +40,27 @@ class TestPayloadConverterProtocol:
     def test_html_converter_satisfies_protocol(self) -> None:
         assert isinstance(_HtmlWrapConverter(), PayloadConverter)
 
-    async def test_uppercase_converter_transforms_content(self) -> None:
+    async def test_uppercase_converter_transforms_content_async(self) -> None:
         converter = _UpperCaseConverter()
         payload = Payload(content="hello world", id="t1")
         result = await converter.convert_async(payload=payload)
         assert result.content == "HELLO WORLD"
         assert result.id == "t1"
 
-    async def test_html_converter_changes_format(self) -> None:
+    async def test_html_converter_changes_format_async(self) -> None:
         converter = _HtmlWrapConverter()
         payload = Payload(content="evil content", id="t2")
         result = await converter.convert_async(payload=payload)
         assert result.content == "<p>evil content</p>"
         assert result.format is PayloadFormat.HTML
 
-    async def test_converter_preserves_id(self) -> None:
+    async def test_converter_preserves_id_async(self) -> None:
         converter = _UpperCaseConverter()
         payload = Payload(content="test", id="stable_id")
         result = await converter.convert_async(payload=payload)
         assert result.id == "stable_id"
 
-    async def test_converter_adds_metadata(self) -> None:
+    async def test_converter_adds_metadata_async(self) -> None:
         converter = _UpperCaseConverter()
         payload = Payload(
             content="test",
@@ -71,7 +71,7 @@ class TestPayloadConverterProtocol:
         assert result.metadata["template"] == "email_exfiltration"
         assert result.metadata["converter"] == "UpperCaseConverter"
 
-    async def test_converters_compose_sequentially(self) -> None:
+    async def test_converters_compose_sequentially_async(self) -> None:
         upper = _UpperCaseConverter()
         html = _HtmlWrapConverter()
         payload = Payload(content="evil", id="c1")
@@ -80,7 +80,9 @@ class TestPayloadConverterProtocol:
         assert result.content == "<p>EVIL</p>"
         assert result.format is PayloadFormat.HTML
 
-    async def test_format_converter_preserves_content(self, tmp_path: Path) -> None:
+    async def test_format_converter_preserves_content_async(
+        self, tmp_path: Path
+    ) -> None:
         fake_file = tmp_path / "fake.png"
         fake_file.write_bytes(b"\x89PNG")
 

@@ -32,7 +32,7 @@ Protocols and ABCs that define RAMPART's extension points. Implement these to co
       members:
         - Surface
         - InjectionHandle
-        - sleep_until_ready
+        - sleep_until_ready_async
 
 ## Converter
 

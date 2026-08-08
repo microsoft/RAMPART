@@ -41,24 +41,24 @@ def _multi_turn_ctx(turns_tool_calls: list[list[ToolCall]]) -> EvalContext:
 
 
 class TestToolCalledDetection:
-    async def test_detects_by_name(self) -> None:
+    async def test_detects_by_name_async(self) -> None:
         ctx = _ctx_with_tool_calls(ToolCall(name="send_email"))
         result = await ToolCalled("send_email").evaluate_async(context=ctx)
         assert result.outcome is EvalOutcome.DETECTED
 
-    async def test_not_detected_wrong_name(self) -> None:
+    async def test_not_detected_wrong_name_async(self) -> None:
         ctx = _ctx_with_tool_calls(ToolCall(name="read_file"))
         result = await ToolCalled("send_email").evaluate_async(context=ctx)
         assert result.outcome is EvalOutcome.NOT_DETECTED
 
-    async def test_not_detected_no_tool_calls(self) -> None:
+    async def test_not_detected_no_tool_calls_async(self) -> None:
         ctx = _ctx_with_tool_calls()
         result = await ToolCalled("send_email").evaluate_async(context=ctx)
         assert result.outcome is EvalOutcome.NOT_DETECTED
 
 
 class TestToolCalledParameterMatching:
-    async def test_exact_parameter_match(self) -> None:
+    async def test_exact_parameter_match_async(self) -> None:
         tc = ToolCall(name="send_email", arguments={"to": "evil@evil.com"})
         ctx = _ctx_with_tool_calls(tc)
         result = await ToolCalled("send_email", to="evil@evil.com").evaluate_async(
@@ -66,7 +66,7 @@ class TestToolCalledParameterMatching:
         )
         assert result.outcome is EvalOutcome.DETECTED
 
-    async def test_exact_parameter_mismatch(self) -> None:
+    async def test_exact_parameter_mismatch_async(self) -> None:
         tc = ToolCall(name="send_email", arguments={"to": "friend@company.com"})
         ctx = _ctx_with_tool_calls(tc)
         result = await ToolCalled("send_email", to="evil@evil.com").evaluate_async(
@@ -74,7 +74,7 @@ class TestToolCalledParameterMatching:
         )
         assert result.outcome is EvalOutcome.NOT_DETECTED
 
-    async def test_predicate_parameter_match(self) -> None:
+    async def test_predicate_parameter_match_async(self) -> None:
         tc = ToolCall(name="send_email", arguments={"to": "evil@evil.com"})
         ctx = _ctx_with_tool_calls(tc)
         result = await ToolCalled(
@@ -83,7 +83,7 @@ class TestToolCalledParameterMatching:
         ).evaluate_async(context=ctx)
         assert result.outcome is EvalOutcome.DETECTED
 
-    async def test_predicate_parameter_mismatch(self) -> None:
+    async def test_predicate_parameter_mismatch_async(self) -> None:
         tc = ToolCall(name="send_email", arguments={"to": "friend@company.com"})
         ctx = _ctx_with_tool_calls(tc)
         result = await ToolCalled(
@@ -92,7 +92,7 @@ class TestToolCalledParameterMatching:
         ).evaluate_async(context=ctx)
         assert result.outcome is EvalOutcome.NOT_DETECTED
 
-    async def test_missing_parameter_returns_none_to_predicate(self) -> None:
+    async def test_missing_parameter_returns_none_to_predicate_async(self) -> None:
         tc = ToolCall(name="send_email", arguments={})
         ctx = _ctx_with_tool_calls(tc)
         result = await ToolCalled(
@@ -103,7 +103,7 @@ class TestToolCalledParameterMatching:
 
 
 class TestToolCalledMultiTurn:
-    async def test_scans_across_turns(self) -> None:
+    async def test_scans_across_turns_async(self) -> None:
         ctx = _multi_turn_ctx(
             [
                 [],
@@ -113,7 +113,7 @@ class TestToolCalledMultiTurn:
         result = await ToolCalled("send_email").evaluate_async(context=ctx)
         assert result.outcome is EvalOutcome.DETECTED
 
-    async def test_not_detected_across_turns(self) -> None:
+    async def test_not_detected_across_turns_async(self) -> None:
         ctx = _multi_turn_ctx(
             [
                 [ToolCall(name="read_file")],
@@ -125,7 +125,7 @@ class TestToolCalledMultiTurn:
 
 
 class TestToolCalledComposition:
-    async def test_composable_with_or(self) -> None:
+    async def test_composable_with_or_async(self) -> None:
         tc = ToolCall(name="send_email")
         ctx = _ctx_with_tool_calls(tc)
         composed = ToolCalled("send_email") | ToolCalled("delete_file")

@@ -479,7 +479,7 @@ class LLMJudge(BaseEvaluator):
         user_message = self._build_user_message(context=context)
 
         @pyrit_json_retry
-        async def _send_and_parse() -> _JudgeVerdict:
+        async def _send_and_parse_async() -> _JudgeVerdict:
             raw = await self._send_async(
                 system_prompt=system_prompt,
                 user_message=user_message,
@@ -487,7 +487,7 @@ class LLMJudge(BaseEvaluator):
             return _JudgeVerdict.from_json(raw)
 
         try:
-            verdict = await _send_and_parse()
+            verdict = await _send_and_parse_async()
         except InvalidJsonException:
             return self._undetermined(
                 rationale="Judge could not produce valid JSON after retries.",

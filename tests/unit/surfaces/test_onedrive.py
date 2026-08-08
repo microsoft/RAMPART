@@ -164,7 +164,7 @@ class TestOneDriveInjectionProperties:
 class TestOneDriveInjectionLifecycle:
     """Test the async context manager lifecycle (upload + delete)."""
 
-    async def test_enter_uploads_and_stores_item_id(self) -> None:
+    async def test_enter_uploads_and_stores_item_id_async(self) -> None:
         client = _make_graph_client(upload_item_id="item-xyz")
         surface = OneDriveSurface(
             graph_client=client,
@@ -177,7 +177,7 @@ class TestOneDriveInjectionLifecycle:
         async with handle as h:
             assert h._item_id == "item-xyz"
 
-    async def test_upload_uses_correct_graph_path(self) -> None:
+    async def test_upload_uses_correct_graph_path_async(self) -> None:
         """Verify the path-based addressing format root:/{folder}/{file}:."""
         client = _make_graph_client(upload_item_id="item-1")
         surface = OneDriveSurface(
@@ -196,7 +196,7 @@ class TestOneDriveInjectionLifecycle:
         upload_call = by_drive_item_id.call_args_list[0]
         assert upload_call == call("root:/Documents/payloads/abc123.txt:")
 
-    async def test_exit_deletes_with_correct_item_id(self) -> None:
+    async def test_exit_deletes_with_correct_item_id_async(self) -> None:
         client = _make_graph_client(upload_item_id="item-to-delete")
         surface = OneDriveSurface(
             graph_client=client,
@@ -215,7 +215,7 @@ class TestOneDriveInjectionLifecycle:
         assert delete_call == call("item-to-delete")
         client._delete_mock.delete.assert_awaited_once()
 
-    async def test_upload_failure_raises_infrastructure_error(self) -> None:
+    async def test_upload_failure_raises_infrastructure_error_async(self) -> None:
         client = _make_graph_client(
             upload_error=ConnectionError("Graph API unavailable"),
         )
@@ -231,7 +231,7 @@ class TestOneDriveInjectionLifecycle:
             async with handle:
                 pass
 
-    async def test_delete_failure_logs_warning_does_not_raise(self) -> None:
+    async def test_delete_failure_logs_warning_does_not_raise_async(self) -> None:
         client = _make_graph_client(
             upload_item_id="item-1",
             delete_error=ConnectionError("cleanup failed"),
@@ -248,7 +248,7 @@ class TestOneDriveInjectionLifecycle:
         async with handle:
             pass
 
-    async def test_exit_skips_delete_when_no_item_id(self) -> None:
+    async def test_exit_skips_delete_when_no_item_id_async(self) -> None:
         """If upload was never called, exit should be a no-op."""
         surface = OneDriveSurface(
             graph_client=MagicMock(),
@@ -261,7 +261,7 @@ class TestOneDriveInjectionLifecycle:
         # Call __aexit__ directly without __aenter__
         await handle.__aexit__(None, None, None)
 
-    async def test_returns_self_from_aenter(self) -> None:
+    async def test_returns_self_from_aenter_async(self) -> None:
         client = _make_graph_client()
         surface = OneDriveSurface(
             graph_client=client,
@@ -274,7 +274,7 @@ class TestOneDriveInjectionLifecycle:
         async with handle as h:
             assert h is handle
 
-    async def test_upload_exceeding_size_limit_raises_infrastructure_error(
+    async def test_upload_exceeding_size_limit_raises_infrastructure_error_async(
         self,
     ) -> None:
         client = _make_graph_client()
@@ -291,7 +291,7 @@ class TestOneDriveInjectionLifecycle:
             async with handle:
                 pass
 
-    async def test_null_drive_item_raises_infrastructure_error(self) -> None:
+    async def test_null_drive_item_raises_infrastructure_error_async(self) -> None:
         client = _make_graph_client(upload_return=None)
         surface = OneDriveSurface(
             graph_client=client,
@@ -305,7 +305,7 @@ class TestOneDriveInjectionLifecycle:
             async with handle:
                 pass
 
-    async def test_null_drive_item_id_raises_infrastructure_error(self) -> None:
+    async def test_null_drive_item_id_raises_infrastructure_error_async(self) -> None:
         """DriveItem exists but has a None id."""
         item_with_no_id = MagicMock()
         item_with_no_id.id = None
@@ -322,7 +322,9 @@ class TestOneDriveInjectionLifecycle:
             async with handle:
                 pass
 
-    async def test_infrastructure_error_from_upload_not_double_wrapped(self) -> None:
+    async def test_infrastructure_error_from_upload_not_double_wrapped_async(
+        self,
+    ) -> None:
         """InfrastructureError raised inside _upload_async propagates directly."""
         original = InfrastructureError("Graph returned no DriveItem")
         client = _make_graph_client(upload_error=original)
@@ -342,10 +344,10 @@ class TestOneDriveInjectionLifecycle:
 
 
 class TestOneDriveInjectionWaitUntilReady:
-    """Test _OneDriveInjection.wait_until_ready wiring."""
+    """Test _OneDriveInjection.wait_until_ready_async wiring."""
 
-    async def test_delegates_to_sleep_until_ready(self) -> None:
-        """Verifies correct arguments are passed to sleep_until_ready."""
+    async def test_delegates_to_sleep_until_ready_async(self) -> None:
+        """Verifies correct arguments are passed to sleep_until_ready_async."""
         surface = OneDriveSurface(
             graph_client=MagicMock(),
             drive_id="d",
@@ -355,9 +357,9 @@ class TestOneDriveInjectionWaitUntilReady:
         handle = surface.inject(payload=Payload(content="test"))
 
         with patch(
-            "rampart.surfaces.onedrive.sleep_until_ready",
+            "rampart.surfaces.onedrive.sleep_until_ready_async",
             new_callable=AsyncMock,
         ) as mock_sleep:
-            await handle.wait_until_ready()
+            await handle.wait_until_ready_async()
 
         mock_sleep.assert_awaited_once_with(delay=5.0)

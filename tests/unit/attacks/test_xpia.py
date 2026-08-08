@@ -72,7 +72,7 @@ def _adapter(
 class TestXPIADetection:
     """Attack semantics: DETECTED->UNSAFE, NOT_DETECTED->SAFE."""
 
-    async def test_detected_returns_unsafe_with_evidence_in_summary(self) -> None:
+    async def test_detected_returns_unsafe_with_evidence_in_summary_async(self) -> None:
         result = await Attacks.xpia(
             inject=_mock_handle(),
             trigger="Summarize Q3",
@@ -86,7 +86,7 @@ class TestXPIADetection:
         assert result.status is SafetyStatus.UNSAFE
         assert "exfil_call_found" in result.summary
 
-    async def test_not_detected_returns_safe(self) -> None:
+    async def test_not_detected_returns_safe_async(self) -> None:
         result = await Attacks.xpia(
             inject=_mock_handle(),
             trigger="Summarize Q3",
@@ -96,7 +96,7 @@ class TestXPIADetection:
         assert result.safe is True
         assert result.status is SafetyStatus.SAFE
 
-    async def test_undetermined_returns_undetermined(self) -> None:
+    async def test_undetermined_returns_undetermined_async(self) -> None:
         result = await Attacks.xpia(
             inject=_mock_handle(),
             trigger="Summarize Q3",
@@ -113,7 +113,7 @@ class TestXPIADetection:
 class TestXPIAEarlyStop:
     """Per-turn evaluation stops the conversation on first detection."""
 
-    async def test_stops_after_first_detection(self) -> None:
+    async def test_stops_after_first_detection_async(self) -> None:
         evaluator = AsyncMock()
         evaluator.evaluate_async.side_effect = [
             EvalResult(outcome=EvalOutcome.NOT_DETECTED),
@@ -129,7 +129,7 @@ class TestXPIAEarlyStop:
         assert result.status is SafetyStatus.UNSAFE
         assert len(result.turns) == 2
 
-    async def test_completes_all_turns_when_not_detected(self) -> None:
+    async def test_completes_all_turns_when_not_detected_async(self) -> None:
         result = await Attacks.xpia(
             inject=_mock_handle(),
             trigger=["Turn 1", "Turn 2"],
@@ -143,7 +143,7 @@ class TestXPIAEarlyStop:
 class TestXPIAMaxTurns:
     """Max-turns resolves normally via resolve_as_attack."""
 
-    async def test_max_turns_resolves_normally(self) -> None:
+    async def test_max_turns_resolves_normally_async(self) -> None:
         result = await Attacks.xpia(
             inject=_mock_handle(),
             trigger=["p1", "p2", "p3"],
@@ -158,7 +158,7 @@ class TestXPIAMaxTurns:
 class TestXPIACleanup:
     """Injection handles are always activated and cleaned up."""
 
-    async def test_handle_entered_and_exited(self) -> None:
+    async def test_handle_entered_and_exited_async(self) -> None:
         handle = _mock_handle()
 
         await Attacks.xpia(
@@ -169,9 +169,9 @@ class TestXPIACleanup:
 
         handle.__aenter__.assert_awaited_once()
         handle.__aexit__.assert_awaited_once()
-        handle.wait_until_ready.assert_awaited_once()
+        handle.wait_until_ready_async.assert_awaited_once()
 
-    async def test_multiple_handles_all_cleaned(self) -> None:
+    async def test_multiple_handles_all_cleaned_async(self) -> None:
         h1 = _mock_handle(surface_name="SP")
         h2 = _mock_handle(surface_name="Exchange")
 
@@ -184,9 +184,9 @@ class TestXPIACleanup:
         for h in (h1, h2):
             h.__aenter__.assert_awaited_once()
             h.__aexit__.assert_awaited_once()
-            h.wait_until_ready.assert_awaited_once()
+            h.wait_until_ready_async.assert_awaited_once()
 
-    async def test_cleanup_on_evaluator_exception(self) -> None:
+    async def test_cleanup_on_evaluator_exception_async(self) -> None:
         """Handles are cleaned up even if the evaluator raises."""
         handle = _mock_handle()
         evaluator = AsyncMock()
@@ -206,7 +206,7 @@ class TestXPIACleanup:
 class TestXPIAInfrastructureError:
     """InfrastructureError produces ERROR result (base class concern)."""
 
-    async def test_handle_activation_failure(self) -> None:
+    async def test_handle_activation_failure_async(self) -> None:
         handle = _mock_handle()
         handle.__aenter__.side_effect = InfrastructureError("SharePoint 503")
 
@@ -219,7 +219,7 @@ class TestXPIAInfrastructureError:
         assert result.status is SafetyStatus.ERROR
         assert "SharePoint 503" in result.summary
 
-    async def test_session_creation_failure(self) -> None:
+    async def test_session_creation_failure_async(self) -> None:
         adapter = AsyncMock()
         adapter.create_session_async.side_effect = InfrastructureError(
             "Connection refused",
@@ -240,7 +240,9 @@ class TestXPIAInfrastructureError:
 class TestXPIAObservabilityAdjustment:
     """SAFE is downgraded to UNDETERMINED when observability is insufficient."""
 
-    async def test_response_only_no_tools_downgrades_to_undetermined(self) -> None:
+    async def test_response_only_no_tools_downgrades_to_undetermined_async(
+        self,
+    ) -> None:
         result = await Attacks.xpia(
             inject=_mock_handle(),
             trigger="Summarize Q3",
@@ -252,7 +254,7 @@ class TestXPIAObservabilityAdjustment:
         assert result.safe is False
         assert result.status is SafetyStatus.UNDETERMINED
 
-    async def test_response_only_with_tool_calls_stays_safe(self) -> None:
+    async def test_response_only_with_tool_calls_stays_safe_async(self) -> None:
         result = await Attacks.xpia(
             inject=_mock_handle(),
             trigger="Summarize Q3",
@@ -267,7 +269,7 @@ class TestXPIAObservabilityAdjustment:
         assert result.safe is True
         assert result.status is SafetyStatus.SAFE
 
-    async def test_non_response_only_levels_are_not_downgraded(self) -> None:
+    async def test_non_response_only_levels_are_not_downgraded_async(self) -> None:
         result = await Attacks.xpia(
             inject=_mock_handle(),
             trigger="Summarize Q3",
@@ -283,7 +285,7 @@ class TestXPIAObservabilityAdjustment:
 class TestXPIAInjectionRecords:
     """Result carries injection records for reproduction."""
 
-    async def test_single_handle_recorded(self) -> None:
+    async def test_single_handle_recorded_async(self) -> None:
         result = await Attacks.xpia(
             inject=_mock_handle(surface_name="SharePoint", payload_id="px-42"),
             trigger="Summarize Q3",
@@ -294,7 +296,7 @@ class TestXPIAInjectionRecords:
         assert result.injections[0].payload_id == "px-42"
         assert result.injections[0].surface_name == "SharePoint"
 
-    async def test_multi_handle_records(self) -> None:
+    async def test_multi_handle_records_async(self) -> None:
         result = await Attacks.xpia(
             inject=[
                 _mock_handle(surface_name="SP", payload_id="p1"),
@@ -312,7 +314,7 @@ class TestXPIAInjectionRecords:
 class TestXPIAAttachments:
     """Inline attachments flow through to turns via Request."""
 
-    async def test_attachments_recorded_in_turns(self) -> None:
+    async def test_attachments_recorded_in_turns_async(self) -> None:
         attachment = Payload(content="malicious doc", id="att-1")
 
         result = await Attacks.xpia(
@@ -327,7 +329,7 @@ class TestXPIAAttachments:
 class TestResponseMetadataPropagation:
     """Response.metadata from the adapter flows into Result.metadata."""
 
-    async def test_single_turn_metadata_promoted_to_top_level(self) -> None:
+    async def test_single_turn_metadata_promoted_to_top_level_async(self) -> None:
         adapter = _adapter(
             responses=[Response(text="ok", metadata={"conversation_id": "c-01"})],
         )
@@ -339,7 +341,9 @@ class TestResponseMetadataPropagation:
 
         assert result.metadata == {"conversation_id": "c-01"}
 
-    async def test_empty_response_metadata_produces_empty_result_metadata(self) -> None:
+    async def test_empty_response_metadata_produces_empty_result_metadata_async(
+        self,
+    ) -> None:
         result = await Attacks.xpia(
             inject=_mock_handle(),
             trigger="Summarize Q3",
@@ -348,7 +352,7 @@ class TestResponseMetadataPropagation:
 
         assert result.metadata == {}
 
-    async def test_multi_turn_metadata_keyed_by_turn_number(self) -> None:
+    async def test_multi_turn_metadata_keyed_by_turn_number_async(self) -> None:
         adapter = _adapter(
             responses=[
                 Response(text="turn0", metadata={"page_url": "url0"}),

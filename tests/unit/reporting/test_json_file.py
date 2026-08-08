@@ -203,7 +203,7 @@ class TestSerializeResult:
 class TestEmitAsync:
     """emit_async writes a valid JSON file."""
 
-    async def test_emitted_file_contains_metadata(self, tmp_path: Path) -> None:
+    async def test_emitted_file_contains_metadata_async(self, tmp_path: Path) -> None:
         sink = JsonFileReportSink(output_dir=tmp_path)
         result = _result_with_turns(
             result_metadata={"conversation_id": "xyz"},

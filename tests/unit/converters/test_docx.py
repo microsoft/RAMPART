@@ -39,7 +39,9 @@ class TestDocxConverterInit:
             DocxConverter()
             mock_cls.assert_not_called()
 
-    async def test_creates_pyrit_converter_on_first_use(self, tmp_path: Path) -> None:
+    async def test_creates_pyrit_converter_on_first_use_async(
+        self, tmp_path: Path
+    ) -> None:
         mock_result = _mock_converter_result(tmp_path)
 
         with patch(_PATCH_TARGET) as mock_cls:
@@ -54,7 +56,7 @@ class TestDocxConverterInit:
 class TestDocxConverterConversion:
     """Conversion delegates to WordDocConverter and maps result."""
 
-    async def test_produces_docx_payload(self, tmp_path: Path) -> None:
+    async def test_produces_docx_payload_async(self, tmp_path: Path) -> None:
         mock_result = _mock_converter_result(tmp_path)
 
         with patch(_PATCH_TARGET) as mock_cls:
@@ -67,7 +69,7 @@ class TestDocxConverterConversion:
         assert result.format is PayloadFormat.DOCX
         assert result.artifact == Path(mock_result.output_text)
 
-    async def test_delegates_content_to_pyrit(self, tmp_path: Path) -> None:
+    async def test_delegates_content_to_pyrit_async(self, tmp_path: Path) -> None:
         mock_result = _mock_converter_result(tmp_path)
 
         with patch(_PATCH_TARGET) as mock_cls:
@@ -84,7 +86,7 @@ class TestDocxConverterConversion:
             input_type="text",
         )
 
-    async def test_preserves_id(self, tmp_path: Path) -> None:
+    async def test_preserves_id_async(self, tmp_path: Path) -> None:
         mock_result = _mock_converter_result(tmp_path)
 
         with patch(_PATCH_TARGET) as mock_cls:
@@ -98,7 +100,7 @@ class TestDocxConverterConversion:
 
         assert result.id == "keep-me"
 
-    async def test_preserves_content_for_reporting(self, tmp_path: Path) -> None:
+    async def test_preserves_content_for_reporting_async(self, tmp_path: Path) -> None:
         mock_result = _mock_converter_result(tmp_path)
 
         with patch(_PATCH_TARGET) as mock_cls:
@@ -112,7 +114,7 @@ class TestDocxConverterConversion:
 
         assert result.content == "adversarial text"
 
-    async def test_metadata_includes_converter_name(self, tmp_path: Path) -> None:
+    async def test_metadata_includes_converter_name_async(self, tmp_path: Path) -> None:
         mock_result = _mock_converter_result(tmp_path)
 
         with patch(_PATCH_TARGET) as mock_cls:
@@ -124,7 +126,7 @@ class TestDocxConverterConversion:
 
         assert result.metadata["converter"] == "DocxConverter"
 
-    async def test_source_metadata_carried_forward(self, tmp_path: Path) -> None:
+    async def test_source_metadata_carried_forward_async(self, tmp_path: Path) -> None:
         mock_result = _mock_converter_result(tmp_path)
 
         with patch(_PATCH_TARGET) as mock_cls:
@@ -142,7 +144,7 @@ class TestDocxConverterConversion:
 class TestDocxConverterValidation:
     """Input validation."""
 
-    async def test_rejects_binary_payload(self, tmp_path: Path) -> None:
+    async def test_rejects_binary_payload_async(self, tmp_path: Path) -> None:
         artifact = tmp_path / "existing.docx"
         artifact.write_bytes(b"PK")
 

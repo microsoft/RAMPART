@@ -270,7 +270,7 @@ class MyFileSurface:
         def surface_name(self) -> str:
             return "file_system"
 
-        async def wait_until_ready(self) -> None:
+        async def wait_until_ready_async(self) -> None:
             pass  # or: await asyncio.sleep(10.0) for indexing delay
 
         async def __aenter__(self):

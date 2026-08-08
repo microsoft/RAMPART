@@ -73,7 +73,7 @@ class ExecutionEventHandler(ABC):
     """
 
     @abstractmethod
-    async def on_event(self, *, event_data: ExecutionEventData) -> None:
+    async def on_event_async(self, *, event_data: ExecutionEventData) -> None:
         """Handle an execution lifecycle event.
 
         Args:
@@ -231,7 +231,7 @@ class BaseExecution(ABC):
             Result: Safety verdict with evidence and diagnostics.
         """
         start = time.monotonic()
-        await self._fire(
+        await self._fire_async(
             ExecutionEvent.ON_PRE_EXECUTE,
             adapter=adapter,
             elapsed=0.0,
@@ -247,7 +247,7 @@ class BaseExecution(ABC):
                 self.strategy_name,
             )
 
-            await self._fire(
+            await self._fire_async(
                 ExecutionEvent.ON_ERROR,
                 adapter=adapter,
                 elapsed=time.monotonic() - start,
@@ -264,7 +264,7 @@ class BaseExecution(ABC):
 
         elapsed = time.monotonic() - start
         result.duration_seconds = elapsed
-        await self._fire(
+        await self._fire_async(
             ExecutionEvent.ON_POST_EXECUTE,
             adapter=adapter,
             elapsed=elapsed,
@@ -284,7 +284,7 @@ class BaseExecution(ABC):
         """
         ...
 
-    async def _fire(
+    async def _fire_async(
         self,
         event: ExecutionEvent,
         *,
@@ -314,7 +314,7 @@ class BaseExecution(ABC):
         )
         for handler in self._handlers:
             try:
-                await handler.on_event(event_data=event_data)
+                await handler.on_event_async(event_data=event_data)
             except Exception:
                 logger.warning(
                     "ExecutionEventHandler %s raised on %s — ignored.",

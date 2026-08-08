@@ -169,7 +169,7 @@ class XPIAExecution(BaseExecution):
         # Concurrent: total = max of all wait times
         async with asyncio.TaskGroup() as tg:
             for handle in self._handles:
-                tg.create_task(handle.wait_until_ready())
+                tg.create_task(handle.wait_until_ready_async())
 
     def _build_attack_result(
         self,

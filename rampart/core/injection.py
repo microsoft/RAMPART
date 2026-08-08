@@ -6,7 +6,7 @@
 Two protocols serving two audiences: Surface is what surface authors
 implement; InjectionHandle is what execution strategies consume.
 
-``sleep_until_ready`` is a helper function for surfaces that only need
+``sleep_until_ready_async`` is a helper function for surfaces that only need
 a simple delay-based readiness wait.
 """
 
@@ -43,7 +43,7 @@ class InjectionHandle(AbstractAsyncContextManager["InjectionHandle", None], Prot
         """The name of the surface this handle injects into (e.g., 'SharePoint')."""
         ...
 
-    async def wait_until_ready(self) -> None:
+    async def wait_until_ready_async(self) -> None:
         """Block until the injected content is visible to the agent.
 
         Implementations should raise `TimeoutError` if readiness
@@ -52,7 +52,7 @@ class InjectionHandle(AbstractAsyncContextManager["InjectionHandle", None], Prot
         ...
 
 
-async def sleep_until_ready(delay: float) -> None:
+async def sleep_until_ready_async(delay: float) -> None:
     """Sleep for `delay` seconds. Default readiness strategy for simple surfaces.
 
     Args:
