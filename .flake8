@@ -1,0 +1,27 @@
+[flake8]
+# Flake8 runs ONLY the RAMPART local plugin. Every general-purpose check
+# (pycodestyle, pyflakes, mccabe) is ruff's job, so selecting just RMP keeps
+# the two linters from ever reporting the same problem twice.
+select = RMP
+
+# extend-exclude, not exclude, so flake8's defaults (__pycache__, .tox, .eggs)
+# are kept rather than replaced.
+extend-exclude = .venv,build,dist
+
+# Baseline of pre-existing violations, recorded so the rule can be enforced
+# from day one without a large mechanical rename in the same change. Each
+# entry is removed by the commit that fixes the file. Do not add new entries.
+per-file-ignores =
+    rampart/core/execution.py:RMP001
+    rampart/core/injection.py:RMP001
+    rampart/evaluators/llm_judge.py:RMP001
+    rampart/pyrit_bridge/llm_bridge.py:RMP001
+    rampart/pytest_plugin/_collection.py:RMP001
+    rampart/surfaces/onedrive.py:RMP001
+    tests/*:RMP001
+
+[flake8:local-plugins]
+extension =
+    RMP = flake8_rampart:RampartChecker
+paths =
+    ./tools
