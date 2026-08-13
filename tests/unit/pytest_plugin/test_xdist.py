@@ -1300,8 +1300,8 @@ class TestReportTestRunMetadata:
 
 
 class TestConstants:
-    def test_default_size_limit_is_64mb(self) -> None:
-        assert DEFAULT_SIZE_LIMIT_BYTES == 64 * 1024 * 1024
+    def test_default_size_limit_is_16mb(self) -> None:
+        assert DEFAULT_SIZE_LIMIT_BYTES == 16 * 1024 * 1024
 
     def test_schema_version_is_v2(self) -> None:
         assert SCHEMA_VERSION == "rampart.xdist.v2"

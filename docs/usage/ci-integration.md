@@ -79,7 +79,7 @@ RAMPART is configured via pytest options and Python (sinks, adapters, payloads).
 
 ### `--rampart-xdist-max-bytes`
 
-Maximum size in bytes of a worker's serialized result payload when running under [`pytest-xdist`](xdist.md). Defaults to `67108864` (64 MB). Workers that exceed the cap log a warning and the controller marks the run as incomplete. Also configurable via the `rampart_xdist_max_bytes` ini option.
+Maximum size in bytes of each serialized Result when running under [`pytest-xdist`](xdist.md). Defaults to `16777216` (16 MiB). Oversized Results are replaced by truncation markers and the controller marks the run as incomplete. Also configurable via the `rampart_xdist_max_bytes` ini option.
 
 ```bash
 pytest -n auto --rampart-xdist-max-bytes=134217728   # 128 MB
@@ -141,5 +141,4 @@ RAMPART does not alter pytest's exit codes:
 | `1` | Some tests failed |
 | `2` | Test execution interrupted |
 | `5` | No tests collected |
-
 

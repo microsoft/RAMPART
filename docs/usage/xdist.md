@@ -189,13 +189,13 @@ Worker payloads cross a process boundary via `execnet` and may contain attacker-
 
 - **Arbitrary code execution** — strict JSON-safe primitives only; no `pickle`, `marshal`, or custom `__reduce__`.
 - **Schema drift** — payloads with missing or unknown schema versions are rejected fail-closed.
-- **Memory exhaustion** — each serialized Result is capped at 64 MB by default.
+- **Memory exhaustion** — each serialized Result is capped at 16 MiB by default.
 - **Terminal/log injection** — ANSI escape sequences are stripped from free-form text at the deserialization boundary.
 - **Path traversal** — worker-local artifact paths are stored as opaque strings in metadata; the controller never accesses worker files.
 
 ### Size cap
 
-The default 64 MB cap can be overridden via the pytest CLI option or an ini setting:
+The default 16 MiB cap can be overridden via the pytest CLI option or an ini setting:
 
 ```bash
 pytest -n 4 --rampart-xdist-max-bytes=134217728

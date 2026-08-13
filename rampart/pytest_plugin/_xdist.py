@@ -60,7 +60,7 @@ SCHEMA_VERSION: str = "rampart.xdist.v2"
 WORKEROUTPUT_KEY: str = "rampart_xdist_v2"
 REPORT_RESULTS_ATTR: str = "_rampart_results"
 SIZE_LIMIT_OPTION: str = "rampart_xdist_max_bytes"
-DEFAULT_SIZE_LIMIT_BYTES: int = 64 * 1024 * 1024
+DEFAULT_SIZE_LIMIT_BYTES: int = 16 * 1024 * 1024
 MIN_RESULT_SIZE_LIMIT_BYTES: int = 4 * 1024
 MAX_METADATA_DEPTH: int = 6
 
