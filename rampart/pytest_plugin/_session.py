@@ -47,6 +47,34 @@ def _result_sort_key(result: Result) -> tuple[str, int, str]:
     return (nodeid, index, source_worker)
 
 
+def tag_collected_results(
+    *,
+    node: pytest.Item,
+    results: Sequence[Result],
+) -> list[Result]:
+    """Copy and tag Results with their pytest item metadata.
+
+    Returns:
+        list[Result]: Tagged shallow copies in their original order.
+    """
+    test_name = node.nodeid.split("::")[-1] if "::" in node.nodeid else node.nodeid
+    harm_marker = node.get_closest_marker("harm")
+    harm_category = harm_marker.args[0] if harm_marker and harm_marker.args else None
+    tagged: list[Result] = []
+    for result_index, original_result in enumerate(results):
+        result = copy.copy(original_result)
+        result.metadata = {
+            **result.metadata,
+            "_pytest_test_name": test_name,
+            "_pytest_nodeid": node.nodeid,
+            "_rampart_result_index": result_index,
+        }
+        if harm_category is not None and result.harm_category is None:
+            result.harm_category = harm_category
+        tagged.append(result)
+    return tagged
+
+
 @dataclass(frozen=True, kw_only=True)
 class TrialSpec:
     """Trial-clone metadata captured at collection time.
@@ -203,27 +231,7 @@ class RampartSession:
             node (pytest.Item): The test item that just completed.
             collector (ResultCollector): The test's result collector.
         """
-        test_name = node.nodeid.split("::")[-1] if "::" in node.nodeid else node.nodeid
-        harm_marker = node.get_closest_marker("harm")
-        harm_category = (
-            harm_marker.args[0] if harm_marker and harm_marker.args else None
-        )
-
-        collected = collector.results
-        tagged: list[Result] = []
-        for result_index, original_result in enumerate(collected):
-            # Shallow copy is sufficient because we reconstruct all
-            # mutable fields we modify (currently metadata and harm_category).
-            result = copy.copy(original_result)
-            result.metadata = {
-                **result.metadata,
-                "_pytest_test_name": test_name,
-                "_pytest_nodeid": node.nodeid,
-                "_rampart_result_index": result_index,
-            }
-            if harm_category is not None and result.harm_category is None:
-                result.harm_category = harm_category
-            tagged.append(result)
+        tagged = tag_collected_results(node=node, results=collector.results)
         self._results.extend(tagged)
         self._results_by_nodeid[node.nodeid] = tagged
         self._cached_report = None
@@ -385,7 +393,8 @@ class RampartSession:
                 in the report metadata.
         """
         self._incomplete = True
-        self._incomplete_reasons.append(reason)
+        if reason not in self._incomplete_reasons:
+            self._incomplete_reasons.append(reason)
         self._cached_report = None
 
     def set_report_metadata(self, *, metadata: dict[str, object]) -> None:

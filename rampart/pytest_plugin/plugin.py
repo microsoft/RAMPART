@@ -43,18 +43,21 @@ from rampart.pytest_plugin._collection import (
     deactivate_collector,
     get_active_collector,
 )
-from rampart.pytest_plugin._session import RampartSession
+from rampart.pytest_plugin._session import RampartSession, tag_collected_results
 from rampart.pytest_plugin._xdist import (
     DEFAULT_SIZE_LIMIT_BYTES,
     SIZE_LIMIT_OPTION,
-    SizeLimitError,
+    WorkerOutputError,
+    attach_report_results,
     discover_sinks_from_conftest,
     finalize_worker,
     get_dist_mode,
     get_worker_count,
+    get_worker_id,
     handle_testnodedown,
     is_xdist_controller,
     is_xdist_worker,
+    merge_report_results,
 )
 from rampart.reporting.sink import ReportSink
 
@@ -70,6 +73,7 @@ __all__ = [
     "pytest_addoption",
     "pytest_collection_modifyitems",
     "pytest_configure",
+    "pytest_runtest_logreport",
     "pytest_runtest_makereport",
     "pytest_sessionfinish",
     "pytest_terminal_summary",
@@ -80,6 +84,8 @@ __all__ = [
 # Config-scoped stash keys: one entry per pytest session.
 _rampart_key = pytest.StashKey[RampartSession]()
 _session_start_key = pytest.StashKey[float]()
+_streamed_result_count_key = pytest.StashKey[int]()
+_received_result_counts_key = pytest.StashKey[dict[str, int]]()
 
 # Item-scoped stash key: a per-test snapshot consumed by xdist streaming.
 _call_results_key = pytest.StashKey[list[Result]]()
@@ -185,14 +191,14 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         type=int,
         default=None,
         help=(
-            "Maximum size in bytes of a worker's serialized result payload "
+            "Maximum size in bytes of each serialized Result "
             f"under pytest-xdist (default: {DEFAULT_SIZE_LIMIT_BYTES})."
         ),
     )
     parser.addini(
         SIZE_LIMIT_OPTION,
         help=(
-            "Maximum size in bytes of a worker's serialized result payload "
+            "Maximum size in bytes of each serialized Result "
             f"under pytest-xdist (default: {DEFAULT_SIZE_LIMIT_BYTES})."
         ),
         default=None,
@@ -493,7 +499,58 @@ def pytest_runtest_makereport(
         collector = get_active_collector()
         if collector is not None:
             item.stash[_call_results_key] = collector.results
+            results = tag_collected_results(
+                node=item,
+                results=item.stash[_call_results_key],
+            )
+            emitted_count = attach_report_results(
+                config=item.config,
+                report=report,
+                results=results,
+            )
+            current_count = item.config.stash.get(_streamed_result_count_key, 0)
+            item.config.stash[_streamed_result_count_key] = (
+                current_count + emitted_count
+            )
     return report
+
+
+def pytest_runtest_logreport(report: pytest.TestReport) -> None:
+    """Merge a streamed xdist Result envelope on the controller.
+
+    Malformed envelopes mark the run incomplete instead of aborting
+    pytest, matching the workeroutput trust-boundary convention.
+
+    Args:
+        report (pytest.TestReport): A setup, call, or teardown report.
+    """
+    node = getattr(report, "node", None)
+    config = getattr(node, "config", None)
+    if config is None or not is_xdist_controller(config=config):
+        return
+    rampart_session = config.stash.get(_rampart_key, None)
+    if rampart_session is None:
+        return
+    try:
+        merged = merge_report_results(session=rampart_session, report=report)
+    except WorkerOutputError as exc:
+        worker_id = get_worker_id(node)
+        logger.exception(
+            "Failed to merge streamed Result report from worker %s.",
+            worker_id,
+        )
+        rampart_session.mark_incomplete(
+            reason=f"worker {worker_id} streamed report invalid: {exc}",
+        )
+        return
+    if merged is None:
+        return
+    worker_id, result_count = merged
+    received_counts = config.stash.get(_received_result_counts_key, None)
+    if received_counts is None:
+        received_counts = {}
+        config.stash[_received_result_counts_key] = received_counts
+    received_counts[worker_id] = received_counts.get(worker_id, 0) + result_count
 
 
 def _has_sink_hook_impl(*, config: pytest.Config) -> bool:
@@ -733,8 +790,8 @@ def pytest_sessionfinish(
 
     Dispatches between three modes:
 
-    - xdist worker: serialize results to ``config.workeroutput`` and
-      skip sink emission (the controller emits the unified report).
+    - xdist worker: write slim session metadata to ``config.workeroutput``
+      and skip sink emission (Results already streamed on test reports).
     - xdist controller: trials already aggregated against the merged
       ``_results_by_nodeid``; resolve sinks via the
       ``pytest_rampart_sinks`` hook (falling back to conftest discovery),
@@ -759,10 +816,15 @@ def pytest_sessionfinish(
         rampart_session.set_duration(duration_seconds=time.monotonic() - start_time)
 
     if is_xdist_worker(config=session.config):
-        try:
-            finalize_worker(config=session.config, session=rampart_session)
-        except SizeLimitError as exc:
-            logger.warning("%s", exc)
+        streamed_result_count = session.config.stash.get(
+            _streamed_result_count_key,
+            0,
+        )
+        finalize_worker(
+            config=session.config,
+            session=rampart_session,
+            streamed_result_count=streamed_result_count,
+        )
         return
 
     _aggregate_trial_results(rampart_session=rampart_session)
@@ -787,7 +849,7 @@ def pytest_sessionfinish(
 
 @pytest.hookimpl(optionalhook=True)
 def pytest_testnodedown(node: object, error: object) -> None:
-    """Merge a finished xdist worker's results into the controller session.
+    """Reconcile a finished xdist worker's streamed Result count.
 
     Thin delegate to ``_xdist.handle_testnodedown`` so plugin.py stays
     focused on hook registration. Registered as ``optionalhook`` so
@@ -804,7 +866,14 @@ def pytest_testnodedown(node: object, error: object) -> None:
     rampart_session = config.stash.get(_rampart_key, None)
     if rampart_session is None:
         return
-    handle_testnodedown(session=rampart_session, node=node, error=error)
+    received_counts = config.stash.get(_received_result_counts_key, {})
+    worker_id = get_worker_id(node)
+    handle_testnodedown(
+        session=rampart_session,
+        node=node,
+        error=error,
+        received_result_count=received_counts.get(worker_id, 0),
+    )
 
 
 def _record_xdist_metadata(

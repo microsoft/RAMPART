@@ -17,7 +17,10 @@ RAMPART's pytest integration. Activates automatically when installed.
 
 ## Parallel Execution Hooks
 
-When `pytest-xdist` is installed, the plugin registers `pytest_testnodedown` (as an optional hook) to merge worker results into the controller session. See [Parallel Execution](../usage/xdist.md) for the data flow and trust boundary.
+When `pytest-xdist` is installed, the plugin streams call-phase Result envelopes
+through `pytest_runtest_logreport` and uses the optional `pytest_testnodedown`
+hook to reconcile per-worker Result counts. See
+[Parallel Execution](../usage/xdist.md) for the data flow and trust boundary.
 
 ::: rampart.pytest_plugin._xdist
     options:
@@ -26,6 +29,7 @@ When `pytest-xdist` is installed, the plugin registers `pytest_testnodedown` (as
         - WORKEROUTPUT_KEY
         - SIZE_LIMIT_OPTION
         - DEFAULT_SIZE_LIMIT_BYTES
+        - MIN_RESULT_SIZE_LIMIT_BYTES
         - WorkerOutputError
         - SchemaVersionError
         - SizeLimitError
@@ -33,8 +37,12 @@ When `pytest-xdist` is installed, the plugin registers `pytest_testnodedown` (as
         - is_xdist_controller
         - get_dist_mode
         - get_worker_count
+        - attach_report_results
+        - serialize_report_data
+        - deserialize_report_data
+        - merge_report_results
         - serialize_worker_data
-        - deserialize_worker_data
+        - deserialize_trial_specs
         - finalize_worker
         - handle_testnodedown
         - discover_sinks_from_conftest

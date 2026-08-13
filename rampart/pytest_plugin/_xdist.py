@@ -4,10 +4,9 @@
 """xdist support for RAMPART's pytest plugin.
 
 Provides serialization, deserialization, and controller-side merge
-logic for running RAMPART under pytest-xdist. Workers serialize their
-``Result`` objects into ``config.workeroutput``; the controller merges
-worker payloads in ``pytest_testnodedown`` and emits a single unified
-report at session end.
+logic for running RAMPART under pytest-xdist. Workers stream ``Result``
+objects on call-phase test reports; the controller merges each report
+incrementally and emits a single unified report at session end.
 
 Trust boundary: worker payloads may contain attacker-controlled
 content (agent responses, payload text). Serialization is strictly
@@ -57,13 +56,18 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-SCHEMA_VERSION: str = "rampart.xdist.v1"
-WORKEROUTPUT_KEY: str = "rampart_xdist_v1"
+SCHEMA_VERSION: str = "rampart.xdist.v2"
+WORKEROUTPUT_KEY: str = "rampart_xdist_v2"
+REPORT_RESULTS_ATTR: str = "_rampart_results"
 SIZE_LIMIT_OPTION: str = "rampart_xdist_max_bytes"
 DEFAULT_SIZE_LIMIT_BYTES: int = 64 * 1024 * 1024
+MIN_RESULT_SIZE_LIMIT_BYTES: int = 4 * 1024
 MAX_METADATA_DEPTH: int = 6
 
 _TRUNCATED_MARKER: str = "rampart_truncated"
+_TRUNCATED_ATTRIBUTION_MAX_BYTES: int = 512
+_TRUNCATED_FALLBACK_ATTRIBUTION_MAX_BYTES: int = 64
+_STREAMED_RESULT_COUNT: str = "streamed_result_count"
 
 
 class WorkerOutputError(Exception):
@@ -75,7 +79,7 @@ class SchemaVersionError(WorkerOutputError):
 
 
 class SizeLimitError(WorkerOutputError):
-    """Raised when a worker payload exceeds the configured size cap."""
+    """Raised when one serialized Result exceeds the configured size cap."""
 
 
 def is_xdist_worker(*, config: pytest.Config) -> bool:
@@ -144,7 +148,7 @@ def get_worker_count(*, config: pytest.Config) -> int:
 
 
 def _size_limit(*, config: pytest.Config) -> int:
-    """Resolve the worker payload size cap from pytest config or default.
+    """Resolve the per-Result size cap from pytest config or default.
 
     Reads from the ``--rampart-xdist-max-bytes`` CLI option first, then
     the ``rampart_xdist_max_bytes`` ini option, then falls back to
@@ -180,6 +184,15 @@ def _size_limit(*, config: pytest.Config) -> int:
             DEFAULT_SIZE_LIMIT_BYTES,
         )
         return DEFAULT_SIZE_LIMIT_BYTES
+    if parsed < MIN_RESULT_SIZE_LIMIT_BYTES:
+        logger.warning(
+            "%s=%d is below the minimum %d bytes required for an attributed "
+            "truncation marker; using the minimum.",
+            SIZE_LIMIT_OPTION,
+            parsed,
+            MIN_RESULT_SIZE_LIMIT_BYTES,
+        )
+        return MIN_RESULT_SIZE_LIMIT_BYTES
     return parsed
 
 
@@ -498,29 +511,237 @@ def _serialize_result(*, result: Result, nodeid: str) -> dict[str, Any]:
     }
 
 
-def serialize_worker_data(*, session: RampartSession) -> dict[str, Any]:
-    """Serialize a worker's RampartSession state for transport to the controller.
+def _serialized_size(*, data: dict[str, Any]) -> int:
+    """Return the UTF-8 JSON size of serialized transport data."""
+    encoded = json.dumps(data, default=str)
+    return len(encoded.encode("utf-8"))
 
-    Produces a JSON-safe dict containing the schema version, the
-    package version (for cross-version diagnostics), the worker's
-    ``_results_by_nodeid`` mapping serialized to primitive types,
-    and trial specs registered during collection.
+
+def _enforce_result_size(
+    *,
+    size_bytes: int,
+    limit_bytes: int,
+    nodeid: str,
+) -> None:
+    """Raise when one serialized Result exceeds its transport cap.
+
+    Raises:
+        SizeLimitError: If the serialized Result exceeds the cap.
+    """
+    if size_bytes <= limit_bytes:
+        return
+    display_nodeid = _bounded_attribution(
+        value=nodeid,
+        max_bytes=_TRUNCATED_ATTRIBUTION_MAX_BYTES,
+    )
+    msg = (
+        f"Result for {display_nodeid!r} is {size_bytes} bytes, exceeding the "
+        f"{limit_bytes}-byte xdist transport cap. Increase "
+        f"--{SIZE_LIMIT_OPTION.replace('_', '-')} (or the "
+        f"{SIZE_LIMIT_OPTION} ini option) to raise the cap."
+    )
+    raise SizeLimitError(msg)
+
+
+def _truncated_result_data(
+    *,
+    result: Result,
+    nodeid: str,
+    size_bytes: int,
+    limit_bytes: int,
+) -> dict[str, Any]:
+    """Build a bounded ERROR Result marker for oversized transport data.
+
+    Returns:
+        dict[str, Any]: JSON-safe truncated Result data.
+    """
+    raw_test_name = result.metadata.get("_pytest_test_name")
+    test_name = (
+        str(raw_test_name)
+        if raw_test_name is not None
+        else nodeid.rsplit("::", maxsplit=1)[-1]
+    )
+    harm_category = (
+        str(result.harm_category) if result.harm_category is not None else None
+    )
+    marker = {
+        _TRUNCATED_MARKER: True,
+        "safe": False,
+        "status": SafetyStatus.ERROR.value,
+        "summary": (
+            "RAMPART Result exceeded the xdist transport size cap; "
+            "full content was truncated."
+        ),
+        "turns": [],
+        "duration_seconds": 0.0,
+        "harm_category": _bounded_attribution(
+            value=harm_category,
+            max_bytes=_TRUNCATED_ATTRIBUTION_MAX_BYTES,
+        ),
+        "strategy": "xdist-transport",
+        "observability_level": ObservabilityLevel.RESPONSE_ONLY.value,
+        "injections": [],
+        "metadata": {
+            "_pytest_test_name": _bounded_attribution(
+                value=test_name,
+                max_bytes=_TRUNCATED_ATTRIBUTION_MAX_BYTES,
+            ),
+            "_pytest_nodeid": _bounded_attribution(
+                value=nodeid,
+                max_bytes=_TRUNCATED_ATTRIBUTION_MAX_BYTES,
+            ),
+            "_rampart_transport_truncated": True,
+            "_rampart_original_size_bytes": size_bytes,
+            "_rampart_limit_bytes": limit_bytes,
+        },
+    }
+    if _serialized_size(data=marker) <= limit_bytes:
+        return marker
+    logger.warning(
+        "Compacting truncation marker for %s to fit the %d-byte transport cap.",
+        _bounded_attribution(
+            value=nodeid,
+            max_bytes=_TRUNCATED_FALLBACK_ATTRIBUTION_MAX_BYTES,
+        ),
+        limit_bytes,
+    )
+    marker["harm_category"] = _bounded_attribution(
+        value=harm_category,
+        max_bytes=_TRUNCATED_FALLBACK_ATTRIBUTION_MAX_BYTES,
+    )
+    marker_metadata = cast("dict[str, Any]", marker["metadata"])
+    marker_metadata["_pytest_test_name"] = _bounded_attribution(
+        value=test_name,
+        max_bytes=_TRUNCATED_FALLBACK_ATTRIBUTION_MAX_BYTES,
+    )
+    marker_metadata["_pytest_nodeid"] = _bounded_attribution(
+        value=nodeid,
+        max_bytes=_TRUNCATED_FALLBACK_ATTRIBUTION_MAX_BYTES,
+    )
+    return marker
+
+
+def _bounded_attribution(*, value: str | None, max_bytes: int) -> str | None:
+    """Bound transport attribution while preserving a recognizable prefix.
+
+    Returns:
+        str | None: The original value or its bounded prefix.
+    """
+    if value is None or len(json.dumps(value).encode("utf-8")) <= max_bytes:
+        return value
+    low = 0
+    high = len(value)
+    while low < high:
+        prefix_length = (low + high + 1) // 2
+        candidate = f"{value[:prefix_length]}..."
+        if len(json.dumps(candidate).encode("utf-8")) <= max_bytes:
+            low = prefix_length
+        else:
+            high = prefix_length - 1
+    return f"{value[:low]}..."
+
+
+def _serialize_capped_result(
+    *,
+    config: pytest.Config,
+    result: Result,
+    nodeid: str,
+) -> dict[str, Any]:
+    """Serialize one Result, replacing only that Result when oversized.
+
+    Returns:
+        dict[str, Any]: Full Result data or a bounded truncation marker.
+    """
+    data = _serialize_result(result=result, nodeid=nodeid)
+    size_bytes = _serialized_size(data=data)
+    limit_bytes = _size_limit(config=config)
+    try:
+        _enforce_result_size(
+            size_bytes=size_bytes,
+            limit_bytes=limit_bytes,
+            nodeid=nodeid,
+        )
+    except SizeLimitError as exc:
+        logger.warning("%s", exc)
+        return _truncated_result_data(
+            result=result,
+            nodeid=nodeid,
+            size_bytes=size_bytes,
+            limit_bytes=limit_bytes,
+        )
+    return data
+
+
+def serialize_report_data(
+    *,
+    config: pytest.Config,
+    nodeid: str,
+    results: list[Result],
+) -> dict[str, Any]:
+    """Serialize call-phase Results into an execnet-safe report envelope.
+
+    Returns:
+        dict[str, Any]: JSON-safe report envelope.
+    """
+    return {
+        "schema": SCHEMA_VERSION,
+        "nodeid": nodeid,
+        "results": [
+            _serialize_capped_result(
+                config=config,
+                result=result,
+                nodeid=nodeid,
+            )
+            for result in results
+        ],
+    }
+
+
+def attach_report_results(
+    *,
+    config: pytest.Config,
+    report: pytest.TestReport,
+    results: list[Result],
+) -> int:
+    """Attach serialized Results to a call-phase worker report.
+
+    Returns:
+        int: Number of Result representations attached.
+    """
+    if not results:
+        return 0
+    data = serialize_report_data(
+        config=config,
+        nodeid=report.nodeid,
+        results=results,
+    )
+    setattr(report, REPORT_RESULTS_ATTR, data)
+    return len(results)
+
+
+def serialize_worker_data(
+    *,
+    session: RampartSession,
+    streamed_result_count: int,
+) -> dict[str, Any]:
+    """Serialize slim session-level worker data for the controller.
+
+    Results are deliberately absent because call-phase reports are the
+    sole Result transport. Workeroutput retains trial specs and the
+    expected streamed Result count for completeness reconciliation.
 
     Args:
         session (RampartSession): The worker's session state.
+        streamed_result_count (int): Result representations attached to
+            reports by this worker.
 
     Returns:
         dict[str, Any]: A JSON-safe payload ready to write to
             ``config.workeroutput``.
     """
-    serialized: dict[str, list[dict[str, Any]]] = {}
-    for nodeid, results in session.results_by_nodeid.items():
-        serialized[nodeid] = [
-            _serialize_result(result=r, nodeid=nodeid) for r in results
-        ]
     return {
         "schema": SCHEMA_VERSION,
-        "results_by_nodeid": serialized,
+        _STREAMED_RESULT_COUNT: streamed_result_count,
         "trial_specs": [
             {
                 "clone_nodeid": clone_nodeid,
@@ -944,48 +1165,59 @@ def _deserialize_result(*, data: object) -> Result:
     )
 
 
-def deserialize_worker_data(*, data: object) -> dict[str, list[Result]]:
-    """Deserialize a worker payload back into a ``results_by_nodeid`` mapping.
+def deserialize_report_data(
+    *,
+    data: object,
+    report_nodeid: str,
+) -> tuple[dict[str, list[Result]], bool]:
+    """Deserialize one call-phase report envelope.
 
     Performs strict schema validation: missing ``schema`` key, unknown
     versions, and malformed enum values all raise ``WorkerOutputError``
-    (or subclass). Caller should catch and mark the run incomplete
-    rather than letting the exception propagate to pytest.
+    (or subclass). The report nodeid and envelope nodeid must agree.
 
     Each result's ``metadata["_pytest_nodeid"]`` and
     ``metadata["_rampart_result_index"]`` are set authoritatively from the
-    outer mapping key and list position so cross-worker ordering is total
+    envelope nodeid and list position so cross-worker ordering is total
     and independent of any (untrusted) serialized values.
 
     Args:
-        data (object): The deserialized JSON object from
-            ``node.workeroutput``.
+        data (object): The deserialized private TestReport attribute.
+        report_nodeid (str): The nodeid from the owning TestReport.
 
     Returns:
-        dict[str, list[Result]]: Results grouped by nodeid.
+        tuple[dict[str, list[Result]], bool]: Results grouped by nodeid
+            and whether any Result is a truncation marker.
 
     Raises:
         SchemaVersionError: Missing or unknown schema version.
         WorkerOutputError: Malformed payload (type errors, bad enums).
     """
     typed = _validate_schema(data=data)
-    raw_results = typed.get("results_by_nodeid", {})
-    if not isinstance(raw_results, dict):
-        msg = f"Expected dict for results_by_nodeid, got {type(raw_results).__name__}."
+    nodeid = typed.get("nodeid")
+    if not isinstance(nodeid, str) or not nodeid:
+        msg = "Streamed report envelope has an invalid 'nodeid'."
         raise WorkerOutputError(msg)
-    out: dict[str, list[Result]] = {}
-    for nodeid, results_data in cast("dict[Any, Any]", raw_results).items():
-        if not isinstance(results_data, list):
-            continue
-        nodeid_str = str(nodeid)
-        deserialized: list[Result] = []
-        for index, raw_result in enumerate(cast("list[Any]", results_data)):
-            result = _deserialize_result(data=raw_result)
-            result.metadata["_pytest_nodeid"] = nodeid_str
-            result.metadata["_rampart_result_index"] = index
-            deserialized.append(result)
-        out[nodeid_str] = deserialized
-    return out
+    if nodeid != report_nodeid:
+        msg = (
+            f"Streamed envelope nodeid {nodeid!r} does not match "
+            f"TestReport nodeid {report_nodeid!r}."
+        )
+        raise WorkerOutputError(msg)
+    raw_results = typed.get("results")
+    if not isinstance(raw_results, list):
+        msg = f"Expected list for results, got {type(raw_results).__name__}."
+        raise WorkerOutputError(msg)
+    deserialized: list[Result] = []
+    truncated = False
+    for index, raw_result in enumerate(cast("list[Any]", raw_results)):
+        result = _deserialize_result(data=raw_result)
+        result.metadata["_pytest_nodeid"] = nodeid
+        result.metadata["_rampart_result_index"] = index
+        deserialized.append(result)
+        if isinstance(raw_result, dict) and raw_result.get(_TRUNCATED_MARKER) is True:
+            truncated = True
+    return {nodeid: deserialized}, truncated
 
 
 def deserialize_trial_specs(*, data: object) -> dict[str, TrialSpec]:
@@ -1043,8 +1275,13 @@ def deserialize_trial_specs(*, data: object) -> dict[str, TrialSpec]:
     return out
 
 
-def finalize_worker(*, config: pytest.Config, session: RampartSession) -> None:
-    """Serialize the worker's session state into ``config.workeroutput``.
+def finalize_worker(
+    *,
+    config: pytest.Config,
+    session: RampartSession,
+    streamed_result_count: int,
+) -> None:
+    """Serialize slim worker session state into ``config.workeroutput``.
 
     Called from ``pytest_sessionfinish`` on each xdist worker. The
     worker skips sink emission entirely; the controller is responsible
@@ -1053,38 +1290,19 @@ def finalize_worker(*, config: pytest.Config, session: RampartSession) -> None:
     Args:
         config (pytest.Config): The pytest configuration object.
         session (RampartSession): The worker's session state.
-
-    Raises:
-        SizeLimitError: If the serialized payload exceeds the
-            configured cap. The truncation marker is still written to
-            ``workeroutput`` before the exception is raised so the
-            controller can record the run as incomplete.
+        streamed_result_count (int): Number of Result representations
+            attached to test reports by this worker.
     """
     if not is_xdist_worker(config=config):
         return
-    payload = serialize_worker_data(session=session)
-    encoded = json.dumps(payload, default=str)
-    size = len(encoded.encode("utf-8"))
-    limit = _size_limit(config=config)
     workeroutput = cast(
         "dict[str, Any]",
         config.workeroutput,  # ty: ignore[unresolved-attribute]
     )
-    if size > limit:
-        workeroutput[WORKEROUTPUT_KEY] = {
-            "schema": SCHEMA_VERSION,
-            _TRUNCATED_MARKER: True,
-            "size_bytes": size,
-            "limit_bytes": limit,
-        }
-        msg = (
-            f"Worker payload size {size} bytes exceeds cap of {limit}; "
-            f"truncated. Increase --{SIZE_LIMIT_OPTION.replace('_', '-')} "
-            f"(or the {SIZE_LIMIT_OPTION} ini option) to raise the cap."
-        )
-        raise SizeLimitError(msg)
-    logger.debug("Worker payload size: %d bytes", size)
-    workeroutput[WORKEROUTPUT_KEY] = payload
+    workeroutput[WORKEROUTPUT_KEY] = serialize_worker_data(
+        session=session,
+        streamed_result_count=streamed_result_count,
+    )
 
 
 def _safe_deserialize_trial_specs(
@@ -1136,13 +1354,88 @@ def _tag_source_worker(
             result.metadata["_rampart_source_worker"] = worker_id_str
 
 
+def get_worker_id(node: object) -> str:
+    """Return xdist's stable identifier for a worker node."""
+    gateway = getattr(node, "gateway", None)
+    return str(getattr(gateway, "id", node)) if gateway else str(node)
+
+
+def _report_worker_id(*, report: pytest.TestReport) -> str:
+    """Return the source worker identifier carried by xdist.
+
+    Returns:
+        str: Stable xdist worker identifier.
+
+    Raises:
+        WorkerOutputError: If the report has no source worker.
+    """
+    worker_id = getattr(report, "worker_id", None)
+    if isinstance(worker_id, str) and worker_id:
+        return worker_id
+    node = getattr(report, "node", None)
+    if node is not None:
+        return get_worker_id(node)
+    msg = f"Streamed report for {report.nodeid!r} has no source worker identifier."
+    raise WorkerOutputError(msg)
+
+
+def merge_report_results(
+    *,
+    session: RampartSession,
+    report: pytest.TestReport,
+) -> tuple[str, int] | None:
+    """Validate and incrementally merge one streamed report envelope.
+
+    Returns:
+        tuple[str, int] | None: Source worker and merged Result count,
+            or None when the report carries no RAMPART envelope.
+    """
+    payload = getattr(report, REPORT_RESULTS_ATTR, None)
+    if payload is None:
+        return None
+    worker_id = _report_worker_id(report=report)
+    results_by_nodeid, truncated = deserialize_report_data(
+        data=payload,
+        report_nodeid=report.nodeid,
+    )
+    _tag_source_worker(
+        results_by_nodeid=results_by_nodeid,
+        worker_id_str=worker_id,
+    )
+    session.merge_worker_results(results_by_nodeid=results_by_nodeid)
+    result_count = sum(len(results) for results in results_by_nodeid.values())
+    if truncated:
+        session.mark_incomplete(
+            reason=f"worker {worker_id} streamed a truncated Result (size cap)",
+        )
+    return worker_id, result_count
+
+
+def _deserialize_streamed_result_count(*, payload: object) -> int:
+    """Read the expected Result count from slim workeroutput.
+
+    Returns:
+        int: Expected streamed Result count.
+
+    Raises:
+        WorkerOutputError: If the count is missing or invalid.
+    """
+    typed = _validate_schema(data=payload)
+    raw_count = typed.get(_STREAMED_RESULT_COUNT)
+    if type(raw_count) is not int or raw_count < 0:
+        msg = "Worker payload missing a valid non-negative streamed_result_count."
+        raise WorkerOutputError(msg)
+    return raw_count
+
+
 def handle_testnodedown(
     *,
     session: RampartSession,
     node: object,
     error: object,
+    received_result_count: int,
 ) -> None:
-    """Merge a finished worker's results into the controller session.
+    """Reconcile a finished worker's streamed Result count.
 
     Called from ``pytest_testnodedown`` on the controller for each
     worker that completes. Failures (missing payload, deserialization
@@ -1153,9 +1446,9 @@ def handle_testnodedown(
         session (RampartSession): The controller's session state.
         node: The xdist node object (has ``workeroutput`` attribute).
         error: The shutdown error from xdist, or None on clean exit.
+        received_result_count (int): Results already merged from this worker.
     """
-    worker_id = getattr(node, "gateway", None)
-    worker_id_str = str(getattr(worker_id, "id", node)) if worker_id else str(node)
+    worker_id_str = get_worker_id(node)
     if error is not None:
         logger.warning(
             "Worker %s reported shutdown error; report will be incomplete: %s",
@@ -1180,46 +1473,36 @@ def handle_testnodedown(
         )
         session.mark_incomplete(reason=f"worker {worker_id_str} missing RAMPART output")
         return
-    typed_payload_dict: dict[str, Any] | None = (
-        cast("dict[str, Any]", payload) if isinstance(payload, dict) else None
-    )
-    if typed_payload_dict is not None and typed_payload_dict.get(_TRUNCATED_MARKER):
-        logger.error(
-            "Worker %s payload was truncated due to size cap; "
-            "report will be incomplete.",
-            worker_id_str,
-        )
-        session.mark_incomplete(
-            reason=f"worker {worker_id_str} payload truncated (size cap)",
-        )
-        return
-    try:
-        results_by_nodeid = deserialize_worker_data(data=cast("object", payload))
-    except WorkerOutputError as exc:
-        logger.exception(
-            "Failed to deserialize worker %s output; report will be incomplete.",
-            worker_id_str,
-        )
-        session.mark_incomplete(
-            reason=f"worker {worker_id_str} deserialization failed: {exc}",
-        )
-        return
     trial_specs = _safe_deserialize_trial_specs(
         payload=cast("object", payload),
         worker_id_str=worker_id_str,
     )
-    _tag_source_worker(
-        results_by_nodeid=results_by_nodeid,
-        worker_id_str=worker_id_str,
-    )
-    session.merge_worker_results(results_by_nodeid=results_by_nodeid)
     if trial_specs:
         session.merge_trial_specs(trial_specs=trial_specs)
-    logger.info(
-        "Merged %d result group(s) from worker %s.",
-        len(results_by_nodeid),
-        worker_id_str,
-    )
+    try:
+        expected_result_count = _deserialize_streamed_result_count(payload=payload)
+    except WorkerOutputError:
+        logger.exception(
+            "Worker %s streamed Result count is invalid; report will be incomplete.",
+            worker_id_str,
+        )
+        session.mark_incomplete(
+            reason=f"worker {worker_id_str} missing streamed Result count",
+        )
+        return
+    if expected_result_count != received_result_count:
+        logger.error(
+            "Worker %s streamed Result count mismatch: expected %d, received %d.",
+            worker_id_str,
+            expected_result_count,
+            received_result_count,
+        )
+        session.mark_incomplete(
+            reason=(
+                f"worker {worker_id_str} streamed Result count mismatch "
+                f"(expected {expected_result_count}, received {received_result_count})"
+            ),
+        )
 
 
 def discover_sinks_from_conftest(*, config: pytest.Config) -> list[ReportSink]:

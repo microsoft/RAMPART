@@ -20,17 +20,18 @@ With `-n 4`, pytest spawns 4 worker processes that execute tests in parallel. RA
 ```
 Worker 1                    Worker 2                    Controller
 ─────────                   ─────────                   ──────────
-collect results             collect results
+call-phase Results           call-phase Results
     │                           │
-pytest_sessionfinish        pytest_sessionfinish
-    │                           │
-serialize → workeroutput    serialize → workeroutput
+serialize → TestReport      serialize → TestReport
     │                           │
     └───────────┬───────────────┘
                 ▼
-        pytest_testnodedown (per worker)
-        deserialize + merge into
-        controller's RampartSession
+        pytest_runtest_logreport
+        validate + merge incrementally
+                │
+                ▼
+        pytest_testnodedown
+        reconcile streamed Result counts
                 │
                 ▼
         pytest_sessionfinish (controller)
@@ -40,8 +41,12 @@ serialize → workeroutput    serialize → workeroutput
         Single unified TestRunReport
 ```
 
-- **Workers** collect [`Result`][rampart.core.result.Result] objects normally and serialize them into `config.workeroutput`. Workers do **not** emit reports.
-- **Controller** receives each worker's payload via the `pytest_testnodedown` hook, merges results into its own [`RampartSession`][rampart.pytest_plugin._session.RampartSession], and emits sinks once at session end.
+- **Workers** attach JSON-safe serialized [`Result`][rampart.core.result.Result] objects to each call-phase `TestReport`. Workers do **not** emit RAMPART report sinks.
+- **Controller** receives each envelope through `pytest_runtest_logreport`, validates and merges it into its [`RampartSession`][rampart.pytest_plugin._session.RampartSession], and emits sinks once at session end.
+- **Worker shutdown** carries only trial specifications and the expected number of streamed Result representations in `config.workeroutput`. The controller reconciles that count in `pytest_testnodedown`; Results are never delivered through both paths.
+
+The call phase is the intentional transport boundary. Results recorded during
+fixture teardown are not streamed.
 
 The result: **one** `JsonFileReportSink` output file, **one** call to `MyCustomSink.emit_async`, and accurate population statistics over the full result set.
 
@@ -184,7 +189,7 @@ Worker payloads cross a process boundary via `execnet` and may contain attacker-
 
 - **Arbitrary code execution** — strict JSON-safe primitives only; no `pickle`, `marshal`, or custom `__reduce__`.
 - **Schema drift** — payloads with missing or unknown schema versions are rejected fail-closed.
-- **Memory exhaustion** — worker payloads are capped at 64 MB by default.
+- **Memory exhaustion** — each serialized Result is capped at 64 MB by default.
 - **Terminal/log injection** — ANSI escape sequences are stripped from free-form text at the deserialization boundary.
 - **Path traversal** — worker-local artifact paths are stored as opaque strings in metadata; the controller never accesses worker files.
 
@@ -203,13 +208,17 @@ Or in `pytest.ini` / `pyproject.toml`:
 rampart_xdist_max_bytes = 134217728
 ```
 
-Workers that exceed the cap log a warning and emit a truncation marker. The controller records the affected worker as incomplete in `TestRunReport.metadata`.
+An oversized Result is replaced by an attributed ERROR/truncation marker while
+normal Results from the same worker continue to stream. The controller records
+the run as incomplete in `TestRunReport.metadata`. Configured limits below 4 KiB
+use a 4 KiB effective minimum so the marker itself always fits.
 
 ---
 
 ## Incomplete Runs
 
-If a worker crashes, runs out of time, or hits the size cap, the controller marks the run as incomplete:
+If a worker crashes, drops a streamed Result, omits its final count, or hits the
+size cap, the controller marks the run as incomplete:
 
 ```python
 report.metadata["incomplete"]            # True if any worker failed
@@ -232,27 +241,17 @@ report.metadata["dist_mode"]      # "load", "loadgroup", etc.
 
 ---
 
-## Durability limitations
+## Durability behavior
 
-The current worker→controller transport flushes a worker's results only at its
-clean `pytest_sessionfinish`. This has two consequences you should be aware of:
+Each call-phase report is merged as it reaches the controller. If a worker is
+killed mid-run, every Result already delivered remains in the final report and
+the run is marked incomplete because the worker cannot provide a final expected
+count. A clean worker shutdown publishes its emitted Result count; any mismatch
+with the controller's received count detects a silent drop and also marks the run
+incomplete.
 
-- **A worker killed mid-run loses its already-finished results.** Because results
-  are shipped in a single batch at session end, a worker that crashes, is killed
-  (e.g. OOM, timeout, `-x` shutdown), or otherwise never reaches
-  `pytest_sessionfinish` contributes **nothing** — even tests it had already
-  completed. The run is marked incomplete (see [Incomplete Runs](#incomplete-runs)).
-- **The size cap drops the whole worker payload, not just the oversized record.**
-  When a worker's aggregate serialized payload exceeds
-  `--rampart-xdist-max-bytes`, the **entire** worker payload is dropped (and the
-  worker marked incomplete), rather than only the single oversized transcript.
-
-Both behaviors are deliberate fail-closed choices for this release. A durable
-per-worker transport (incremental JSONL shards that survive a killed worker, with
-the size cap applied per-record) is in progress as a follow-up change; until it
-lands, use `--dist=loadgroup` only when your trial groups need worker cohesion (see
-[Choosing `loadgroup` vs `load`](#choosing-loadgroup-vs-load)) and size your cap to
-your largest expected worker payload.
+The cap applies independently to each Result. An oversized transcript therefore
+does not discard normal Results from that worker.
 
 ---
 
@@ -261,9 +260,11 @@ your largest expected worker payload.
 - Sinks discovered through the **fixture fallback** on the controller cannot depend
   on other pytest fixtures — use the `pytest_rampart_sinks` hook instead (see
   [Registering Sinks](#registering-sinks-the-pytest_rampart_sinks-hook)).
-- Results from a worker that dies before `pytest_sessionfinish` are lost, and an
-  over-cap worker payload is dropped wholesale (see
-  [Durability limitations](#durability-limitations)).
+- Results recorded only during fixture teardown are outside the call-phase
+  streaming boundary and are not included.
+- A worker that dies can lose Results whose call-phase reports had not reached
+  the controller; already-streamed Results are retained and the run is marked
+  incomplete (see [Durability behavior](#durability-behavior)).
 - Mixed RAMPART versions across controller and workers are unsupported; install the
   same version everywhere.
 - `pytest-xdist` itself does not support interactive debugging (`--pdb`, `--trace`);

@@ -21,19 +21,24 @@ from rampart.pytest_plugin._collection import (
     deactivate_collector,
 )
 from rampart.pytest_plugin._session import RampartSession
+from rampart.pytest_plugin._xdist import REPORT_RESULTS_ATTR, serialize_report_data
 from rampart.pytest_plugin.plugin import (
     _call_results_key,
     _emit_sinks,
     _enforce_incomplete_exit_status,
     _evaluate_gates,
     _has_sink_hook_impl,
+    _rampart_key,
+    _received_result_counts_key,
     _resolve_hook_sinks,
     _resolve_trial_n,
     _sanitize_for_terminal,
+    _streamed_result_count_key,
     _write_result_line,
     _write_trial_group_lines,
     pytest_collection_modifyitems,
     pytest_configure,
+    pytest_runtest_logreport,
     pytest_runtest_makereport,
     pytest_sessionfinish,
     pytest_terminal_summary,
@@ -993,10 +998,20 @@ def _make_reporting_item(*, worker: bool = True) -> Any:
     """
     item = MagicMock()
     item.stash = pytest.Stash()
+    item.nodeid = "test_plugin.py::test_stream"
+    item.get_closest_marker.return_value = None
+    config_kwargs = {
+        "stash": pytest.Stash(),
+        "getoption": lambda _name, default=None: default,
+        "getini": lambda _name: None,
+    }
     if worker:
-        item.config = SimpleNamespace(workerinput={"workerid": "gw0"})
+        item.config = SimpleNamespace(
+            workerinput={"workerid": "gw0"},
+            **config_kwargs,
+        )
     else:
-        item.config = SimpleNamespace()
+        item.config = SimpleNamespace(**config_kwargs)
     return item
 
 
@@ -1004,7 +1019,14 @@ def _drive_makereport(*, item: Any, when: str, report: Any = None) -> Any:
     """Drive the makereport wrapper generator and return its result."""
     call = MagicMock()
     call.when = when
-    sent = report if report is not None else MagicMock()
+    sent = cast(
+        "pytest.TestReport",
+        (
+            report
+            if report is not None
+            else SimpleNamespace(nodeid="test_plugin.py::test_stream")
+        ),
+    )
     gen = pytest_runtest_makereport(
         item=cast("pytest.Item", item),
         call=cast("pytest.CallInfo[None]", call),
@@ -1033,6 +1055,7 @@ class TestPytestRuntestMakereport:
         snapshot = item.stash[_call_results_key]
         assert len(snapshot) == 1
         assert snapshot[0].summary == "captured"
+        assert item.config.stash[_streamed_result_count_key] == 1
 
     def test_snapshots_empty_list_when_no_results(self) -> None:
         item = _make_reporting_item()
@@ -1044,6 +1067,7 @@ class TestPytestRuntestMakereport:
             deactivate_collector(token)
 
         assert item.stash[_call_results_key] == []
+        assert item.config.stash[_streamed_result_count_key] == 0
 
     def test_no_snapshot_at_setup_phase(self) -> None:
         item = _make_reporting_item()
@@ -1056,6 +1080,19 @@ class TestPytestRuntestMakereport:
             deactivate_collector(token)
 
         assert _call_results_key not in item.stash
+
+    def test_no_transport_at_teardown_phase(self) -> None:
+        item = _make_reporting_item()
+        collector = ResultCollector()
+        collector.record(result=_make_result(summary="teardown-only"))
+        token = activate_collector(collector)
+        try:
+            report = _drive_makereport(item=item, when="teardown")
+        finally:
+            deactivate_collector(token)
+
+        assert _call_results_key not in item.stash
+        assert not hasattr(report, REPORT_RESULTS_ATTR)
 
     def test_no_snapshot_when_no_collector_active(self) -> None:
         item = _make_reporting_item()
@@ -1086,3 +1123,65 @@ class TestPytestRuntestMakereport:
         returned = _drive_makereport(item=item, when="call", report=report)
 
         assert returned is report
+
+    def test_report_envelope_contains_call_snapshot_only(self) -> None:
+        item = _make_reporting_item()
+        collector = ResultCollector()
+        collector.record(result=_make_result(summary="call"))
+        token = activate_collector(collector)
+        try:
+            report = _drive_makereport(item=item, when="call")
+            collector.record(result=_make_result(summary="teardown"))
+        finally:
+            deactivate_collector(token)
+
+        envelope = getattr(report, REPORT_RESULTS_ATTR)
+        assert envelope["nodeid"] == item.nodeid
+        assert len(envelope["results"]) == 1
+        assert envelope["results"][0]["summary"] == "call"
+
+
+def _make_controller_report(*, payload: object) -> tuple[Any, RampartSession]:
+    config = SimpleNamespace(
+        option=SimpleNamespace(dist="load", numprocesses=2, tx=None),
+        stash=pytest.Stash(),
+    )
+    rampart_session = RampartSession()
+    config.stash[_rampart_key] = rampart_session
+    node = SimpleNamespace(
+        config=config,
+        gateway=SimpleNamespace(id="gw0"),
+    )
+    report = SimpleNamespace(
+        node=node,
+        nodeid="test_plugin.py::test_stream",
+        worker_id="gw0",
+    )
+    setattr(report, REPORT_RESULTS_ATTR, payload)
+    return report, rampart_session
+
+
+class TestPytestRuntestLogreport:
+    def test_controller_incrementally_merges_and_counts_results(self) -> None:
+        nodeid = "test_plugin.py::test_stream"
+        payload = serialize_report_data(
+            config=_make_reporting_item().config,
+            nodeid=nodeid,
+            results=[_make_result(summary="one"), _make_result(summary="two")],
+        )
+        report, rampart_session = _make_controller_report(payload=payload)
+        pytest_runtest_logreport(cast("pytest.TestReport", report))
+        counts = report.node.config.stash[_received_result_counts_key]
+        assert [result.summary for result in rampart_session._results] == ["one", "two"]
+        assert counts == {"gw0": 2}
+        assert {
+            result.metadata["_rampart_source_worker"]
+            for result in rampart_session._results
+        } == {"gw0"}
+
+    def test_malformed_envelope_marks_run_incomplete(self) -> None:
+        report, rampart_session = _make_controller_report(
+            payload={"schema": "wrong"},
+        )
+        pytest_runtest_logreport(cast("pytest.TestReport", report))
+        assert rampart_session.is_incomplete is True
