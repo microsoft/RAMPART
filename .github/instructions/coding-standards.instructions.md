@@ -619,7 +619,7 @@ rule is a [flake8 local plugin][flake8-local]. It needs no packaging:
 
 Suppress with a same-line `# noqa: RMP001` and a short justification. Note the
 syntax: `# ruff: ignore[...]` is this repository's convention for ruff rules,
-while `# noqa:` is reserved for external codes like `RMP001`, which flake8
+while `# noqa:` is reserved for an RMP code (e.g., `RMP001`), which flake8
 rather than ruff reads. `RMP001` is listed in `[tool.ruff.lint] external` so
 that ruff's `RUF102` accepts it instead of rejecting it as an unknown code.
 

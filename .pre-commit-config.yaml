@@ -15,7 +15,7 @@ repos:
       types: [python]
       pass_filenames: false
     - id: flake8-rampart
-      name: flake8-rampart (RMP001)
+      name: flake8-rampart (RMPXXX)
       entry: uv run flake8
       language: system
       # flake8 scans its whole configured scope, so trigger on any Python file
