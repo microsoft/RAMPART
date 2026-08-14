@@ -159,7 +159,7 @@ Before committing, run pre-commit — it covers everything the automated tooling
 uv run pre-commit run --all-files
 ```
 
-This runs Ruff (linting + formatting), ty (type checking), and flake8 (`RMPXXX`), which together enforce the copyright header, type annotations, log formatting, import organization, the `_async` suffix, and most other conventions on this page.
+This runs Ruff (linting + formatting), ty (type checking), and flake8 (`RMP` codes), which together enforce the copyright header, type annotations, log formatting, import organization, the `_async` suffix, and most other conventions on this page.
 
 A few rules are **not** caught by tooling and still need a human eye:
 

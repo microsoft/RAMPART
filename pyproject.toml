@@ -117,7 +117,7 @@ ignore = [
     "docstring-extraneous-exception", # Allow extraneous exceptions in docstrings to deliberately document the caller-visible contract, even if they propagate from a delegated callee.
 ]
 
-# RMPXXX comes from the flake8 local plugin in tools/. Declaring it here stops
+# RMP comes from the flake8 local plugin in tools/. Declaring it here stops
 # RUF102 (invalid-rule-code) from rejecting `# noqa: RMPXXX` as unknown.
 external = ["RMP001"]
 
