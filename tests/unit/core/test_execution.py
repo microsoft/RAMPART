@@ -121,7 +121,7 @@ class _RecordingHandler(ExecutionEventHandler):
     def __init__(self) -> None:
         self.events: list[ExecutionEventData] = []
 
-    async def on_event(self, *, event_data: ExecutionEventData) -> None:
+    async def on_event_async(self, *, event_data: ExecutionEventData) -> None:
         """Record the event data."""
         self.events.append(event_data)
 
@@ -129,13 +129,13 @@ class _RecordingHandler(ExecutionEventHandler):
 class _BrokenHandler(ExecutionEventHandler):
     """Handler that always raises."""
 
-    async def on_event(self, *, event_data: ExecutionEventData) -> None:
+    async def on_event_async(self, *, event_data: ExecutionEventData) -> None:
         """Raise unconditionally to test handler safety."""
         raise ValueError("handler broke")
 
 
 class TestBaseExecutionLifecycle:
-    async def test_fires_pre_and_post_execute(self) -> None:
+    async def test_fires_pre_and_post_execute_async(self) -> None:
         handler = _RecordingHandler()
         execution = _SuccessExecution(event_handlers=[handler])
         adapter = _StubAdapter()
@@ -148,7 +148,7 @@ class TestBaseExecutionLifecycle:
         assert handler.events[1].event is ExecutionEvent.ON_POST_EXECUTE
         assert handler.events[1].result is result
 
-    async def test_post_execute_has_elapsed_time(self) -> None:
+    async def test_post_execute_has_elapsed_time_async(self) -> None:
         handler = _RecordingHandler()
         execution = _SuccessExecution(event_handlers=[handler])
 
@@ -159,7 +159,7 @@ class TestBaseExecutionLifecycle:
 
 
 class TestInfrastructureErrorHandling:
-    async def test_produces_error_result(self) -> None:
+    async def test_produces_error_result_async(self) -> None:
         execution = _InfraErrorExecution()
         adapter = _StubAdapter()
 
@@ -169,21 +169,21 @@ class TestInfrastructureErrorHandling:
         assert result.status is SafetyStatus.ERROR
         assert "SharePoint returned 503" in result.summary
 
-    async def test_error_result_has_strategy(self) -> None:
+    async def test_error_result_has_strategy_async(self) -> None:
         execution = _InfraErrorExecution()
 
         result = await execution.execute_async(adapter=_StubAdapter())
 
         assert result.strategy == "infra_error"
 
-    async def test_error_result_has_observability_level(self) -> None:
+    async def test_error_result_has_observability_level_async(self) -> None:
         execution = _InfraErrorExecution()
 
         result = await execution.execute_async(adapter=_StubAdapter())
 
         assert result.observability_level is ObservabilityLevel.TOOL_ONLY
 
-    async def test_error_result_has_metadata(self) -> None:
+    async def test_error_result_has_metadata_async(self) -> None:
         execution = _InfraErrorExecution()
 
         result = await execution.execute_async(adapter=_StubAdapter())
@@ -191,7 +191,7 @@ class TestInfrastructureErrorHandling:
         assert result.metadata["error"] == "SharePoint returned 503"
         assert result.metadata["error_type"] == "InfrastructureError"
 
-    async def test_fires_on_error_and_post_execute(self) -> None:
+    async def test_fires_on_error_and_post_execute_async(self) -> None:
         handler = _RecordingHandler()
         execution = _InfraErrorExecution(event_handlers=[handler])
 
@@ -203,7 +203,7 @@ class TestInfrastructureErrorHandling:
 
 
 class TestGenericErrorHandling:
-    async def test_produces_error_result(self) -> None:
+    async def test_produces_error_result_async(self) -> None:
         execution = _GenericErrorExecution()
 
         result = await execution.execute_async(adapter=_StubAdapter())
@@ -212,14 +212,14 @@ class TestGenericErrorHandling:
         assert result.status is SafetyStatus.ERROR
         assert "unexpected failure" in result.summary
 
-    async def test_error_result_has_strategy(self) -> None:
+    async def test_error_result_has_strategy_async(self) -> None:
         execution = _GenericErrorExecution()
 
         result = await execution.execute_async(adapter=_StubAdapter())
 
         assert result.strategy == "generic_error"
 
-    async def test_error_result_has_metadata(self) -> None:
+    async def test_error_result_has_metadata_async(self) -> None:
         execution = _GenericErrorExecution()
 
         result = await execution.execute_async(adapter=_StubAdapter())
@@ -227,7 +227,7 @@ class TestGenericErrorHandling:
         assert result.metadata["error"] == "unexpected failure"
         assert result.metadata["error_type"] == "RuntimeError"
 
-    async def test_fires_on_error_and_post_execute(self) -> None:
+    async def test_fires_on_error_and_post_execute_async(self) -> None:
         handler = _RecordingHandler()
         execution = _GenericErrorExecution(event_handlers=[handler])
 
@@ -237,7 +237,7 @@ class TestGenericErrorHandling:
         assert ExecutionEvent.ON_ERROR in event_types
         assert ExecutionEvent.ON_POST_EXECUTE in event_types
 
-    async def test_on_error_contains_exception(self) -> None:
+    async def test_on_error_contains_exception_async(self) -> None:
         handler = _RecordingHandler()
         execution = _GenericErrorExecution(event_handlers=[handler])
 
@@ -250,7 +250,7 @@ class TestGenericErrorHandling:
 
 
 class TestHandlerSafety:
-    async def test_broken_handler_does_not_abort_execution(self) -> None:
+    async def test_broken_handler_does_not_abort_execution_async(self) -> None:
         broken = _BrokenHandler()
         recorder = _RecordingHandler()
         execution = _SuccessExecution(event_handlers=[broken, recorder])
@@ -262,14 +262,14 @@ class TestHandlerSafety:
 
 
 class TestDefaultHandlerFactory:
-    async def test_execution_works_without_factory(self) -> None:
+    async def test_execution_works_without_factory_async(self) -> None:
         execution = _SuccessExecution()
 
         result = await execution.execute_async(adapter=_StubAdapter())
 
         assert result.safe is True
 
-    async def test_factory_handlers_are_prepended(self) -> None:
+    async def test_factory_handlers_are_prepended_async(self) -> None:
         from rampart.core.execution import (
             clear_default_handler_factory,
             register_default_handler_factory,
@@ -295,7 +295,7 @@ class TestDefaultHandlerFactory:
 
 
 class TestDriverErrorHandling:
-    async def test_produces_error_result(self) -> None:
+    async def test_produces_error_result_async(self) -> None:
         execution = _DriverErrorExecution()
         adapter = _StubAdapter()
 
@@ -305,14 +305,14 @@ class TestDriverErrorHandling:
         assert result.status is SafetyStatus.ERROR
         assert "LLM returned garbage" in result.summary
 
-    async def test_error_result_has_strategy(self) -> None:
+    async def test_error_result_has_strategy_async(self) -> None:
         execution = _DriverErrorExecution()
 
         result = await execution.execute_async(adapter=_StubAdapter())
 
         assert result.strategy == "driver_error"
 
-    async def test_error_result_has_metadata(self) -> None:
+    async def test_error_result_has_metadata_async(self) -> None:
         execution = _DriverErrorExecution()
 
         result = await execution.execute_async(adapter=_StubAdapter())
@@ -320,7 +320,7 @@ class TestDriverErrorHandling:
         assert result.metadata["error"] == "LLM returned garbage"
         assert result.metadata["error_type"] == "DriverError"
 
-    async def test_fires_on_error_and_post_execute(self) -> None:
+    async def test_fires_on_error_and_post_execute_async(self) -> None:
         handler = _RecordingHandler()
         execution = _DriverErrorExecution(event_handlers=[handler])
 
@@ -332,7 +332,7 @@ class TestDriverErrorHandling:
 
 
 class TestEvaluateTurnAsync:
-    async def test_returns_turn_with_eval_result(self) -> None:
+    async def test_returns_turn_with_eval_result_async(self) -> None:
         from unittest.mock import AsyncMock
 
         from rampart.core.execution import evaluate_turn_async
@@ -362,7 +362,7 @@ class TestEvaluateTurnAsync:
         assert turn.response.text == "world"
         assert turn.turn_number == 0
 
-    async def test_includes_history_in_context(self) -> None:
+    async def test_includes_history_in_context_async(self) -> None:
         from unittest.mock import AsyncMock
 
         from rampart.core.execution import evaluate_turn_async
@@ -402,7 +402,7 @@ class TestEvaluateTurnAsync:
         assert captured_context.turns[0].request.prompt == "prev"
         assert captured_context.turns[1].request.prompt == "current"
 
-    async def test_preserves_driver_reasoning(self) -> None:
+    async def test_preserves_driver_reasoning_async(self) -> None:
         from unittest.mock import AsyncMock
 
         from rampart.core.execution import evaluate_turn_async

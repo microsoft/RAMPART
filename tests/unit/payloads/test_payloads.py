@@ -80,7 +80,7 @@ def _patch_llm(*responses: str):
 class TestGeneration:
     """Core generation pipeline — text variants from LLM."""
 
-    async def test_generates_text_payloads(self) -> None:
+    async def test_generates_text_payloads_async(self) -> None:
         with _patch_llm("variant_a", "variant_b"):
             result = await Payloads.generate_async(
                 template=_template(),
@@ -94,7 +94,7 @@ class TestGeneration:
         assert result[1].content == "variant_b"
         assert all(p.format is PayloadFormat.TEXT for p in result)
 
-    async def test_count_below_one_raises(self) -> None:
+    async def test_count_below_one_raises_async(self) -> None:
         with pytest.raises(ValueError, match="count must be >= 1"):
             await Payloads.generate_async(
                 template=_template(),
@@ -103,7 +103,7 @@ class TestGeneration:
                 count=0,
             )
 
-    async def test_provenance_metadata_on_payloads(self) -> None:
+    async def test_provenance_metadata_on_payloads_async(self) -> None:
         with _patch_llm("variant"):
             result = await Payloads.generate_async(
                 template=_template(),
@@ -118,7 +118,7 @@ class TestGeneration:
         assert meta["objective"] == "Make agent send data to attacker."
         assert meta["variant_index"] == 0
 
-    async def test_manifest_reaches_llm_prompt(self) -> None:
+    async def test_manifest_reaches_llm_prompt_async(self) -> None:
         """Manifest tools and agent name appear in the LLM user message."""
         captured: dict[str, str] = {}
 
@@ -144,7 +144,7 @@ class TestGeneration:
         assert "send_email" in captured["user_message"]
         assert "TestAgent" in captured["user_message"]
 
-    async def test_persona_becomes_system_message(self) -> None:
+    async def test_persona_becomes_system_message_async(self) -> None:
         """Persona system_prompt is forwarded as the LLM system message."""
         captured: dict[str, str] = {}
 
@@ -172,7 +172,7 @@ class TestGeneration:
 class TestConverterPipeline:
     """Converter chaining — sequential pipeline like PyRIT."""
 
-    async def test_returns_base_and_converted(self) -> None:
+    async def test_returns_base_and_converted_async(self) -> None:
         """With converters, output is base text + final chain result."""
         with _patch_llm("content"):
             result = await Payloads.generate_async(
@@ -189,7 +189,7 @@ class TestConverterPipeline:
         assert result[1].content == "CONTENT"
         assert result[1].format is PayloadFormat.HTML
 
-    async def test_chaining_feeds_output_to_next_converter(self) -> None:
+    async def test_chaining_feeds_output_to_next_converter_async(self) -> None:
         """[Upper, Prefix] chains: upper first, then prefix the result."""
         with _patch_llm("hello"):
             result = await Payloads.generate_async(
@@ -206,7 +206,7 @@ class TestConverterPipeline:
         # Chain: "hello" -> Upper -> "HELLO" -> Prefix -> "PREFIX:HELLO"
         assert result[1].content == "PREFIX:HELLO"
 
-    async def test_multiple_variants_one_chain_per_variant(self) -> None:
+    async def test_multiple_variants_one_chain_per_variant_async(self) -> None:
         with _patch_llm("a", "b"):
             result = await Payloads.generate_async(
                 template=_template(),
@@ -220,7 +220,7 @@ class TestConverterPipeline:
         assert len(result) == 4
         assert [p.content for p in result] == ["a", "b", "A", "B"]
 
-    async def test_empty_converters_same_as_none(self) -> None:
+    async def test_empty_converters_same_as_none_async(self) -> None:
         with _patch_llm("variant"):
             result = await Payloads.generate_async(
                 template=_template(),
@@ -233,7 +233,7 @@ class TestConverterPipeline:
         assert len(result) == 1
         assert result[0].format is PayloadFormat.TEXT
 
-    async def test_converter_metadata_preserved(self) -> None:
+    async def test_converter_metadata_preserved_async(self) -> None:
         """Converter can add its own metadata alongside provenance."""
         with _patch_llm("content"):
             result = await Payloads.generate_async(

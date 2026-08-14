@@ -44,7 +44,7 @@ def _persona() -> Persona:
 
 
 class TestGenerateTextVariants:
-    async def test_returns_one_variant_per_call(self) -> None:
+    async def test_returns_one_variant_per_call_async(self) -> None:
         with patch(
             "rampart.payloads._generator.PayloadGenerator._send_to_llm_async",
             new_callable=AsyncMock,
@@ -65,7 +65,7 @@ class TestGenerateTextVariants:
 
         assert result == ["variant one", "variant two", "variant three"]
 
-    async def test_resolves_template_variables(self) -> None:
+    async def test_resolves_template_variables_async(self) -> None:
         captured_args: dict[str, str] = {}
 
         def capture(*, system_message: str, user_message: str):
@@ -95,7 +95,7 @@ class TestGenerateTextVariants:
         assert "override@evil.com" in captured_args["user_message"]
         assert "{email}" not in captured_args["user_message"]
 
-    async def test_strips_whitespace(self) -> None:
+    async def test_strips_whitespace_async(self) -> None:
         with patch(
             "rampart.payloads._generator.PayloadGenerator._send_to_llm_async",
             new_callable=AsyncMock,
@@ -115,7 +115,7 @@ class TestGenerateTextVariants:
 
         assert result == ["padded content"]
 
-    async def test_includes_objective_in_prompt(self) -> None:
+    async def test_includes_objective_in_prompt_async(self) -> None:
         captured_args: dict[str, str] = {}
 
         def capture(*, system_message: str, user_message: str) -> str:

@@ -8,11 +8,12 @@ RAMPART enforces a consistent code style through automated tooling and documente
 |------|---------|-----------------|
 | [Ruff](https://docs.astral.sh/ruff/) | Linting and formatting | `pyproject.toml` `[tool.ruff.*]` |
 | [ty](https://github.com/astral-sh/ty) | Static type checking | `pyproject.toml` `[tool.ty]` |
+| [flake8](https://flake8.pycqa.org/) | For project conventions Ruff cannot express | `.flake8`, `tools/flake8_rampart.py` |
 | [pre-commit](https://pre-commit.com/) | Git hooks for automated checks | `.pre-commit-config.yaml` |
 
 ### Running Checks
 
-Pre-commit is the primary entry point — it runs Ruff (lint + format) and ty in one command:
+Pre-commit is the primary entry point. It runs Ruff (lint + format), ty, and the RAMPART convention check in one command:
 
 ```bash
 # Install the Git hook once (optional, runs on every commit)
@@ -33,6 +34,7 @@ A few details worth knowing:
 
 - **Ruff** is configured with `select = ["ALL"]`. Test files have relaxed rules (no docstrings, no type annotations, magic values allowed) via `per-file-ignores` in `pyproject.toml`.
 - **ty** targets Python 3.11 — every function needs complete parameter and return type annotations.
+- **flake8** runs only `RMP` codes (`select = RMP` in `.flake8`), so it never overlaps Ruff. Suppress an RMP code with `# noqa: <CODE>` (e.g., `# noqa: RMP001`); Ruff rules use `# ruff: ignore[rule-name]`.
 
 
 ## Key Conventions
@@ -60,7 +62,7 @@ async def send_request_async(self, *, payload: str) -> Response: ...
 async def send_request(self, *, payload: str) -> Response: ...
 ```
 
-Dunder methods (`__aenter__`, `__aexit__`) are exempt.
+Dunder methods (`__aenter__`, `__aexit__`) are exempt. Enforced by `RMP001`.
 
 ### Keyword-Only Arguments
 
@@ -157,11 +159,10 @@ Before committing, run pre-commit — it covers everything the automated tooling
 uv run pre-commit run --all-files
 ```
 
-This runs Ruff (linting + formatting) and ty (type checking), which together enforce the copyright header, type annotations, log formatting, import organization, and most other conventions on this page.
+This runs Ruff (linting + formatting), ty (type checking), and flake8 (`RMP` codes), which together enforce the copyright header, type annotations, log formatting, import organization, the `_async` suffix, and most other conventions on this page.
 
 A few rules are **not** caught by tooling and still need a human eye:
 
-- [ ] All async functions end with `_async`
 - [ ] Functions with more than one parameter use keyword-only arguments (`*`)
 - [ ] `Enum` / `StrEnum` is used instead of `Literal` for predefined choices
 - [ ] PyRIT imports are lazy (inside functions), not module-level

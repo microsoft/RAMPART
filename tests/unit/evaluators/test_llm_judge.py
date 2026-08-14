@@ -123,7 +123,7 @@ def _patched_judge(sender: _FakeSender) -> AbstractContextManager[None]:
     )
 
 
-async def _evaluate(
+async def _evaluate_async(
     *,
     responses: list[str | BaseException] | None = None,
     context: EvalContext | None = None,
@@ -172,7 +172,7 @@ class TestConstructorValidation:
 
 class TestOutcomeRoundTrip:
     async def test_detected_round_trips_async(self) -> None:
-        result, _ = await _evaluate(
+        result, _ = await _evaluate_async(
             responses=[
                 _verdict_json(
                     outcome="detected",
@@ -188,13 +188,13 @@ class TestOutcomeRoundTrip:
         assert result.evidence == ["email leaked"]
 
     async def test_not_detected_round_trips_async(self) -> None:
-        result, _ = await _evaluate(
+        result, _ = await _evaluate_async(
             responses=[_verdict_json(outcome="not_detected")],
         )
         assert result.outcome is EvalOutcome.NOT_DETECTED
 
     async def test_undetermined_round_trips_async(self) -> None:
-        result, _ = await _evaluate(
+        result, _ = await _evaluate_async(
             responses=[_verdict_json(outcome="undetermined")],
         )
         assert result.outcome is EvalOutcome.UNDETERMINED
@@ -203,12 +203,12 @@ class TestOutcomeRoundTrip:
 class TestJsonRobustness:
     async def test_markdown_fenced_json_parses_async(self) -> None:
         raw = f"```json\n{_verdict_json()}\n```"
-        result, _ = await _evaluate(responses=[raw])
+        result, _ = await _evaluate_async(responses=[raw])
         assert result.outcome is EvalOutcome.DETECTED
 
     async def test_json_embedded_in_prose_parses_async(self) -> None:
         raw = f"Here is the verdict: {_verdict_json()} (end)"
-        result, _ = await _evaluate(responses=[raw])
+        result, _ = await _evaluate_async(responses=[raw])
         assert result.outcome is EvalOutcome.DETECTED
 
     async def test_malformed_json_exhausts_retries_to_undetermined_async(
@@ -216,7 +216,7 @@ class TestJsonRobustness:
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         monkeypatch.setenv("RETRY_MAX_NUM_ATTEMPTS", "2")
-        result, _ = await _evaluate(responses=["not json at all"])
+        result, _ = await _evaluate_async(responses=["not json at all"])
         assert result.outcome is EvalOutcome.UNDETERMINED
         assert "valid JSON" in result.rationale
         assert result.confidence == pytest.approx(0.0)  # pyright: ignore[reportUnknownMemberType]
@@ -226,7 +226,7 @@ class TestJsonRobustness:
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         monkeypatch.setenv("RETRY_MAX_NUM_ATTEMPTS", "2")
-        result, _ = await _evaluate(
+        result, _ = await _evaluate_async(
             responses=[_verdict_json(outcome="maybe_detected")],
         )
         assert result.outcome is EvalOutcome.UNDETERMINED
@@ -237,7 +237,7 @@ class TestJsonRobustness:
     ) -> None:
         monkeypatch.setenv("RETRY_MAX_NUM_ATTEMPTS", "2")
         raw = json.dumps({"outcome": "detected", "confidence": 0.5, "rationale": "r"})
-        result, _ = await _evaluate(responses=[raw])
+        result, _ = await _evaluate_async(responses=[raw])
         assert result.outcome is EvalOutcome.UNDETERMINED
 
     async def test_evidence_must_be_list_of_strings_async(
@@ -253,17 +253,17 @@ class TestJsonRobustness:
                 "evidence": [1, 2, 3],
             },
         )
-        result, _ = await _evaluate(responses=[raw])
+        result, _ = await _evaluate_async(responses=[raw])
         assert result.outcome is EvalOutcome.UNDETERMINED
 
 
 class TestConfidenceClamping:
     async def test_above_one_clamps_to_one_async(self) -> None:
-        result, _ = await _evaluate(responses=[_verdict_json(confidence=1.7)])
+        result, _ = await _evaluate_async(responses=[_verdict_json(confidence=1.7)])
         assert result.confidence == pytest.approx(1.0)  # pyright: ignore[reportUnknownMemberType]
 
     async def test_below_zero_clamps_to_zero_async(self) -> None:
-        result, _ = await _evaluate(responses=[_verdict_json(confidence=-0.4)])
+        result, _ = await _evaluate_async(responses=[_verdict_json(confidence=-0.4)])
         assert result.confidence == pytest.approx(0.0)  # pyright: ignore[reportUnknownMemberType]
 
     async def test_non_numeric_confidence_degrades_async(
@@ -279,7 +279,7 @@ class TestConfidenceClamping:
                 "evidence": [],
             },
         )
-        result, _ = await _evaluate(responses=[raw])
+        result, _ = await _evaluate_async(responses=[raw])
         assert result.outcome is EvalOutcome.UNDETERMINED
 
     async def test_nan_confidence_degrades_async(
@@ -295,7 +295,7 @@ class TestConfidenceClamping:
             '{"outcome": "detected", "confidence": NaN, '
             '"rationale": "r", "evidence": []}'
         )
-        result, _ = await _evaluate(responses=[raw])
+        result, _ = await _evaluate_async(responses=[raw])
         assert result.outcome is EvalOutcome.UNDETERMINED
 
 
@@ -316,7 +316,7 @@ def _two_turn_ctx() -> EvalContext:
 
 class TestTranscriptScope:
     async def test_full_scope_includes_all_turns_async(self) -> None:
-        _, sender = await _evaluate(
+        _, sender = await _evaluate_async(
             context=_two_turn_ctx(),
             scope=TranscriptScope.FULL,
         )
@@ -327,7 +327,7 @@ class TestTranscriptScope:
         assert "[Turn 1]" in user_message
 
     async def test_current_turn_scope_excludes_earlier_turns_async(self) -> None:
-        _, sender = await _evaluate(
+        _, sender = await _evaluate_async(
             context=_two_turn_ctx(),
             scope=TranscriptScope.CURRENT_TURN,
         )
@@ -336,7 +336,7 @@ class TestTranscriptScope:
         assert "second user prompt" in user_message
 
     async def test_empty_transcript_uses_placeholder_async(self) -> None:
-        _, sender = await _evaluate(context=EvalContext(turns=[]))
+        _, sender = await _evaluate_async(context=EvalContext(turns=[]))
         _, user_message = sender.calls[0]
         assert user_message == "(empty transcript)"
 
@@ -364,7 +364,7 @@ class TestTranscriptRendering:
                 ),
             ),
         )
-        _, sender = await _evaluate(context=ctx)
+        _, sender = await _evaluate_async(context=ctx)
         _, user_message = sender.calls[0]
         assert "User: please help" in user_message
         assert "Agent: here you go" in user_message
@@ -397,7 +397,7 @@ class TestTranscriptRendering:
                 response=Response(text="ok"),
             ),
         )
-        _, sender = await _evaluate(context=ctx)
+        _, sender = await _evaluate_async(context=ctx)
         _, user_message = sender.calls[0]
         assert payload_body not in user_message
         assert "att-123" in user_message
@@ -406,7 +406,7 @@ class TestTranscriptRendering:
 
 class TestSystemPromptAssembly:
     async def test_hardening_suffix_appended_async(self) -> None:
-        _, sender = await _evaluate()
+        _, sender = await _evaluate_async()
         system_prompt, _ = sender.calls[0]
         assert system_prompt.endswith(LLMJudge._HARDENING_SUFFIX)
         assert "SECURITY BOUNDARY" in system_prompt
@@ -416,17 +416,17 @@ class TestSystemPromptAssembly:
             name="security_reviewer",
             system_prompt="You are a senior security engineer.",
         )
-        _, sender = await _evaluate(persona=custom)
+        _, sender = await _evaluate_async(persona=custom)
         system_prompt, _ = sender.calls[0]
         assert "senior security engineer" in system_prompt
 
     async def test_objective_rendered_async(self) -> None:
-        _, sender = await _evaluate(objective="The agent leaked an API key.")
+        _, sender = await _evaluate_async(objective="The agent leaked an API key.")
         system_prompt, _ = sender.calls[0]
         assert "The agent leaked an API key." in system_prompt
 
     async def test_default_persona_neutral_evaluator_in_prompt_async(self) -> None:
-        _, sender = await _evaluate()
+        _, sender = await _evaluate_async()
         system_prompt, _ = sender.calls[0]
         assert (
             NEUTRAL_EVALUATOR.system_prompt.split(".", maxsplit=1)[0] in system_prompt
@@ -438,13 +438,13 @@ class TestSystemPromptAssembly:
             description="A test agent.",
             tools=[ToolDeclaration(name="send_email", description="send mail")],
         )
-        _, sender = await _evaluate(context=_make_ctx(manifest=manifest))
+        _, sender = await _evaluate_async(context=_make_ctx(manifest=manifest))
         system_prompt, _ = sender.calls[0]
         assert "TestAgent" in system_prompt
         assert "send_email" in system_prompt
 
     async def test_schema_declaration_in_system_prompt_async(self) -> None:
-        _, sender = await _evaluate()
+        _, sender = await _evaluate_async()
         system_prompt, _ = sender.calls[0]
         assert "outcome" in system_prompt
         assert "confidence" in system_prompt
@@ -456,14 +456,14 @@ class TestFailureTiers:
     async def test_transient_empty_response_degrades_to_undetermined_async(
         self,
     ) -> None:
-        result, _ = await _evaluate(
+        result, _ = await _evaluate_async(
             responses=[EmptyResponseException(message="empty")],
         )
         assert result.outcome is EvalOutcome.UNDETERMINED
         assert "EmptyResponseException" in result.rationale
 
     async def test_transient_rate_limit_degrades_to_undetermined_async(self) -> None:
-        result, _ = await _evaluate(
+        result, _ = await _evaluate_async(
             responses=[RateLimitException(message="rate")],
         )
         assert result.outcome is EvalOutcome.UNDETERMINED

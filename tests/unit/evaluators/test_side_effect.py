@@ -27,24 +27,24 @@ def _ctx_with_side_effects(*effects: SideEffect) -> EvalContext:
 
 
 class TestSideEffectOccurredDetection:
-    async def test_detects_by_kind(self) -> None:
+    async def test_detects_by_kind_async(self) -> None:
         ctx = _ctx_with_side_effects(SideEffect(kind="http_request"))
         result = await SideEffectOccurred("http_request").evaluate_async(context=ctx)
         assert result.outcome is EvalOutcome.DETECTED
 
-    async def test_not_detected_wrong_kind(self) -> None:
+    async def test_not_detected_wrong_kind_async(self) -> None:
         ctx = _ctx_with_side_effects(SideEffect(kind="file_write"))
         result = await SideEffectOccurred("http_request").evaluate_async(context=ctx)
         assert result.outcome is EvalOutcome.NOT_DETECTED
 
-    async def test_not_detected_no_effects(self) -> None:
+    async def test_not_detected_no_effects_async(self) -> None:
         ctx = _ctx_with_side_effects()
         result = await SideEffectOccurred("http_request").evaluate_async(context=ctx)
         assert result.outcome is EvalOutcome.NOT_DETECTED
 
 
 class TestSideEffectOccurredDetailPredicates:
-    async def test_exact_detail_match(self) -> None:
+    async def test_exact_detail_match_async(self) -> None:
         se = SideEffect(kind="http_request", details={"url": "https://evil.com"})
         ctx = _ctx_with_side_effects(se)
         result = await SideEffectOccurred(
@@ -53,7 +53,7 @@ class TestSideEffectOccurredDetailPredicates:
         ).evaluate_async(context=ctx)
         assert result.outcome is EvalOutcome.DETECTED
 
-    async def test_exact_detail_mismatch(self) -> None:
+    async def test_exact_detail_mismatch_async(self) -> None:
         se = SideEffect(kind="http_request", details={"url": "https://safe.com"})
         ctx = _ctx_with_side_effects(se)
         result = await SideEffectOccurred(
@@ -62,7 +62,7 @@ class TestSideEffectOccurredDetailPredicates:
         ).evaluate_async(context=ctx)
         assert result.outcome is EvalOutcome.NOT_DETECTED
 
-    async def test_predicate_detail_match(self) -> None:
+    async def test_predicate_detail_match_async(self) -> None:
         se = SideEffect(kind="http_request", details={"url": "https://evil.com/data"})
         ctx = _ctx_with_side_effects(se)
         result = await SideEffectOccurred(
@@ -71,7 +71,7 @@ class TestSideEffectOccurredDetailPredicates:
         ).evaluate_async(context=ctx)
         assert result.outcome is EvalOutcome.DETECTED
 
-    async def test_predicate_detail_mismatch(self) -> None:
+    async def test_predicate_detail_mismatch_async(self) -> None:
         se = SideEffect(kind="http_request", details={"url": "https://safe.com"})
         ctx = _ctx_with_side_effects(se)
         result = await SideEffectOccurred(

@@ -100,7 +100,7 @@ class ResultCollectionHandler(ExecutionEventHandler):
     """
 
     @override
-    async def on_event(self, *, event_data: ExecutionEventData) -> None:
+    async def on_event_async(self, *, event_data: ExecutionEventData) -> None:
         """Record result on post-execute. Ignore all other events.
 
         Args:

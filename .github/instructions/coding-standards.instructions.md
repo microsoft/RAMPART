@@ -53,6 +53,7 @@ Use parenthesized multi-line imports when importing 3+ names from the same modul
 - **MANDATORY**: All async functions and methods MUST end with `_async` suffix
 - This applies to ALL async functions without exception
 - **Exception**: Dunder methods (`__aenter__`, `__aexit__`, etc.) follow Python's protocol naming and are exempt
+- Enforced by `RMP001` (see [Automated Enforcement](#automated-enforcement))
 
 ```python
 # CORRECT
@@ -600,6 +601,31 @@ Before committing code, ensure:
 - **MANDATORY**: Never use `sed` (or similar stream-editing CLI tools) to modify source files
 - `sed` frequently corrupts files, applies partial edits, or silently fails
 - Always use the editor's built-in replace/edit tools (e.g., `replace_string_in_file`, `multi_replace_string_in_file`) to make targeted, verifiable changes
+
+---
+
+## Automated Enforcement
+
+| Convention | Code | Enforced by |
+|---|---|---|
+| Async `_async` suffix | `RMP001` | `tools/flake8_rampart.py`, a flake8 local plugin |
+
+### Async naming (`RMP001`)
+
+No ruff rule can require a name suffix, and ruff has no plugin system, so this
+rule is a [flake8 local plugin][flake8-local]. It needs no packaging:
+`.flake8` points flake8 at `tools/`, and `select = RMP` ensures flake8 runs
+*only* this check, leaving every general-purpose rule to ruff.
+
+Suppress with a same-line `# noqa: RMP001` and a short justification. Note the
+syntax: `# ruff: ignore[...]` is this repository's convention for ruff rules,
+while `# noqa:` is reserved for an RMP code (e.g., `RMP001`), which flake8
+rather than ruff reads. `RMP001` is listed in `[tool.ruff.lint] external` so
+that ruff's `RUF102` accepts it instead of rejecting it as an unknown code.
+
+`RMP001` applies repo-wide, including to tests: the test standards require the
+`_async` suffix on async test names too.
+[flake8-local]: https://flake8.pycqa.org/en/latest/user/configuration.html#using-local-plugins
 
 ---
 

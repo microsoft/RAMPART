@@ -51,6 +51,7 @@ rampart = "rampart.pytest_plugin.plugin"
 
 [dependency-groups]
 dev = [
+    "flake8>=7.3.0",
     "hatch-vcs>=0.5.0",
     "hatchling>=1.30.1",
     "pre-commit>=4.5.1",
@@ -89,7 +90,7 @@ show_missing = true
 skip_empty = true
 
 [tool.pytest.ini_options]
-pythonpath = ["scripts"]
+pythonpath = ["scripts", "tools"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "session"
 markers = [
@@ -116,9 +117,16 @@ ignore = [
     "docstring-extraneous-exception", # Allow extraneous exceptions in docstrings to deliberately document the caller-visible contract, even if they propagate from a delegated callee.
 ]
 
+# RMP comes from the flake8 local plugin in tools/. Declaring it here stops
+# RUF102 (invalid-rule-code) from rejecting `# noqa: RMPXXX` as unknown.
+external = ["RMP001"]
+
 [tool.ruff.lint.per-file-ignores]
 "scripts/hatch_build.py" = [
   "implicit-namespace-package", # Top-level build hook
+]
+"tools/flake8_rampart.py" = [
+  "implicit-namespace-package", # flake8 imports it as a top-level module
 ]
 "tests/**" = [
   "any-type",                                          # no type annotations needed
@@ -170,10 +178,10 @@ max-args = 10
 
 [tool.ty.environment]
 python-version = "3.11"
-extra-paths = ["scripts"]
+extra-paths = ["scripts", "tools"]
 
 [tool.ty.src]
-include = ["rampart", "tests", "scripts"]
+include = ["rampart", "tests", "scripts", "tools"]
 
 [tool.uv.sources]
 pyrit = { git = "https://github.com/microsoft/PyRIT", rev = "6dc8b94139757390286bbce7d53c1f7e58e66e29" } # v0.13.0

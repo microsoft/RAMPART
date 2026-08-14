@@ -87,7 +87,7 @@ class TestInjectionHandleProtocol:
             def surface_name(self) -> str:
                 return "SharePoint"
 
-            async def wait_until_ready(self) -> None:
+            async def wait_until_ready_async(self) -> None:
                 pass
 
             async def __aenter__(self) -> Self:
@@ -115,7 +115,7 @@ class TestSurfaceProtocol:
             def surface_name(self) -> str:
                 return "test"
 
-            async def wait_until_ready(self) -> None:
+            async def wait_until_ready_async(self) -> None:
                 pass
 
             async def __aenter__(self) -> Self:

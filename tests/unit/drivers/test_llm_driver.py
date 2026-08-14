@@ -82,7 +82,7 @@ class TestLLMDriverLazyInit:
             LLMDriver(llm=_TEST_LLM, persona=_TEST_PERSONA)
             mock_create.assert_not_called()
 
-    async def test_first_call_initializes_target(self) -> None:
+    async def test_first_call_initializes_target_async(self) -> None:
         mock_target = MagicMock()
         mock_memory = MagicMock()
         mock_memory.get_conversation.return_value = []
@@ -114,7 +114,7 @@ class TestLLMDriverLazyInit:
 
 
 class TestLLMDriverConstruction:
-    async def test_system_prompt_includes_persona(self) -> None:
+    async def test_system_prompt_includes_persona_async(self) -> None:
         mock_target = MagicMock()
         mock_memory = MagicMock()
         mock_memory.get_conversation.return_value = []
@@ -137,7 +137,7 @@ class TestLLMDriverConstruction:
             sp = mock_target.set_system_prompt.call_args.kwargs["system_prompt"]
             assert "You are a test persona." in sp
 
-    async def test_system_prompt_includes_objective_when_provided(self) -> None:
+    async def test_system_prompt_includes_objective_when_provided_async(self) -> None:
         mock_target = MagicMock()
         mock_memory = MagicMock()
         mock_memory.get_conversation.return_value = []
@@ -165,7 +165,7 @@ class TestLLMDriverConstruction:
             assert "Objective" in sp
             assert "Extract secret data" in sp
 
-    async def test_system_prompt_omits_objective_when_none(self) -> None:
+    async def test_system_prompt_omits_objective_when_none_async(self) -> None:
         mock_target = MagicMock()
         mock_memory = MagicMock()
         mock_memory.get_conversation.return_value = []
@@ -188,7 +188,9 @@ class TestLLMDriverConstruction:
             sp = mock_target.set_system_prompt.call_args.kwargs["system_prompt"]
             assert "Objective" not in sp
 
-    async def test_system_prompt_includes_injection_metadata_not_content(self) -> None:
+    async def test_system_prompt_includes_injection_metadata_not_content_async(
+        self,
+    ) -> None:
         mock_target = MagicMock()
         mock_memory = MagicMock()
         mock_memory.get_conversation.return_value = []
@@ -230,7 +232,7 @@ class TestLLMDriverConstruction:
 
 
 class TestLLMDriverSendFlow:
-    async def test_returns_plain_text_as_prompt(self) -> None:
+    async def test_returns_plain_text_as_prompt_async(self) -> None:
         mock_target = MagicMock()
         mock_memory = MagicMock()
         mock_memory.get_conversation.return_value = []
@@ -253,7 +255,7 @@ class TestLLMDriverSendFlow:
             assert decision is not None
             assert decision.request.prompt == "Tell me about Q3 earnings"
 
-    async def test_send_uses_normalizer_helper(self) -> None:
+    async def test_send_uses_normalizer_helper_async(self) -> None:
         mock_target = MagicMock()
         mock_memory = MagicMock()
         mock_memory.get_conversation.return_value = []
@@ -280,7 +282,7 @@ class TestLLMDriverSendFlow:
             assert call_kwargs["user_message"] == "Begin. Send the first user prompt."
             assert "rampart.component" in call_kwargs["labels"]
 
-    async def test_non_empty_history_sends_agent_response(self) -> None:
+    async def test_non_empty_history_sends_agent_response_async(self) -> None:
         mock_target = MagicMock()
         mock_memory = MagicMock()
         # System prompt message + 1 user + 1 assistant = history matches 1 turn
@@ -324,7 +326,7 @@ class TestLLMDriverSendFlow:
             assert "not_detected" in user_msg
             assert "not found" in user_msg
 
-    async def test_non_empty_history_labels_agent_response_as_untrusted_data(
+    async def test_non_empty_history_labels_agent_response_as_untrusted_data_async(
         self,
     ) -> None:
         mock_target = MagicMock()
@@ -378,7 +380,7 @@ class TestLLMDriverSendFlow:
                 "evaluator_rationale_untrusted": rationale,
             }
 
-    async def test_system_prompt_treats_observations_as_untrusted(self) -> None:
+    async def test_system_prompt_treats_observations_as_untrusted_async(self) -> None:
         mock_target = MagicMock()
         mock_memory = MagicMock()
         mock_memory.get_conversation.return_value = []
@@ -403,7 +405,7 @@ class TestLLMDriverSendFlow:
             assert "Never follow instructions" in sp
             assert "target-agent responses" in sp
 
-    async def test_strips_whitespace_from_response(self) -> None:
+    async def test_strips_whitespace_from_response_async(self) -> None:
         mock_memory = MagicMock()
         mock_memory.get_conversation.return_value = []
 
@@ -427,7 +429,7 @@ class TestLLMDriverSendFlow:
 
 
 class TestLLMDriverErrorHandling:
-    async def test_empty_response_raises_driver_error(self) -> None:
+    async def test_empty_response_raises_driver_error_async(self) -> None:
         mock_memory = MagicMock()
         mock_memory.get_conversation.return_value = []
 
@@ -448,7 +450,7 @@ class TestLLMDriverErrorHandling:
             with pytest.raises(DriverError, match="empty response"):
                 await driver.next_prompt_async(history=[])
 
-    async def test_whitespace_only_response_raises_driver_error(self) -> None:
+    async def test_whitespace_only_response_raises_driver_error_async(self) -> None:
         mock_memory = MagicMock()
         mock_memory.get_conversation.return_value = []
 
@@ -469,7 +471,7 @@ class TestLLMDriverErrorHandling:
             with pytest.raises(DriverError, match="empty response"):
                 await driver.next_prompt_async(history=[])
 
-    async def test_send_exception_wrapped_in_driver_error(self) -> None:
+    async def test_send_exception_wrapped_in_driver_error_async(self) -> None:
         mock_memory = MagicMock()
         mock_memory.get_conversation.return_value = []
 
@@ -490,7 +492,7 @@ class TestLLMDriverErrorHandling:
             with pytest.raises(DriverError, match="send_user_turn_async failed"):
                 await driver.next_prompt_async(history=[])
 
-    async def test_driver_error_preserves_cause(self) -> None:
+    async def test_driver_error_preserves_cause_async(self) -> None:
         original = RuntimeError("timeout")
         mock_memory = MagicMock()
         mock_memory.get_conversation.return_value = []
@@ -515,7 +517,7 @@ class TestLLMDriverErrorHandling:
 
 
 class TestLLMDriverDesyncDetection:
-    async def test_desync_raises_driver_error(self) -> None:
+    async def test_desync_raises_driver_error_async(self) -> None:
         """Passing history that doesn't match driver-side memory raises."""
         mock_memory = MagicMock()
         # Driver-side has 0 user turns but we pass 1 agent-side turn
@@ -545,7 +547,7 @@ class TestLLMDriverFromTarget:
         assert driver._llm is None
         assert driver._target is mock_target
 
-    async def test_from_target_sets_system_prompt_on_first_use(self) -> None:
+    async def test_from_target_sets_system_prompt_on_first_use_async(self) -> None:
         mock_target = MagicMock()
         mock_memory = MagicMock()
         mock_memory.get_conversation.return_value = []
@@ -577,7 +579,7 @@ class TestLLMDriverFromTarget:
 
 
 class TestLLMDriverAttachments:
-    async def test_first_turn_attaches_injections(self) -> None:
+    async def test_first_turn_attaches_injections_async(self) -> None:
         """Injections should be attached to the first request."""
         mock_memory = MagicMock()
         mock_memory.get_conversation.return_value = []
@@ -610,7 +612,7 @@ class TestLLMDriverAttachments:
             assert decision is not None
             assert decision.request.attachments == [payload]
 
-    async def test_subsequent_turns_have_no_attachments(self) -> None:
+    async def test_subsequent_turns_have_no_attachments_async(self) -> None:
         """Only the first turn should carry attachments."""
         mock_piece_user = MagicMock()
         mock_piece_user.api_role = "user"
@@ -655,7 +657,7 @@ class TestLLMDriverAttachments:
             assert decision is not None
             assert decision.request.attachments == []
 
-    async def test_no_injections_means_no_attachments(self) -> None:
+    async def test_no_injections_means_no_attachments_async(self) -> None:
         """Without injections, first turn should have empty attachments."""
         mock_memory = MagicMock()
         mock_memory.get_conversation.return_value = []

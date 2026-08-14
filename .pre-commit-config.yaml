@@ -14,3 +14,12 @@ repos:
       language: system
       types: [python]
       pass_filenames: false
+    - id: flake8-rampart
+      name: flake8-rampart
+      entry: uv run flake8
+      language: system
+      # flake8 scans its whole configured scope, so trigger on any Python file
+      # (mirroring the ty hook above) plus the config itself. `types` is omitted
+      # so that .flake8, which is not Python, still triggers the hook.
+      files: (\.py$|^\.flake8$)
+      pass_filenames: false

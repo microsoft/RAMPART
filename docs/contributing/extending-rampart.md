@@ -337,7 +337,7 @@ For the basic protocol skeleton, see [Implementing Surfaces](../usage/authoring-
 
 - **`Surface.inject` does not activate** — it only prepares the handle. Activation happens when an execution strategy enters the handle as an async context manager.
 - **`__aexit__` must be idempotent and must not raise** — cleanup runs even on exceptions, and a failing cleanup must not mask the original error.
-- **`wait_until_ready` should bound itself** with `TimeoutError` rather than block indefinitely. For simple delay-based waits, call `sleep_until_ready` from `rampart.core.injection`.
+- **`wait_until_ready_async` should bound itself** with `TimeoutError` rather than block indefinitely. For simple delay-based waits, call `sleep_until_ready_async` from `rampart.core.injection`.
 - **Raise `InfrastructureError`** for transient, external failures (timeouts, rate limits, service outages). It's the documented convention for surfaces and adapters to signal "not a safety signal" — `BaseExecution` catches all exceptions and produces an `ERROR` result either way, but the exception type is preserved in metadata for triage.
 
 For a complete reference, see [`OneDriveSurface`](https://github.com/microsoft/RAMPART/blob/main/rampart/surfaces/onedrive.py).

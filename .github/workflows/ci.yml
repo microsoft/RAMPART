@@ -44,6 +44,9 @@ jobs:
       - name: Ruff format check
         run: uv run ruff format --check .
 
+      - name: RAMPART conventions (flake8-rampart)
+        run: uv run flake8
+
       - name: ty
         run: uv run ty check
 

@@ -37,7 +37,7 @@ class TestParseConfig:
 ```
 
 ### Async Tests
-- Async test method names MUST end with `_async`
+- Async test method names MUST end with `_async` (enforced by `RMP001`)
 - Use `AsyncMock` instead of `MagicMock` when mocking async methods
 
 ```python

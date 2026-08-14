@@ -17,40 +17,40 @@ def _ctx(text: str) -> EvalContext:
 
 
 class TestResponseContainsSubstring:
-    async def test_case_insensitive_by_default(self) -> None:
+    async def test_case_insensitive_by_default_async(self) -> None:
         result = await ResponseContains("HELLO").evaluate_async(
             context=_ctx("hello world"),
         )
         assert result.outcome is EvalOutcome.DETECTED
 
-    async def test_case_sensitive_opt_in(self) -> None:
+    async def test_case_sensitive_opt_in_async(self) -> None:
         result = await ResponseContains(
             "HELLO",
             case_sensitive=True,
         ).evaluate_async(context=_ctx("hello world"))
         assert result.outcome is EvalOutcome.NOT_DETECTED
 
-    async def test_case_sensitive_match(self) -> None:
+    async def test_case_sensitive_match_async(self) -> None:
         result = await ResponseContains(
             "hello",
             case_sensitive=True,
         ).evaluate_async(context=_ctx("hello world"))
         assert result.outcome is EvalOutcome.DETECTED
 
-    async def test_not_detected(self) -> None:
+    async def test_not_detected_async(self) -> None:
         result = await ResponseContains("evil").evaluate_async(context=_ctx("all good"))
         assert result.outcome is EvalOutcome.NOT_DETECTED
 
 
 class TestResponseContainsRegex:
-    async def test_regex_match(self) -> None:
+    async def test_regex_match_async(self) -> None:
         pattern = re.compile(r"evil@\w+\.com")
         result = await ResponseContains(pattern).evaluate_async(
             context=_ctx("sent to evil@evil.com"),
         )
         assert result.outcome is EvalOutcome.DETECTED
 
-    async def test_regex_no_match(self) -> None:
+    async def test_regex_no_match_async(self) -> None:
         pattern = re.compile(r"evil@\w+\.com")
         result = await ResponseContains(pattern).evaluate_async(
             context=_ctx("all good"),
@@ -59,13 +59,13 @@ class TestResponseContainsRegex:
 
 
 class TestResponseContainsCallable:
-    async def test_callable_match(self) -> None:
+    async def test_callable_match_async(self) -> None:
         result = await ResponseContains(
             lambda text: "secret" in text,
         ).evaluate_async(context=_ctx("the secret is here"))
         assert result.outcome is EvalOutcome.DETECTED
 
-    async def test_callable_no_match(self) -> None:
+    async def test_callable_no_match_async(self) -> None:
         result = await ResponseContains(
             lambda text: "secret" in text,
         ).evaluate_async(context=_ctx("nothing to see"))
@@ -73,7 +73,7 @@ class TestResponseContainsCallable:
 
 
 class TestResponseContainsComposition:
-    async def test_composable_with_not(self) -> None:
+    async def test_composable_with_not_async(self) -> None:
         composed = ~ResponseContains("I cannot help")
         result = await composed.evaluate_async(context=_ctx("Sure, here you go"))
         assert result.outcome is EvalOutcome.DETECTED

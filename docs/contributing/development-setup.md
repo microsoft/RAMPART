@@ -62,7 +62,7 @@ Install the project dependencies using uv:
 uv sync
 ```
 
-`uv sync` installs the project in editable mode and includes the default `dev` group from `pyproject.toml` — ruff, ty, pytest-cov, pytest-xdist, and pre-commit — into a virtual environment managed by uv.
+`uv sync` installs the project in editable mode and includes the default `dev` group from `pyproject.toml` (ruff, ty, flake8, pytest-cov, pytest-xdist, and pre-commit) into a virtual environment managed by uv.
 
 If you also plan to build the documentation locally, include the `docs` group:
 

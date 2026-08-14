@@ -144,7 +144,7 @@ async def send_user_turn_async(
     Returns:
         The model's text response.
     """
-    return await _send_via_normalizer(
+    return await _send_via_normalizer_async(
         normalizer=normalizer,
         target=target,
         conversation_id=conversation_id,
@@ -242,7 +242,7 @@ async def send_judge_request_async(
     prompt_metadata: dict[str, str | int] | None = (
         {"response_format": response_format} if response_format else None
     )
-    return await _send_via_normalizer(
+    return await _send_via_normalizer_async(
         normalizer=normalizer,
         target=target,
         conversation_id=conversation_id,
@@ -253,7 +253,7 @@ async def send_judge_request_async(
     )
 
 
-async def _send_via_normalizer(
+async def _send_via_normalizer_async(
     *,
     normalizer: PromptNormalizer,
     target: PromptChatTarget,
