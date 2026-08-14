@@ -57,7 +57,7 @@ def tag_collected_results(
     Returns:
         list[Result]: Tagged shallow copies in their original order.
     """
-    test_name = node.nodeid.split("::")[-1] if "::" in node.nodeid else node.nodeid
+    test_name = node.name
     harm_marker = node.get_closest_marker("harm")
     harm_category = harm_marker.args[0] if harm_marker and harm_marker.args else None
     tagged: list[Result] = []

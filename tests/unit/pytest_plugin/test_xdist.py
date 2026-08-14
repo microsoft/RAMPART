@@ -1073,19 +1073,25 @@ class TestReportEnvelope:
         ]
         assert truncated is False
 
-    def test_oversized_result_is_localized_and_marks_incomplete(self) -> None:
-        payload = serialize_report_data(
-            config=_make_config(is_worker=True, max_bytes=1024),
-            nodeid="n",
-            results=[
-                _make_result(summary="normal"),
-                _make_result(
-                    summary="x" * 10_000,
-                    harm_category="custom-risk",
-                    metadata={"_pytest_test_name": "test_oversized"},
-                ),
-            ],
-        )
+    def test_oversized_result_is_localized_and_marks_incomplete(
+        self,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        config = _make_config(is_worker=True, max_bytes=1024)
+        config.getoption = MagicMock(wraps=config.getoption)
+        with caplog.at_level(logging.WARNING):
+            payload = serialize_report_data(
+                config=config,
+                nodeid="n",
+                results=[
+                    _make_result(summary="normal"),
+                    _make_result(
+                        summary="x" * 10_000,
+                        harm_category="custom-risk",
+                        metadata={"_pytest_test_name": "test_oversized"},
+                    ),
+                ],
+            )
         report = MagicMock()
         report.nodeid = "n"
         report.worker_id = "gw0"
@@ -1103,6 +1109,11 @@ class TestReportEnvelope:
         assert len(json.dumps(marker).encode("utf-8")) <= MIN_RESULT_SIZE_LIMIT_BYTES
         assert marker["metadata"]["_rampart_limit_bytes"] == MIN_RESULT_SIZE_LIMIT_BYTES
         assert session.is_incomplete is True
+        config.getoption.assert_called_once_with(SIZE_LIMIT_OPTION, default=None)
+        assert (
+            sum("below the minimum" in record.getMessage() for record in caplog.records)
+            == 1
+        )
 
     @pytest.mark.parametrize(
         "escaped",

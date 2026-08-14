@@ -643,7 +643,7 @@ def _bounded_attribution(*, value: str | None, max_bytes: int) -> str | None:
 
 def _serialize_capped_result(
     *,
-    config: pytest.Config,
+    limit_bytes: int,
     result: Result,
     nodeid: str,
 ) -> dict[str, Any]:
@@ -654,7 +654,6 @@ def _serialize_capped_result(
     """
     data = _serialize_result(result=result, nodeid=nodeid)
     size_bytes = _serialized_size(data=data)
-    limit_bytes = _size_limit(config=config)
     try:
         _enforce_result_size(
             size_bytes=size_bytes,
@@ -683,12 +682,13 @@ def serialize_report_data(
     Returns:
         dict[str, Any]: JSON-safe report envelope.
     """
+    limit_bytes = _size_limit(config=config)
     return {
         "schema": SCHEMA_VERSION,
         "nodeid": nodeid,
         "results": [
             _serialize_capped_result(
-                config=config,
+                limit_bytes=limit_bytes,
                 result=result,
                 nodeid=nodeid,
             )

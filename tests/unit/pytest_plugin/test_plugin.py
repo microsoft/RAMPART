@@ -152,6 +152,21 @@ class TestRampartSession:
         assert report.total_runs == 1
         assert report.passed == 1
 
+    def test_absorb_uses_parameterized_item_display_name(self) -> None:
+        session = RampartSession()
+        collector = ResultCollector()
+        collector.record(
+            result=Result(status=SafetyStatus.SAFE, summary="ok"),
+        )
+        node = MagicMock()
+        node.nodeid = "test_file.py::test_absorb[raw-id]"
+        node.name = "test_absorb[display-id]"
+
+        session.absorb(node=node, collector=collector)
+
+        result = session.build_report().results[0]
+        assert result.metadata["_pytest_test_name"] == "test_absorb[display-id]"
+
     def test_has_results_false_when_empty(self) -> None:
         session = RampartSession()
         assert not session.has_results
