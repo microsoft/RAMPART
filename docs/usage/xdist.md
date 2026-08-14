@@ -20,7 +20,7 @@ With `-n 4`, pytest spawns 4 worker processes that execute tests in parallel. RA
 ```
 Worker 1                    Worker 2                    Controller
 ─────────                   ─────────                   ──────────
-call-phase Results           call-phase Results
+eligible Results             eligible Results
     │                           │
 serialize → TestReport      serialize → TestReport
     │                           │
@@ -41,12 +41,14 @@ serialize → TestReport      serialize → TestReport
         Single unified TestRunReport
 ```
 
-- **Workers** attach JSON-safe serialized [`Result`][rampart.core.result.Result] objects to each call-phase `TestReport`. Workers do **not** emit RAMPART report sinks.
+- **Workers** attach JSON-safe serialized [`Result`][rampart.core.result.Result] objects to each call-phase `TestReport`, or to a non-passing setup report when setup recorded Results and no call report will occur. Workers do **not** emit RAMPART report sinks.
 - **Controller** receives each envelope through `pytest_runtest_logreport`, validates and merges it into its [`RampartSession`][rampart.pytest_plugin._session.RampartSession], and emits sinks once at session end.
 - **Worker shutdown** carries only trial specifications and the expected number of streamed Result representations in `config.workeroutput`. The controller reconciles that count in `pytest_testnodedown`; Results are never delivered through both paths.
 
-The call phase is the intentional transport boundary. Results recorded during
-fixture teardown are not streamed.
+The normal transport boundary is the call phase, which includes Results recorded
+during successful fixture setup. A failed or skipped setup that recorded Results
+uses its setup report as a fallback because no call report follows. Results
+recorded during fixture teardown are not streamed.
 
 The result: **one** `JsonFileReportSink` output file, **one** call to `MyCustomSink.emit_async`, and accurate population statistics over the full result set.
 
@@ -243,7 +245,7 @@ report.metadata["dist_mode"]      # "load", "loadgroup", etc.
 
 ## Durability behavior
 
-Each call-phase report is merged as it reaches the controller. If a worker is
+Each eligible report is merged as it reaches the controller. If a worker is
 killed mid-run, every Result already delivered remains in the final report and
 the run is marked incomplete because the worker cannot provide a final expected
 count. A clean worker shutdown publishes its emitted Result count; any mismatch
@@ -260,9 +262,9 @@ does not discard normal Results from that worker.
 - Sinks discovered through the **fixture fallback** on the controller cannot depend
   on other pytest fixtures — use the `pytest_rampart_sinks` hook instead (see
   [Registering Sinks](#registering-sinks-the-pytest_rampart_sinks-hook)).
-- Results recorded only during fixture teardown are outside the call-phase
-  streaming boundary and are not included.
-- A worker that dies can lose Results whose call-phase reports had not reached
+- Results recorded only during fixture teardown are outside the report-streaming
+  boundary and are not included.
+- A worker that dies can lose Results whose eligible reports had not reached
   the controller; already-streamed Results are retained and the run is marked
   incomplete (see [Durability behavior](#durability-behavior)).
 - Mixed RAMPART versions across controller and workers are unsupported; install the

@@ -1014,6 +1014,7 @@ def _make_reporting_item(*, worker: bool = True) -> Any:
     item = MagicMock()
     item.stash = pytest.Stash()
     item.nodeid = "test_plugin.py::test_stream"
+    item.name = "test_stream"
     item.get_closest_marker.return_value = None
     config_kwargs = {
         "stash": pytest.Stash(),
@@ -1030,7 +1031,13 @@ def _make_reporting_item(*, worker: bool = True) -> Any:
     return item
 
 
-def _drive_makereport(*, item: Any, when: str, report: Any = None) -> Any:
+def _drive_makereport(
+    *,
+    item: Any,
+    when: str,
+    outcome: str = "passed",
+    report: Any = None,
+) -> Any:
     """Drive the makereport wrapper generator and return its result."""
     call = MagicMock()
     call.when = when
@@ -1039,7 +1046,10 @@ def _drive_makereport(*, item: Any, when: str, report: Any = None) -> Any:
         (
             report
             if report is not None
-            else SimpleNamespace(nodeid="test_plugin.py::test_stream")
+            else SimpleNamespace(
+                nodeid="test_plugin.py::test_stream",
+                passed=outcome == "passed",
+            )
         ),
     )
     gen = pytest_runtest_makereport(
@@ -1084,17 +1094,39 @@ class TestPytestRuntestMakereport:
         assert item.stash[_call_results_key] == []
         assert item.config.stash[_streamed_result_count_key] == 0
 
-    def test_no_snapshot_at_setup_phase(self) -> None:
+    @pytest.mark.parametrize("outcome", ["failed", "skipped"])
+    def test_nonpassing_setup_streams_collected_results(self, outcome: str) -> None:
         item = _make_reporting_item()
         collector = ResultCollector()
-        collector.record(result=_make_result())
+        collector.record(result=_make_result(summary=outcome))
         token = activate_collector(collector)
         try:
-            _drive_makereport(item=item, when="setup")
+            report = _drive_makereport(item=item, when="setup", outcome=outcome)
         finally:
             deactivate_collector(token)
 
-        assert _call_results_key not in item.stash
+        envelope = getattr(report, REPORT_RESULTS_ATTR)
+        assert envelope["results"][0]["summary"] == outcome
+        assert item.config.stash[_streamed_result_count_key] == 1
+
+    def test_successful_setup_defers_results_to_call(self) -> None:
+        item = _make_reporting_item()
+        collector = ResultCollector()
+        collector.record(result=_make_result(summary="setup"))
+        token = activate_collector(collector)
+        try:
+            setup_report = _drive_makereport(item=item, when="setup")
+            collector.record(result=_make_result(summary="call"))
+            call_report = _drive_makereport(item=item, when="call")
+        finally:
+            deactivate_collector(token)
+
+        assert not hasattr(setup_report, REPORT_RESULTS_ATTR)
+        assert [
+            result["summary"]
+            for result in getattr(call_report, REPORT_RESULTS_ATTR)["results"]
+        ] == ["setup", "call"]
+        assert item.config.stash[_streamed_result_count_key] == 2
 
     def test_no_transport_at_teardown_phase(self) -> None:
         item = _make_reporting_item()

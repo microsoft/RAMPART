@@ -17,8 +17,9 @@ RAMPART's pytest integration. Activates automatically when installed.
 
 ## Parallel Execution Hooks
 
-When `pytest-xdist` is installed, the plugin streams call-phase Result envelopes
-through `pytest_runtest_logreport` and uses the optional `pytest_testnodedown`
+When `pytest-xdist` is installed, the plugin streams Result envelopes on call
+reports, with a non-passing setup fallback when no call report will occur,
+through `pytest_runtest_logreport`. It uses the optional `pytest_testnodedown`
 hook to reconcile per-worker Result counts. See
 [Parallel Execution](../usage/xdist.md) for the data flow and trust boundary.
 

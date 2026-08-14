@@ -213,6 +213,114 @@ class TestStreamedResultTransport:
         assert reports[0]["total_runs"] == 1
         assert _report_results(reports[0])[0]["summary"] == "async"
 
+    def test_setup_failure_streams_result(
+        self,
+        configured_pytester: Pytester,
+    ) -> None:
+        configured_pytester.makepyfile(
+            test_setup_failure="""
+            import pytest
+            from rampart import record_result
+            from rampart.core.result import Result, SafetyStatus
+
+            @pytest.fixture
+            def failing_setup():
+                record_result(Result(
+                    status=SafetyStatus.ERROR,
+                    summary="setup-failed",
+                ))
+                raise RuntimeError("setup failed")
+
+            @pytest.mark.harm("setup")
+            def test_setup_failure(failing_setup):
+                pass
+            """,
+        )
+        result = configured_pytester.runpytest(
+            "-p",
+            "no:cacheprovider",
+            "-n",
+            "1",
+        )
+        result.assert_outcomes(errors=1)
+        reports = _load_reports(configured_pytester)
+        assert [item["summary"] for item in _report_results(reports[0])] == [
+            "setup-failed",
+        ]
+
+    def test_setup_skip_streams_result(
+        self,
+        configured_pytester: Pytester,
+    ) -> None:
+        configured_pytester.makepyfile(
+            test_setup_skip="""
+            import pytest
+            from rampart import record_result
+            from rampart.core.result import Result, SafetyStatus
+
+            @pytest.fixture
+            def skipped_setup():
+                record_result(Result(
+                    status=SafetyStatus.UNDETERMINED,
+                    summary="setup-skipped",
+                ))
+                pytest.skip("setup skipped")
+
+            @pytest.mark.harm("setup")
+            def test_setup_skip(skipped_setup):
+                pass
+            """,
+        )
+        result = configured_pytester.runpytest(
+            "-p",
+            "no:cacheprovider",
+            "-n",
+            "1",
+        )
+        result.assert_outcomes(skipped=1)
+        reports = _load_reports(configured_pytester)
+        assert [item["summary"] for item in _report_results(reports[0])] == [
+            "setup-skipped",
+        ]
+
+    def test_successful_setup_and_call_stream_once(
+        self,
+        configured_pytester: Pytester,
+    ) -> None:
+        configured_pytester.makepyfile(
+            test_setup_success="""
+            import pytest
+            from rampart import record_result
+            from rampart.core.result import Result, SafetyStatus
+
+            @pytest.fixture
+            def recorded_setup():
+                record_result(Result(
+                    status=SafetyStatus.SAFE,
+                    summary="setup",
+                ))
+
+            @pytest.mark.harm("setup")
+            def test_setup_success(recorded_setup):
+                record_result(Result(
+                    status=SafetyStatus.SAFE,
+                    summary="call",
+                ))
+            """,
+        )
+        result = configured_pytester.runpytest(
+            "-p",
+            "no:cacheprovider",
+            "-n",
+            "1",
+        )
+        result.assert_outcomes(passed=1)
+        reports = _load_reports(configured_pytester)
+        assert [item["summary"] for item in _report_results(reports[0])] == [
+            "setup",
+            "call",
+        ]
+
     def test_teardown_only_result_is_intentionally_not_streamed(
         self,
         configured_pytester: Pytester,

@@ -471,13 +471,12 @@ def pytest_runtest_makereport(
     item: pytest.Item,
     call: pytest.CallInfo[None],
 ) -> Generator[None, pytest.TestReport, pytest.TestReport]:
-    """Snapshot the active collector's results at the call phase.
+    """Snapshot the active collector's results for xdist transport.
 
-    On xdist workers, copies the per-test results onto the item stash
-    while the collector is still active — before the autouse fixture's
-    teardown drains and deactivates it. Downstream xdist streaming reads
-    this snapshot to deliver results per test rather than in a single
-    end-of-worker batch.
+    On xdist workers, the call report carries all Results recorded through
+    successful setup and call. If setup fails or skips after recording Results,
+    its report carries the snapshot because pytest will not produce a call report.
+    Teardown-only Results remain outside the transport boundary.
 
     Restricted to worker processes: single-process and controller runs
     never consume the snapshot, so skipping it there keeps those paths
@@ -495,23 +494,26 @@ def pytest_runtest_makereport(
             unchanged report produced by downstream hookimpls.
     """
     report = yield
-    if call.when == "call" and is_xdist_worker(config=item.config):
-        collector = get_active_collector()
-        if collector is not None:
-            item.stash[_call_results_key] = collector.results
-            results = tag_collected_results(
-                node=item,
-                results=item.stash[_call_results_key],
-            )
-            emitted_count = attach_report_results(
-                config=item.config,
-                report=report,
-                results=results,
-            )
-            current_count = item.config.stash.get(_streamed_result_count_key, 0)
-            item.config.stash[_streamed_result_count_key] = (
-                current_count + emitted_count
-            )
+    if call.when not in {"setup", "call"} or not is_xdist_worker(config=item.config):
+        return report
+    collector = get_active_collector()
+    if collector is None:
+        return report
+    snapshot = collector.results
+    if call.when == "setup" and (report.passed or not snapshot):
+        return report
+    item.stash[_call_results_key] = snapshot
+    results = tag_collected_results(
+        node=item,
+        results=item.stash[_call_results_key],
+    )
+    emitted_count = attach_report_results(
+        config=item.config,
+        report=report,
+        results=results,
+    )
+    current_count = item.config.stash.get(_streamed_result_count_key, 0)
+    item.config.stash[_streamed_result_count_key] = current_count + emitted_count
     return report
 
 
