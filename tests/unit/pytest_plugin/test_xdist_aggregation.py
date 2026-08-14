@@ -197,7 +197,7 @@ class TestStreamedResultTransport:
 
             @pytest.mark.asyncio
             @pytest.mark.harm("async")
-            async def test_async_stream():
+            async def test_async_stream_async():
                 await asyncio.gather(asyncio.sleep(0), asyncio.sleep(0))
                 record_result(Result(status=SafetyStatus.SAFE, summary="async"))
             """,
