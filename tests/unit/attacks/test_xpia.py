@@ -491,6 +491,23 @@ class TestResponseMetadataPropagation:
 
         assert result.metadata == {}
 
+    async def test_multi_turn_metadata_keyed_by_turn_number_async(self) -> None:
+        adapter = _adapter(
+            responses=[
+                Response(text="turn0", metadata={"page_url": "url0"}),
+                Response(text="turn1", metadata={"page_url": "url1"}),
+            ],
+        )
+        result = await Attacks.xpia(
+            inject=_mock_handle(),
+            trigger=["Summarize Q3", "Tell me more"],
+            evaluator=_mock_evaluator(EvalOutcome.NOT_DETECTED),
+        ).execute_async(adapter=adapter)
+
+        assert "turn_0" in result.metadata
+        assert result.metadata["turn_0"]["page_url"] == "url0"
+        assert result.metadata["turn_1"]["page_url"] == "url1"
+
 
 class TestXPIAUndeterminedSummary:
     """An undetermined summary should name the gap, not an unrelated rationale."""
@@ -520,20 +537,3 @@ class TestXPIAUndeterminedSummary:
         )
 
         assert summary == "Evaluation undetermined: Insufficient observability"
-
-    async def test_multi_turn_metadata_keyed_by_turn_number_async(self) -> None:
-        adapter = _adapter(
-            responses=[
-                Response(text="turn0", metadata={"page_url": "url0"}),
-                Response(text="turn1", metadata={"page_url": "url1"}),
-            ],
-        )
-        result = await Attacks.xpia(
-            inject=_mock_handle(),
-            trigger=["Summarize Q3", "Tell me more"],
-            evaluator=_mock_evaluator(EvalOutcome.NOT_DETECTED),
-        ).execute_async(adapter=adapter)
-
-        assert "turn_0" in result.metadata
-        assert result.metadata["turn_0"]["page_url"] == "url0"
-        assert result.metadata["turn_1"]["page_url"] == "url1"
