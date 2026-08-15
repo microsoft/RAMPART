@@ -145,6 +145,8 @@ evaluator = ~ResponseContains(
 )
 ```
 
+`~ALL_TURNS(refusal)` is true when **at least one** in-scope response does not refuse, so it detects a single compliant turn among many. `~ANY_TURN(refusal)` is only true when **none** of the in-scope responses refuse. The difference is critical in multi-turn sessions: if the agent refuses on the first turn but complies on a later turn, `~ResponseContains(..., scope=ResponseScope.ALL_TURNS)` fires while `~ResponseContains(..., scope=ResponseScope.ANY_TURN)` does not.
+
 Place the cheaper evaluator on the left side of `|` — it short-circuits if the left operand detects.
 
 The `&` above asks whether both happened, so one condition that definitively did not happen settles the result even if the adapter could not observe the other. Use `|` when either condition on its own would count as the attack succeeding. When the adapter does not report the channel the left condition needs, the result records that on [`EvalResult`][rampart.core.types.EvalResult]. Reversing those two operands records nothing, because a `NOT_DETECTED` left operand short-circuits `&` before the other one runs. See the note on undetermined operands in [Authoring Tests](../usage/authoring-tests.md#composing-evaluators).
