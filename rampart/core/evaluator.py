@@ -153,7 +153,8 @@ class _AllEvaluator(BaseEvaluator):
         Returns:
             EvalResult: NOT_DETECTED if either operand is NOT_DETECTED,
                 UNDETERMINED if either operand is UNDETERMINED, otherwise
-                DETECTED with the evidence of both operands.
+                DETECTED. An outcome reached after both operands ran carries
+                the evidence of both.
         """
         left_result = await self._left.evaluate_async(context=context)
 
@@ -171,15 +172,20 @@ class _AllEvaluator(BaseEvaluator):
                 rationale=f"Right operand not detected: {right_result.rationale}",
             )
 
+        # Both operands ran, so carry the evidence they produced even though the
+        # conjunction cannot be settled. Dropping it would discard, for example,
+        # a judge detection that is real but unconfirmable on its own.
         if left_result.outcome == EvalOutcome.UNDETERMINED:
             return EvalResult(
                 outcome=EvalOutcome.UNDETERMINED,
+                evidence=left_result.evidence + right_result.evidence,
                 rationale=f"Left operand undetermined: {left_result.rationale}",
             )
 
         if right_result.outcome == EvalOutcome.UNDETERMINED:
             return EvalResult(
                 outcome=EvalOutcome.UNDETERMINED,
+                evidence=left_result.evidence + right_result.evidence,
                 rationale=f"Right operand undetermined: {right_result.rationale}",
             )
 

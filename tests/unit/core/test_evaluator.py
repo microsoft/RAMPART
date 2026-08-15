@@ -141,6 +141,16 @@ class TestAndComposition:
 
         assert result.outcome is EvalOutcome.UNDETERMINED
 
+    async def test_undetermined_keeps_evidence_from_both_operands_async(self) -> None:
+        left = _StubEvaluator(outcome=EvalOutcome.UNDETERMINED)
+        right = _StubEvaluator(outcome=EvalOutcome.DETECTED)
+        composed = left & right
+
+        result = await composed.evaluate_async(context=_ctx())
+
+        assert result.outcome is EvalOutcome.UNDETERMINED
+        assert result.evidence == ["stub:undetermined", "stub:detected"]
+
     async def test_both_detected_async(self) -> None:
         left = _StubEvaluator(outcome=EvalOutcome.DETECTED, rationale="L")
         right = _StubEvaluator(outcome=EvalOutcome.DETECTED, rationale="R")
@@ -280,7 +290,7 @@ class TestOperandOrderIndependence:
                     f"{left} | {right}"
                 )
 
-    async def test_de_morgan_holds_async(self) -> None:
+    async def test_de_morgan_negated_and_async(self) -> None:
         for left in _OUTCOMES:
             for right in _OUTCOMES:
                 negated_and = ~(
@@ -296,6 +306,59 @@ class TestOperandOrderIndependence:
                 assert negated_result.outcome is or_result.outcome, (
                     f"NOT ({left} & {right})"
                 )
+
+    async def test_de_morgan_negated_or_async(self) -> None:
+        for left in _OUTCOMES:
+            for right in _OUTCOMES:
+                negated_or = ~(
+                    _StubEvaluator(outcome=left) | _StubEvaluator(outcome=right)
+                )
+                and_of_negations = ~_StubEvaluator(outcome=left) & ~_StubEvaluator(
+                    outcome=right,
+                )
+
+                negated_result = await negated_or.evaluate_async(context=_ctx())
+                and_result = await and_of_negations.evaluate_async(context=_ctx())
+
+                assert negated_result.outcome is and_result.outcome, (
+                    f"NOT ({left} | {right})"
+                )
+
+    async def test_and_is_associative_async(self) -> None:
+        for first in _OUTCOMES:
+            for second in _OUTCOMES:
+                for third in _OUTCOMES:
+                    left_grouped = (
+                        _StubEvaluator(outcome=first) & _StubEvaluator(outcome=second)
+                    ) & _StubEvaluator(outcome=third)
+                    right_grouped = _StubEvaluator(outcome=first) & (
+                        _StubEvaluator(outcome=second) & _StubEvaluator(outcome=third)
+                    )
+
+                    left_result = await left_grouped.evaluate_async(context=_ctx())
+                    right_result = await right_grouped.evaluate_async(context=_ctx())
+
+                    assert left_result.outcome is right_result.outcome, (
+                        f"{first} & {second} & {third}"
+                    )
+
+    async def test_or_is_associative_async(self) -> None:
+        for first in _OUTCOMES:
+            for second in _OUTCOMES:
+                for third in _OUTCOMES:
+                    left_grouped = (
+                        _StubEvaluator(outcome=first) | _StubEvaluator(outcome=second)
+                    ) | _StubEvaluator(outcome=third)
+                    right_grouped = _StubEvaluator(outcome=first) | (
+                        _StubEvaluator(outcome=second) | _StubEvaluator(outcome=third)
+                    )
+
+                    left_result = await left_grouped.evaluate_async(context=_ctx())
+                    right_result = await right_grouped.evaluate_async(context=_ctx())
+
+                    assert left_result.outcome is right_result.outcome, (
+                        f"{first} | {second} | {third}"
+                    )
 
 
 class TestCompositionChaining:
