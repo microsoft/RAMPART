@@ -106,7 +106,7 @@ class TestResponseContainsComposition:
 
 
 class TestResponseScopeAnyTurn:
-    async def test_earlier_match_then_benign_final_response(self) -> None:
+    async def test_earlier_match_then_benign_final_response_async(self) -> None:
         result = await ResponseContains(
             "id_rsa",
             scope=ResponseScope.ANY_TURN,
@@ -116,7 +116,7 @@ class TestResponseScopeAnyTurn:
         assert result.evidence == ["Pattern found on turn(s): 0"]
         assert result.rationale == "At least one response contains the target pattern"
 
-    async def test_no_turn_matches(self) -> None:
+    async def test_no_turn_matches_async(self) -> None:
         result = await ResponseContains(
             "id_rsa",
             scope=ResponseScope.ANY_TURN,
@@ -124,7 +124,7 @@ class TestResponseScopeAnyTurn:
 
         assert result.outcome is EvalOutcome.NOT_DETECTED
 
-    async def test_regex_target(self) -> None:
+    async def test_regex_target_async(self) -> None:
         result = await ResponseContains(
             re.compile(r"evil@\w+\.com"),
             scope=ResponseScope.ANY_TURN,
@@ -132,7 +132,7 @@ class TestResponseScopeAnyTurn:
 
         assert result.outcome is EvalOutcome.DETECTED
 
-    async def test_case_sensitive_target(self) -> None:
+    async def test_case_sensitive_target_async(self) -> None:
         result = await ResponseContains(
             "SECRET",
             case_sensitive=True,
@@ -143,7 +143,7 @@ class TestResponseScopeAnyTurn:
 
 
 class TestResponseScopeAllTurns:
-    async def test_every_turn_matches(self) -> None:
+    async def test_every_turn_matches_async(self) -> None:
         result = await ResponseContains(
             "Paris",
             scope=ResponseScope.ALL_TURNS,
@@ -151,7 +151,7 @@ class TestResponseScopeAllTurns:
 
         assert result.outcome is EvalOutcome.DETECTED
 
-    async def test_one_turn_missing(self) -> None:
+    async def test_one_turn_missing_async(self) -> None:
         result = await ResponseContains(
             "Paris",
             scope=ResponseScope.ALL_TURNS,
@@ -161,7 +161,7 @@ class TestResponseScopeAllTurns:
         assert result.evidence == ["Pattern missing on turn(s): 1"]
         assert result.rationale == "Not every response contains the target pattern"
 
-    async def test_callable_target(self) -> None:
+    async def test_callable_target_async(self) -> None:
         result = await ResponseContains(
             lambda text: "secret" in text,
             scope=ResponseScope.ALL_TURNS,
@@ -171,7 +171,7 @@ class TestResponseScopeAllTurns:
 
 
 class TestResponseScopeCurrentTurn:
-    async def test_ignores_earlier_turns(self) -> None:
+    async def test_ignores_earlier_turns_async(self) -> None:
         result = await ResponseContains(
             "id_rsa",
             scope=ResponseScope.CURRENT_TURN,
@@ -179,7 +179,7 @@ class TestResponseScopeCurrentTurn:
 
         assert result.outcome is EvalOutcome.NOT_DETECTED
 
-    async def test_matches_final_turn(self) -> None:
+    async def test_matches_final_turn_async(self) -> None:
         result = await ResponseContains(
             "id_rsa",
             scope=ResponseScope.CURRENT_TURN,
@@ -189,7 +189,7 @@ class TestResponseScopeCurrentTurn:
 
 
 class TestResponseScopeMigrationWarning:
-    async def test_unspecified_scope_warns_on_multi_turn(self) -> None:
+    async def test_unspecified_scope_warns_on_multi_turn_async(self) -> None:
         with pytest.warns(FutureWarning, match="ResponseScope") as warning_record:
             result = await ResponseContains("id_rsa").evaluate_async(
                 context=_multi_ctx("here is id_rsa", "Anything else?"),
@@ -198,7 +198,7 @@ class TestResponseScopeMigrationWarning:
         assert len(warning_record) == 1
         assert result.outcome is EvalOutcome.NOT_DETECTED
 
-    async def test_unspecified_scope_single_turn_does_not_warn(self) -> None:
+    async def test_unspecified_scope_single_turn_does_not_warn_async(self) -> None:
         with warnings.catch_warnings():
             warnings.simplefilter("error", FutureWarning)
             result = await ResponseContains("hello").evaluate_async(
@@ -208,7 +208,9 @@ class TestResponseScopeMigrationWarning:
         assert result.outcome is EvalOutcome.DETECTED
 
     @pytest.mark.parametrize("scope", list(ResponseScope))
-    async def test_explicit_scope_does_not_warn(self, scope: ResponseScope) -> None:
+    async def test_explicit_scope_does_not_warn_async(
+        self, scope: ResponseScope
+    ) -> None:
         with warnings.catch_warnings():
             warnings.simplefilter("error", FutureWarning)
             await ResponseContains("id_rsa", scope=scope).evaluate_async(
@@ -217,7 +219,7 @@ class TestResponseScopeMigrationWarning:
 
 
 class TestResponseScopeNegation:
-    async def test_not_all_turns_detects_single_failure_to_refuse(self) -> None:
+    async def test_not_all_turns_detects_single_failure_to_refuse_async(self) -> None:
         composed = ~ResponseContains(
             "I cannot help",
             scope=ResponseScope.ALL_TURNS,
@@ -228,7 +230,7 @@ class TestResponseScopeNegation:
 
         assert result.outcome is EvalOutcome.DETECTED
 
-    async def test_not_all_turns_stays_not_detected_when_every_turn_refuses(
+    async def test_not_all_turns_stays_not_detected_when_every_turn_refuses_async(
         self,
     ) -> None:
         composed = ~ResponseContains(
@@ -241,7 +243,7 @@ class TestResponseScopeNegation:
 
         assert result.outcome is EvalOutcome.NOT_DETECTED
 
-    async def test_not_any_turn_detects_clean_transcript(self) -> None:
+    async def test_not_any_turn_detects_clean_transcript_async(self) -> None:
         composed = ~ResponseContains("id_rsa", scope=ResponseScope.ANY_TURN)
         result = await composed.evaluate_async(
             context=_multi_ctx("all good", "fine"),
@@ -249,7 +251,7 @@ class TestResponseScopeNegation:
 
         assert result.outcome is EvalOutcome.DETECTED
 
-    async def test_not_any_turn_stays_not_detected_when_one_turn_matches(
+    async def test_not_any_turn_stays_not_detected_when_one_turn_matches_async(
         self,
     ) -> None:
         composed = ~ResponseContains("id_rsa", scope=ResponseScope.ANY_TURN)
@@ -261,7 +263,7 @@ class TestResponseScopeNegation:
 
 
 @pytest.mark.parametrize("scope", [None, *ResponseScope])
-async def test_empty_context_raises(scope: ResponseScope | None) -> None:
+async def test_empty_context_raises_async(scope: ResponseScope | None) -> None:
     """Every response scope rejects a trace that never exercised the agent."""
     evaluator = ResponseContains("anything", scope=scope)
 
