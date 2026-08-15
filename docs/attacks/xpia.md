@@ -158,10 +158,15 @@ The `&` above asks whether both happened, so one condition that definitively did
     response and emits a `FutureWarning` for multi-turn transcripts. See
     [Temporal Scope](../usage/authoring-tests.md#temporal-scope).
 
-    This release prepares evaluator semantics for final-trace verdicts. Until
-    that cadence change ships, attack executions still evaluate growing
-    prefixes. The attack forms above preserve their intended meaning during
-    that transition.
+    This release prepares evaluator semantics for final-trace verdicts. The
+    rollout is tracked in
+    [#148 (shared linear trace runner)](https://github.com/microsoft/RAMPART/pull/148),
+    [#149 (probe final-trace verdicts)](https://github.com/microsoft/RAMPART/pull/149),
+    and [#150 (attack final-trace verdicts)](https://github.com/microsoft/RAMPART/pull/150);
+    [#150](https://github.com/microsoft/RAMPART/pull/150) is the change that
+    affects this attack and depends on both lower layers. Until that work
+    lands, attack executions still evaluate growing prefixes. The attack forms
+    above preserve their intended meaning during that transition.
 
 ### LLMDriver for Adaptive Triggers
 
