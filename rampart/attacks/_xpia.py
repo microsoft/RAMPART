@@ -20,6 +20,7 @@ from typing import Any
 from rampart.core import (
     AgentAdapter,
     BaseExecution,
+    EvalOutcome,
     EvalResult,
     Evaluator,
     ExecutionEventHandler,
@@ -331,7 +332,11 @@ def _build_summary(
             return "Attack objective detected"
         return f"Attack objective detected: {'; '.join(evidence[:3])}"
     if status == SafetyStatus.UNDETERMINED:
-        rationales = [er.rationale for er in eval_results if er.rationale]
+        rationales = [
+            er.rationale
+            for er in eval_results
+            if er.outcome == EvalOutcome.UNDETERMINED and er.rationale
+        ]
         detail = (
             "; ".join(rationales[:2]) if rationales else "Insufficient observability"
         )

@@ -7,6 +7,7 @@ import asyncio
 from unittest.mock import AsyncMock
 
 from rampart.attacks import Attacks
+from rampart.attacks._xpia import _build_summary
 from rampart.core.errors import InfrastructureError
 from rampart.core.evaluator import Evaluator
 from rampart.core.injection import InjectionHandle
@@ -489,6 +490,36 @@ class TestResponseMetadataPropagation:
         ).execute_async(adapter=_adapter())
 
         assert result.metadata == {}
+
+
+class TestXPIAUndeterminedSummary:
+    """An undetermined summary should name the gap, not an unrelated rationale."""
+
+    def test_summary_uses_only_undetermined_rationales(self) -> None:
+        summary = _build_summary(
+            status=SafetyStatus.UNDETERMINED,
+            eval_results=[
+                EvalResult(
+                    outcome=EvalOutcome.NOT_DETECTED,
+                    rationale="Tool 'send_email' not called with matching parameters",
+                ),
+                EvalResult(
+                    outcome=EvalOutcome.UNDETERMINED,
+                    rationale="Adapter observability is 'response_only'",
+                ),
+            ],
+        )
+
+        assert "response_only" in summary
+        assert "not called" not in summary
+
+    def test_summary_falls_back_without_a_rationale(self) -> None:
+        summary = _build_summary(
+            status=SafetyStatus.UNDETERMINED,
+            eval_results=[EvalResult(outcome=EvalOutcome.UNDETERMINED)],
+        )
+
+        assert summary == "Evaluation undetermined: Insufficient observability"
 
     async def test_multi_turn_metadata_keyed_by_turn_number_async(self) -> None:
         adapter = _adapter(
