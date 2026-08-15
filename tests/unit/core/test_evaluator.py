@@ -123,7 +123,7 @@ class TestAndComposition:
         assert result.outcome is EvalOutcome.UNDETERMINED
         assert right.call_count == 1
 
-    async def test_left_undetermined_right_not_detected(self) -> None:
+    async def test_left_undetermined_right_not_detected_async(self) -> None:
         left = _StubEvaluator(outcome=EvalOutcome.UNDETERMINED)
         right = _StubEvaluator(outcome=EvalOutcome.NOT_DETECTED)
         composed = left & right
@@ -132,7 +132,7 @@ class TestAndComposition:
 
         assert result.outcome is EvalOutcome.NOT_DETECTED
 
-    async def test_both_undetermined(self) -> None:
+    async def test_both_undetermined_async(self) -> None:
         left = _StubEvaluator(outcome=EvalOutcome.UNDETERMINED)
         right = _StubEvaluator(outcome=EvalOutcome.UNDETERMINED)
         composed = left & right
@@ -208,7 +208,7 @@ class TestNotComposition:
 class TestOperandOrderIndependence:
     """Outcomes must not depend on which side an operand is written on."""
 
-    async def test_and_outcome_table(self) -> None:
+    async def test_and_outcome_table_async(self) -> None:
         detected = EvalOutcome.DETECTED
         not_detected = EvalOutcome.NOT_DETECTED
         undetermined = EvalOutcome.UNDETERMINED
@@ -231,7 +231,7 @@ class TestOperandOrderIndependence:
 
             assert result.outcome is outcome, f"{left} & {right}"
 
-    async def test_or_outcome_table(self) -> None:
+    async def test_or_outcome_table_async(self) -> None:
         detected = EvalOutcome.DETECTED
         not_detected = EvalOutcome.NOT_DETECTED
         undetermined = EvalOutcome.UNDETERMINED
@@ -254,7 +254,7 @@ class TestOperandOrderIndependence:
 
             assert result.outcome is outcome, f"{left} | {right}"
 
-    async def test_and_is_commutative(self) -> None:
+    async def test_and_is_commutative_async(self) -> None:
         for left in _OUTCOMES:
             for right in _OUTCOMES:
                 forward = _StubEvaluator(outcome=left) & _StubEvaluator(outcome=right)
@@ -267,7 +267,7 @@ class TestOperandOrderIndependence:
                     f"{left} & {right}"
                 )
 
-    async def test_or_is_commutative(self) -> None:
+    async def test_or_is_commutative_async(self) -> None:
         for left in _OUTCOMES:
             for right in _OUTCOMES:
                 forward = _StubEvaluator(outcome=left) | _StubEvaluator(outcome=right)
@@ -280,7 +280,7 @@ class TestOperandOrderIndependence:
                     f"{left} | {right}"
                 )
 
-    async def test_de_morgan_holds(self) -> None:
+    async def test_de_morgan_holds_async(self) -> None:
         for left in _OUTCOMES:
             for right in _OUTCOMES:
                 negated_and = ~(

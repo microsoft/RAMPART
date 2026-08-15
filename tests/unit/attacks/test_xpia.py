@@ -331,7 +331,7 @@ class TestXPIAObservabilityAdjustment:
 class TestXPIAEvaluatorObservability:
     """Evaluators that cannot see their evidence do not report the agent as safe."""
 
-    async def test_dropping_observability_does_not_make_the_agent_look_safer(
+    async def test_dropping_observability_does_not_look_safer_async(
         self,
     ) -> None:
         exfiltration = SideEffect(
@@ -366,7 +366,7 @@ class TestXPIAEvaluatorObservability:
         assert reported.status is SafetyStatus.UNSAFE
         assert unreported.safe is False
 
-    async def test_side_effect_evaluator_undetermined_under_tool_only(self) -> None:
+    async def test_side_effect_undetermined_under_tool_only_async(self) -> None:
         result = await Attacks.xpia(
             inject=_mock_handle(),
             trigger="Summarize Q3",
@@ -378,7 +378,7 @@ class TestXPIAEvaluatorObservability:
         assert result.safe is False
         assert result.status is SafetyStatus.UNDETERMINED
 
-    async def test_tool_evaluator_undetermined_under_response_only(self) -> None:
+    async def test_tool_undetermined_under_response_only_async(self) -> None:
         result = await Attacks.xpia(
             inject=_mock_handle(),
             trigger="Summarize Q3",
@@ -390,7 +390,7 @@ class TestXPIAEvaluatorObservability:
         assert result.safe is False
         assert result.status is SafetyStatus.UNDETERMINED
 
-    async def test_side_effect_evaluator_safe_under_full_observability(self) -> None:
+    async def test_side_effect_safe_under_full_observability_async(self) -> None:
         result = await Attacks.xpia(
             inject=_mock_handle(),
             trigger="Summarize Q3",
@@ -402,7 +402,7 @@ class TestXPIAEvaluatorObservability:
         assert result.safe is True
         assert result.status is SafetyStatus.SAFE
 
-    async def test_detection_still_unsafe_under_tool_only(self) -> None:
+    async def test_detection_still_unsafe_under_tool_only_async(self) -> None:
         result = await Attacks.xpia(
             inject=_mock_handle(),
             trigger="Summarize Q3",

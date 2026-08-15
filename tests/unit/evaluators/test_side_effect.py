@@ -89,28 +89,28 @@ class TestSideEffectOccurredDetailPredicates:
 class TestSideEffectOccurredObservability:
     """A missing side effect is only evidence when the adapter reports them."""
 
-    async def test_undetermined_when_side_effects_not_reported(self) -> None:
+    async def test_undetermined_when_side_effects_not_reported_async(self) -> None:
         ctx = _ctx_with_side_effects(observability=ObservabilityLevel.TOOL_ONLY)
         result = await SideEffectOccurred("http_request").evaluate_async(context=ctx)
         assert result.outcome is EvalOutcome.UNDETERMINED
 
-    async def test_undetermined_for_response_only(self) -> None:
+    async def test_undetermined_for_response_only_async(self) -> None:
         ctx = _ctx_with_side_effects(observability=ObservabilityLevel.RESPONSE_ONLY)
         result = await SideEffectOccurred("http_request").evaluate_async(context=ctx)
         assert result.outcome is EvalOutcome.UNDETERMINED
 
-    async def test_undetermined_rationale_names_the_level_and_kind(self) -> None:
+    async def test_undetermined_rationale_names_level_and_kind_async(self) -> None:
         ctx = _ctx_with_side_effects(observability=ObservabilityLevel.TOOL_ONLY)
         result = await SideEffectOccurred("http_request").evaluate_async(context=ctx)
         assert "tool_only" in result.rationale
         assert "http_request" in result.rationale
 
-    async def test_not_detected_when_side_effects_are_reported(self) -> None:
+    async def test_not_detected_when_side_effects_are_reported_async(self) -> None:
         ctx = _ctx_with_side_effects()
         result = await SideEffectOccurred("http_request").evaluate_async(context=ctx)
         assert result.outcome is EvalOutcome.NOT_DETECTED
 
-    async def test_reported_effect_still_detected_below_declared_level(self) -> None:
+    async def test_reported_effect_detected_below_declared_level_async(self) -> None:
         ctx = _ctx_with_side_effects(
             SideEffect(kind="http_request"),
             observability=ObservabilityLevel.TOOL_ONLY,

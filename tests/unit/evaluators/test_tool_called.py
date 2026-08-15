@@ -132,23 +132,23 @@ class TestToolCalledMultiTurn:
 class TestToolCalledObservability:
     """A missing tool call is only evidence when the adapter reports tool calls."""
 
-    async def test_undetermined_when_tool_calls_not_reported(self) -> None:
+    async def test_undetermined_when_tool_calls_not_reported_async(self) -> None:
         ctx = _ctx_with_tool_calls(observability=ObservabilityLevel.RESPONSE_ONLY)
         result = await ToolCalled("send_email").evaluate_async(context=ctx)
         assert result.outcome is EvalOutcome.UNDETERMINED
 
-    async def test_undetermined_rationale_names_the_level_and_tool(self) -> None:
+    async def test_undetermined_rationale_names_the_level_and_tool_async(self) -> None:
         ctx = _ctx_with_tool_calls(observability=ObservabilityLevel.RESPONSE_ONLY)
         result = await ToolCalled("send_email").evaluate_async(context=ctx)
         assert "response_only" in result.rationale
         assert "send_email" in result.rationale
 
-    async def test_not_detected_when_tool_calls_are_reported(self) -> None:
+    async def test_not_detected_when_tool_calls_are_reported_async(self) -> None:
         ctx = _ctx_with_tool_calls(observability=ObservabilityLevel.TOOL_ONLY)
         result = await ToolCalled("send_email").evaluate_async(context=ctx)
         assert result.outcome is EvalOutcome.NOT_DETECTED
 
-    async def test_reported_tool_call_still_detected_below_declared_level(self) -> None:
+    async def test_reported_tool_call_detected_below_declared_level_async(self) -> None:
         ctx = _ctx_with_tool_calls(
             ToolCall(name="send_email"),
             observability=ObservabilityLevel.RESPONSE_ONLY,
@@ -165,31 +165,31 @@ class TestToolCalledComposition:
         result = await composed.evaluate_async(context=ctx)
         assert result.outcome is EvalOutcome.DETECTED
 
-    async def test_undetermined_propagates_through_or(self) -> None:
+    async def test_undetermined_propagates_through_or_async(self) -> None:
         ctx = _ctx_with_tool_calls(observability=ObservabilityLevel.RESPONSE_ONLY)
         composed = ToolCalled("send_email") | ToolCalled("delete_file")
         result = await composed.evaluate_async(context=ctx)
         assert result.outcome is EvalOutcome.UNDETERMINED
 
-    async def test_undetermined_and_not_detected_is_not_detected(self) -> None:
+    async def test_undetermined_and_not_detected_is_not_detected_async(self) -> None:
         ctx = _ctx_with_tool_calls(observability=ObservabilityLevel.RESPONSE_ONLY)
         composed = ToolCalled("send_email") & ResponseContains("not present")
         result = await composed.evaluate_async(context=ctx)
         assert result.outcome is EvalOutcome.NOT_DETECTED
 
-    async def test_not_detected_and_undetermined_is_not_detected(self) -> None:
+    async def test_not_detected_and_undetermined_is_not_detected_async(self) -> None:
         ctx = _ctx_with_tool_calls(observability=ObservabilityLevel.RESPONSE_ONLY)
         composed = ResponseContains("not present") & ToolCalled("send_email")
         result = await composed.evaluate_async(context=ctx)
         assert result.outcome is EvalOutcome.NOT_DETECTED
 
-    async def test_undetermined_and_detected_stays_undetermined(self) -> None:
+    async def test_undetermined_and_detected_stays_undetermined_async(self) -> None:
         ctx = _ctx_with_tool_calls(observability=ObservabilityLevel.RESPONSE_ONLY)
         composed = ToolCalled("send_email") & ResponseContains("ok")
         result = await composed.evaluate_async(context=ctx)
         assert result.outcome is EvalOutcome.UNDETERMINED
 
-    async def test_detected_and_undetermined_stays_undetermined(self) -> None:
+    async def test_detected_and_undetermined_stays_undetermined_async(self) -> None:
         ctx = _ctx_with_tool_calls(observability=ObservabilityLevel.RESPONSE_ONLY)
         composed = ResponseContains("ok") & ToolCalled("send_email")
         result = await composed.evaluate_async(context=ctx)
