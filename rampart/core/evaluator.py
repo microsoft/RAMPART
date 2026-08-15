@@ -98,8 +98,10 @@ class _AnyEvaluator(BaseEvaluator):
         LLM judge. Place the cheaper evaluator on the left side of |.
 
         Returns:
-            EvalResult: DETECTED if either operand detects; otherwise
-                the right operand's result.
+            EvalResult: DETECTED if either operand detects, UNDETERMINED if
+                either operand is UNDETERMINED, otherwise NOT_DETECTED. An
+                outcome reached after both operands ran carries the evidence
+                of both.
         """
         left_result = await self._left.evaluate_async(context=context)
 
@@ -119,10 +121,21 @@ class _AnyEvaluator(BaseEvaluator):
                 rationale=right_result.rationale,
             )
 
-        if EvalOutcome.UNDETERMINED in {left_result.outcome, right_result.outcome}:
+        # Both operands ran and neither detected, so name the one that could not
+        # be determined and carry the evidence they produced. A bare "undetermined"
+        # here would hide the adapter setting that caused it.
+        if left_result.outcome == EvalOutcome.UNDETERMINED:
             return EvalResult(
                 outcome=EvalOutcome.UNDETERMINED,
-                rationale="One or both operands undetermined",
+                evidence=left_result.evidence + right_result.evidence,
+                rationale=f"Left operand undetermined: {left_result.rationale}",
+            )
+
+        if right_result.outcome == EvalOutcome.UNDETERMINED:
+            return EvalResult(
+                outcome=EvalOutcome.UNDETERMINED,
+                evidence=left_result.evidence + right_result.evidence,
+                rationale=f"Right operand undetermined: {right_result.rationale}",
             )
 
         return EvalResult(

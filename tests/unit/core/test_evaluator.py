@@ -100,6 +100,17 @@ class TestOrComposition:
 
         assert result.outcome is EvalOutcome.UNDETERMINED
 
+    async def test_undetermined_names_operand_and_keeps_evidence_async(self) -> None:
+        left = _StubEvaluator(outcome=EvalOutcome.UNDETERMINED, rationale="cannot see")
+        right = _StubEvaluator(outcome=EvalOutcome.NOT_DETECTED)
+        composed = left | right
+
+        result = await composed.evaluate_async(context=_ctx())
+
+        assert result.outcome is EvalOutcome.UNDETERMINED
+        assert "cannot see" in result.rationale
+        assert result.evidence == ["stub:undetermined", "stub:not_detected"]
+
 
 class TestAndComposition:
     async def test_left_not_detected_short_circuits_async(self) -> None:
