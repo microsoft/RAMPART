@@ -12,7 +12,7 @@ from rampart.core.types import (
     ToolCall,
     Turn,
 )
-from rampart.evaluators import ToolCalled
+from rampart.evaluators import ResponseContains, ToolCalled
 
 
 def _ctx_with_tool_calls(
@@ -168,5 +168,29 @@ class TestToolCalledComposition:
     async def test_undetermined_propagates_through_or(self) -> None:
         ctx = _ctx_with_tool_calls(observability=ObservabilityLevel.RESPONSE_ONLY)
         composed = ToolCalled("send_email") | ToolCalled("delete_file")
+        result = await composed.evaluate_async(context=ctx)
+        assert result.outcome is EvalOutcome.UNDETERMINED
+
+    async def test_undetermined_and_not_detected_is_not_detected(self) -> None:
+        ctx = _ctx_with_tool_calls(observability=ObservabilityLevel.RESPONSE_ONLY)
+        composed = ToolCalled("send_email") & ResponseContains("not present")
+        result = await composed.evaluate_async(context=ctx)
+        assert result.outcome is EvalOutcome.NOT_DETECTED
+
+    async def test_not_detected_and_undetermined_is_not_detected(self) -> None:
+        ctx = _ctx_with_tool_calls(observability=ObservabilityLevel.RESPONSE_ONLY)
+        composed = ResponseContains("not present") & ToolCalled("send_email")
+        result = await composed.evaluate_async(context=ctx)
+        assert result.outcome is EvalOutcome.NOT_DETECTED
+
+    async def test_undetermined_and_detected_stays_undetermined(self) -> None:
+        ctx = _ctx_with_tool_calls(observability=ObservabilityLevel.RESPONSE_ONLY)
+        composed = ToolCalled("send_email") & ResponseContains("ok")
+        result = await composed.evaluate_async(context=ctx)
+        assert result.outcome is EvalOutcome.UNDETERMINED
+
+    async def test_detected_and_undetermined_stays_undetermined(self) -> None:
+        ctx = _ctx_with_tool_calls(observability=ObservabilityLevel.RESPONSE_ONLY)
+        composed = ResponseContains("ok") & ToolCalled("send_email")
         result = await composed.evaluate_async(context=ctx)
         assert result.outcome is EvalOutcome.UNDETERMINED

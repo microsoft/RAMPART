@@ -132,22 +132,28 @@ class _AnyEvaluator(BaseEvaluator):
 
 
 class _AllEvaluator(BaseEvaluator):
-    """DETECTED only if both operands detect. Short-circuits on left non-DETECTED."""
+    """DETECTED only if both operands detect. Short-circuits on left NOT_DETECTED."""
 
     def __init__(self, *, left: Evaluator, right: Evaluator) -> None:
         self._left = left
         self._right = right
 
     async def evaluate_async(self, *, context: EvalContext) -> EvalResult:
-        """Evaluate left first. If NOT_DETECTED or UNDETERMINED, skip right.
+        """Evaluate left first. If NOT_DETECTED, skip right.
 
-        Short-circuiting avoids unnecessary work when the left operand
-        can rule out the conjunction cheaply. Place the cheaper or more
-        likely-to-fail evaluator on the left side of &.
+        Only a NOT_DETECTED operand settles the conjunction on its own, so
+        that is the one case the left operand can short-circuit. An
+        UNDETERMINED left operand does not, because the right operand may
+        still be NOT_DETECTED and settle it. Returning early there would
+        make the outcome depend on the order the operands were written in.
+
+        Place the cheaper or more likely-to-fail evaluator on the left side
+        of & so the short-circuit saves the most work.
 
         Returns:
-            EvalResult: DETECTED with combined evidence if both operands
-                detect; otherwise the left operand's early-exit result.
+            EvalResult: NOT_DETECTED if either operand is NOT_DETECTED,
+                UNDETERMINED if either operand is UNDETERMINED, otherwise
+                DETECTED with the evidence of both operands.
         """
         left_result = await self._left.evaluate_async(context=context)
 
@@ -157,19 +163,18 @@ class _AllEvaluator(BaseEvaluator):
                 rationale=f"Left operand not detected: {left_result.rationale}",
             )
 
+        right_result = await self._right.evaluate_async(context=context)
+
+        if right_result.outcome == EvalOutcome.NOT_DETECTED:
+            return EvalResult(
+                outcome=EvalOutcome.NOT_DETECTED,
+                rationale=f"Right operand not detected: {right_result.rationale}",
+            )
+
         if left_result.outcome == EvalOutcome.UNDETERMINED:
             return EvalResult(
                 outcome=EvalOutcome.UNDETERMINED,
                 rationale=f"Left operand undetermined: {left_result.rationale}",
-            )
-
-        right_result = await self._right.evaluate_async(context=context)
-
-        if right_result.detected:
-            return EvalResult(
-                outcome=EvalOutcome.DETECTED,
-                evidence=left_result.evidence + right_result.evidence,
-                rationale=f"({left_result.rationale}) AND ({right_result.rationale})",
             )
 
         if right_result.outcome == EvalOutcome.UNDETERMINED:
@@ -179,8 +184,9 @@ class _AllEvaluator(BaseEvaluator):
             )
 
         return EvalResult(
-            outcome=EvalOutcome.NOT_DETECTED,
-            rationale="Not both conditions detected",
+            outcome=EvalOutcome.DETECTED,
+            evidence=left_result.evidence + right_result.evidence,
+            rationale=f"({left_result.rationale}) AND ({right_result.rationale})",
         )
 
 

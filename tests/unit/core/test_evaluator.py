@@ -39,6 +39,13 @@ def _ctx() -> EvalContext:
     )
 
 
+_OUTCOMES = (
+    EvalOutcome.DETECTED,
+    EvalOutcome.NOT_DETECTED,
+    EvalOutcome.UNDETERMINED,
+)
+
+
 class TestEvaluatorProtocol:
     def test_is_runtime_checkable(self) -> None:
         class MyEvaluator:
@@ -106,7 +113,7 @@ class TestAndComposition:
         assert left.call_count == 1
         assert right.call_count == 0
 
-    async def test_left_undetermined_short_circuits_async(self) -> None:
+    async def test_left_undetermined_evaluates_right_async(self) -> None:
         left = _StubEvaluator(outcome=EvalOutcome.UNDETERMINED)
         right = _StubEvaluator(outcome=EvalOutcome.DETECTED)
         composed = left & right
@@ -114,7 +121,25 @@ class TestAndComposition:
         result = await composed.evaluate_async(context=_ctx())
 
         assert result.outcome is EvalOutcome.UNDETERMINED
-        assert right.call_count == 0
+        assert right.call_count == 1
+
+    async def test_left_undetermined_right_not_detected(self) -> None:
+        left = _StubEvaluator(outcome=EvalOutcome.UNDETERMINED)
+        right = _StubEvaluator(outcome=EvalOutcome.NOT_DETECTED)
+        composed = left & right
+
+        result = await composed.evaluate_async(context=_ctx())
+
+        assert result.outcome is EvalOutcome.NOT_DETECTED
+
+    async def test_both_undetermined(self) -> None:
+        left = _StubEvaluator(outcome=EvalOutcome.UNDETERMINED)
+        right = _StubEvaluator(outcome=EvalOutcome.UNDETERMINED)
+        composed = left & right
+
+        result = await composed.evaluate_async(context=_ctx())
+
+        assert result.outcome is EvalOutcome.UNDETERMINED
 
     async def test_both_detected_async(self) -> None:
         left = _StubEvaluator(outcome=EvalOutcome.DETECTED, rationale="L")
@@ -178,6 +203,99 @@ class TestNotComposition:
 
         assert result.evidence == ["stub:detected"]
         assert "NOT" in result.rationale
+
+
+class TestOperandOrderIndependence:
+    """Outcomes must not depend on which side an operand is written on."""
+
+    async def test_and_outcome_table(self) -> None:
+        detected = EvalOutcome.DETECTED
+        not_detected = EvalOutcome.NOT_DETECTED
+        undetermined = EvalOutcome.UNDETERMINED
+        expected = {
+            (detected, detected): detected,
+            (detected, not_detected): not_detected,
+            (detected, undetermined): undetermined,
+            (not_detected, detected): not_detected,
+            (not_detected, not_detected): not_detected,
+            (not_detected, undetermined): not_detected,
+            (undetermined, detected): undetermined,
+            (undetermined, not_detected): not_detected,
+            (undetermined, undetermined): undetermined,
+        }
+
+        for (left, right), outcome in expected.items():
+            composed = _StubEvaluator(outcome=left) & _StubEvaluator(outcome=right)
+
+            result = await composed.evaluate_async(context=_ctx())
+
+            assert result.outcome is outcome, f"{left} & {right}"
+
+    async def test_or_outcome_table(self) -> None:
+        detected = EvalOutcome.DETECTED
+        not_detected = EvalOutcome.NOT_DETECTED
+        undetermined = EvalOutcome.UNDETERMINED
+        expected = {
+            (detected, detected): detected,
+            (detected, not_detected): detected,
+            (detected, undetermined): detected,
+            (not_detected, detected): detected,
+            (not_detected, not_detected): not_detected,
+            (not_detected, undetermined): undetermined,
+            (undetermined, detected): detected,
+            (undetermined, not_detected): undetermined,
+            (undetermined, undetermined): undetermined,
+        }
+
+        for (left, right), outcome in expected.items():
+            composed = _StubEvaluator(outcome=left) | _StubEvaluator(outcome=right)
+
+            result = await composed.evaluate_async(context=_ctx())
+
+            assert result.outcome is outcome, f"{left} | {right}"
+
+    async def test_and_is_commutative(self) -> None:
+        for left in _OUTCOMES:
+            for right in _OUTCOMES:
+                forward = _StubEvaluator(outcome=left) & _StubEvaluator(outcome=right)
+                flipped = _StubEvaluator(outcome=right) & _StubEvaluator(outcome=left)
+
+                forward_result = await forward.evaluate_async(context=_ctx())
+                flipped_result = await flipped.evaluate_async(context=_ctx())
+
+                assert forward_result.outcome is flipped_result.outcome, (
+                    f"{left} & {right}"
+                )
+
+    async def test_or_is_commutative(self) -> None:
+        for left in _OUTCOMES:
+            for right in _OUTCOMES:
+                forward = _StubEvaluator(outcome=left) | _StubEvaluator(outcome=right)
+                flipped = _StubEvaluator(outcome=right) | _StubEvaluator(outcome=left)
+
+                forward_result = await forward.evaluate_async(context=_ctx())
+                flipped_result = await flipped.evaluate_async(context=_ctx())
+
+                assert forward_result.outcome is flipped_result.outcome, (
+                    f"{left} | {right}"
+                )
+
+    async def test_de_morgan_holds(self) -> None:
+        for left in _OUTCOMES:
+            for right in _OUTCOMES:
+                negated_and = ~(
+                    _StubEvaluator(outcome=left) & _StubEvaluator(outcome=right)
+                )
+                or_of_negations = ~_StubEvaluator(outcome=left) | ~_StubEvaluator(
+                    outcome=right,
+                )
+
+                negated_result = await negated_and.evaluate_async(context=_ctx())
+                or_result = await or_of_negations.evaluate_async(context=_ctx())
+
+                assert negated_result.outcome is or_result.outcome, (
+                    f"NOT ({left} & {right})"
+                )
 
 
 class TestCompositionChaining:
