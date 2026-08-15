@@ -137,7 +137,7 @@ class TestToolCalledObservability:
         result = await ToolCalled("send_email").evaluate_async(context=ctx)
         assert result.outcome is EvalOutcome.UNDETERMINED
 
-    async def test_undetermined_rationale_names_the_level_and_tool_async(self) -> None:
+    async def test_undetermined_rationale_names_level_and_tool_async(self) -> None:
         ctx = _ctx_with_tool_calls(observability=ObservabilityLevel.RESPONSE_ONLY)
         result = await ToolCalled("send_email").evaluate_async(context=ctx)
         assert "response_only" in result.rationale

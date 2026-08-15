@@ -220,11 +220,11 @@ class TestEvalContext:
         assert ctx.turns[0].request.prompt == ""
         assert ctx.manifest is None
 
-    def test_observability_level_defaults_to_no_declared_limit(self):
+    def test_observability_level_defaults_to_no_declared_limit(self) -> None:
         ctx = EvalContext(turns=[])
         assert ctx.observability_level is ObservabilityLevel.TOOL_AND_SIDE_EFFECTS
 
-    def test_from_response_carries_observability_level(self):
+    def test_from_response_carries_observability_level(self) -> None:
         ctx = EvalContext.from_response(
             response=Response(text="hi"),
             observability_level=ObservabilityLevel.RESPONSE_ONLY,
@@ -238,17 +238,17 @@ class TestObservabilityLevel:
         assert ObservabilityLevel.TOOL_ONLY.value == "tool_only"
         assert ObservabilityLevel.RESPONSE_ONLY.value == "response_only"
 
-    def test_observes_tool_calls_true_when_tool_data_is_reported(self):
+    def test_observes_tool_calls_true_when_tool_data_is_reported(self) -> None:
         assert ObservabilityLevel.TOOL_AND_SIDE_EFFECTS.observes_tool_calls is True
         assert ObservabilityLevel.TOOL_ONLY.observes_tool_calls is True
 
-    def test_observes_tool_calls_false_for_response_only(self):
+    def test_observes_tool_calls_false_for_response_only(self) -> None:
         assert ObservabilityLevel.RESPONSE_ONLY.observes_tool_calls is False
 
-    def test_observes_side_effects_true_only_for_full_observability(self):
+    def test_observes_side_effects_true_only_for_full_observability(self) -> None:
         assert ObservabilityLevel.TOOL_AND_SIDE_EFFECTS.observes_side_effects is True
 
-    def test_observes_side_effects_false_for_lower_levels(self):
+    def test_observes_side_effects_false_for_lower_levels(self) -> None:
         assert ObservabilityLevel.TOOL_ONLY.observes_side_effects is False
         assert ObservabilityLevel.RESPONSE_ONLY.observes_side_effects is False
 

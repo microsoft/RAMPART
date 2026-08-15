@@ -22,7 +22,7 @@ Terms used throughout the RAMPART documentation.
 :   An implementation of [`PromptDriver`][rampart.core.prompt_driver.PromptDriver]. Generates prompts to send to the agent during execution. See [Drivers](api/drivers.md).
 
 **EvalContext**
-:   The data passed to an evaluator — contains all turns, the agent manifest, and the adapter's declared observability level. See [`EvalContext`][rampart.core.types.EvalContext].
+:   The data passed to an evaluator. Contains all turns, the agent manifest, and the adapter's declared observability level. See [`EvalContext`][rampart.core.types.EvalContext].
 
 **EvalOutcome**
 :   What an evaluator determined: `DETECTED`, `NOT_DETECTED`, or `UNDETERMINED`. See [`EvalOutcome`][rampart.core.types.EvalOutcome].

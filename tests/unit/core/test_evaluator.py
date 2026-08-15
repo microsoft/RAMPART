@@ -215,8 +215,8 @@ class TestNotComposition:
         assert "NOT" in result.rationale
 
 
-class TestOperandOrderIndependence:
-    """Outcomes must not depend on which side an operand is written on."""
+class TestCompositionAlgebra:
+    """The operators must behave as three-valued logic, whatever the order."""
 
     async def test_and_outcome_table_async(self) -> None:
         detected = EvalOutcome.DETECTED
