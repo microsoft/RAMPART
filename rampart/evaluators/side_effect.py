@@ -57,14 +57,13 @@ class SideEffectOccurred(BaseEvaluator):
                     rationale=f"Side effect '{se.kind}' detected",
                 )
 
-        # Observability is checked only after the scan, so a side effect the
-        # adapter did report is still evidence even if it reported one it
-        # said it could not see.
+        # Checked after the scan, so a side effect the adapter did report still
+        # counts, even at a level that says it cannot report them.
         if not context.observability_level.observes_side_effects:
             return EvalResult(
                 outcome=EvalOutcome.UNDETERMINED,
                 rationale=(
-                    f"Adapter observability is "
+                    "Adapter observability is "
                     f"'{context.observability_level.value}', which does not "
                     f"report side effects, so whether '{self._kind}' occurred "
                     f"cannot be determined"

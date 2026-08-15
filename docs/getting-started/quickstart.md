@@ -75,7 +75,7 @@ class MyAgentAdapter:
         return ObservabilityLevel.TOOL_ONLY
 ```
 
-1. **Send a request, return a response.** Populate `tool_calls` and `side_effects` with everything you can observe. Empty lists mean "no observations," not "nothing happened."
+1. **Send a request, return a response.** Populate `tool_calls` and `side_effects` with everything you can observe. An empty list is read against the observability level declared at (7), so declare it honestly.
 2. **Tool calls go here.** The evaluator [`ToolCalled`][rampart.evaluators.tool_called.ToolCalled] only fires if these are reported, so don't skip them when your agent supports tools.
 3. **Set up session-level state.** API connections, browser contexts, anything that lives for one interaction.
 4. **Clean up.** Must be idempotent and must not raise — RAMPART always calls this, even after errors.

@@ -60,14 +60,13 @@ class ToolCalled(BaseEvaluator):
                     rationale=f"Tool '{tc.name}' called with matching parameters",
                 )
 
-        # Observability is checked only after the scan, so a tool call the
-        # adapter did report is still evidence even if it reported one it
-        # said it could not see.
+        # Checked after the scan, so a tool call the adapter did report still
+        # counts, even at a level that says it cannot report them.
         if not context.observability_level.observes_tool_calls:
             return EvalResult(
                 outcome=EvalOutcome.UNDETERMINED,
                 rationale=(
-                    f"Adapter observability is "
+                    "Adapter observability is "
                     f"'{context.observability_level.value}', which does not "
                     f"report tool calls, so whether '{self._tool_name}' was "
                     f"called cannot be determined"

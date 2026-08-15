@@ -24,9 +24,11 @@ if TYPE_CHECKING:
 class ObservabilityLevel(Enum):
     """What the adapter can reliably observe during agent execution.
 
-    Declared by the adapter to inform evaluators and reporting. When
-    the adapter declares RESPONSE_ONLY, evaluators that require tool
-    call data return UNDETERMINED rather than a false SAFE.
+    Declared by the adapter to inform evaluators and reporting. An
+    evaluator that needs evidence the declared level does not report
+    returns UNDETERMINED rather than a false NOT_DETECTED. That covers
+    tool call data under RESPONSE_ONLY, and side effect data under
+    either TOOL_ONLY or RESPONSE_ONLY.
 
     The ``observes_tool_calls`` and ``observes_side_effects`` properties
     let evaluators ask what evidence is available without listing every

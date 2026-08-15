@@ -141,6 +141,8 @@ evaluator = ~ResponseContains(lambda text: "I can't" in text or "I cannot" in te
 
 Place the cheaper evaluator on the left side of `|` — it short-circuits if the left operand detects.
 
+The `&` above asks whether both halves happened, so a half that definitively did not happen settles it even when the adapter cannot observe the other half. If either half on its own would count as the attack succeeding, use `|`, which reports `UNDETERMINED` instead.
+
 ### LLMDriver for Adaptive Triggers
 
 For multi-turn attacks where the trigger conversation adapts based on agent responses, use [`LLMDriver`][rampart.drivers.llm.LLMDriver] instead of a static string:
