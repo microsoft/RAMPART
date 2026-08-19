@@ -235,9 +235,7 @@ evaluator = ~ResponseContains("I cannot help with that")
 !!! note "Undetermined operands"
     An `UNDETERMINED` operand does not settle a composition on its own. `|` is `DETECTED` if either side detects, `&` is `NOT_DETECTED` if either side does not, and the result is `UNDETERMINED` only when neither side settles it. Both operators give the same answer whichever order the operands are written in.
 
-    `&` short-circuits only on a `NOT_DETECTED` left operand. An `UNDETERMINED` left operand still runs the right one, so an `LLMJudge` on the right of `&` is called even when the left operand is blind.
-
-    This matters when you combine two views of the same harm to corroborate it. `&` asks whether both happened, so one operand that definitively did not happen settles it even if the other could not be observed. Use `|` when either view on its own is enough, because it reports `UNDETERMINED` rather than clearing the agent on the strength of the view you could see.
+`&` short-circuits only on a `NOT_DETECTED` left operand. An `UNDETERMINED` left operand still runs the right one, so an `LLMJudge` on the right of `&` is called in this case. When you combine two views of the same harm to corroborate it, `&` asks whether both happened, so one operand that definitively did not happen settles the result even if the other could not be observed. Use `|` when either view on its own is enough.
 
 ---
 

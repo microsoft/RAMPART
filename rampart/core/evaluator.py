@@ -98,10 +98,10 @@ class _AnyEvaluator(BaseEvaluator):
         LLM judge. Place the cheaper evaluator on the left side of |.
 
         Returns:
-            EvalResult: DETECTED if either operand detects, UNDETERMINED if
-                either operand is UNDETERMINED, otherwise NOT_DETECTED. An
-                outcome reached after both operands ran carries the evidence
-                of both.
+            EvalResult: DETECTED if either operand is DETECTED; otherwise
+                UNDETERMINED if either operand is UNDETERMINED; otherwise
+                NOT_DETECTED. An UNDETERMINED outcome carries both operands'
+                evidence.
         """
         left_result = await self._left.evaluate_async(context=context)
 
@@ -164,10 +164,11 @@ class _AllEvaluator(BaseEvaluator):
         of & so the short-circuit saves the most work.
 
         Returns:
-            EvalResult: NOT_DETECTED if either operand is NOT_DETECTED,
-                UNDETERMINED if either operand is UNDETERMINED, otherwise
-                DETECTED. An outcome reached after both operands ran carries
-                the evidence of both.
+            EvalResult: NOT_DETECTED if either operand is NOT_DETECTED;
+                otherwise UNDETERMINED if either operand is UNDETERMINED;
+                otherwise DETECTED. The DETECTED and UNDETERMINED outcomes are
+                the ones reached after both operands run, and they carry both
+                operands' evidence.
         """
         left_result = await self._left.evaluate_async(context=context)
 

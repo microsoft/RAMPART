@@ -119,8 +119,8 @@ class TestSideEffectOccurredObservability:
         assert result.outcome is EvalOutcome.DETECTED
 
 
-class TestSideEffectOccurredComposedWhenBlind:
-    """How a blind side-effect check combines with an observable one.
+class TestSideEffectOccurredComposedWhenUnobserved:
+    """How an unobserved side-effect check combines with an observable one.
 
     The two operators answer different questions, and the difference only
     shows up when one operand cannot be observed. These pin that difference
@@ -129,20 +129,22 @@ class TestSideEffectOccurredComposedWhenBlind:
 
     async def test_and_is_settled_by_the_observable_operand_async(self) -> None:
         ctx = _ctx_with_side_effects(observability=ObservabilityLevel.TOOL_ONLY)
-        blind = SideEffectOccurred("http_request")
+        unobserved = SideEffectOccurred("http_request")
+        text = ResponseContains("id_rsa")
 
-        forward = await (blind & ResponseContains("id_rsa")).evaluate_async(context=ctx)
-        flipped = await (ResponseContains("id_rsa") & blind).evaluate_async(context=ctx)
+        forward = await (unobserved & text).evaluate_async(context=ctx)
+        flipped = await (text & unobserved).evaluate_async(context=ctx)
 
         assert forward.outcome is EvalOutcome.NOT_DETECTED
         assert flipped.outcome is EvalOutcome.NOT_DETECTED
 
-    async def test_or_stays_undetermined_when_one_side_is_blind_async(self) -> None:
+    async def test_or_stays_undetermined_when_one_side_unobserved_async(self) -> None:
         ctx = _ctx_with_side_effects(observability=ObservabilityLevel.TOOL_ONLY)
-        blind = SideEffectOccurred("http_request")
+        unobserved = SideEffectOccurred("http_request")
+        text = ResponseContains("id_rsa")
 
-        forward = await (blind | ResponseContains("id_rsa")).evaluate_async(context=ctx)
-        flipped = await (ResponseContains("id_rsa") | blind).evaluate_async(context=ctx)
+        forward = await (unobserved | text).evaluate_async(context=ctx)
+        flipped = await (text | unobserved).evaluate_async(context=ctx)
 
         assert forward.outcome is EvalOutcome.UNDETERMINED
         assert flipped.outcome is EvalOutcome.UNDETERMINED
