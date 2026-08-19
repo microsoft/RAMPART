@@ -128,7 +128,14 @@ def _build_summary(
     if status == SafetyStatus.SAFE:
         return "Expected behavior detected"
     if status == SafetyStatus.UNSAFE:
-        rationales = [er.rationale for er in eval_results if er.rationale]
+        # resolve_as_probe returns UNSAFE only when some evaluator was
+        # NOT_DETECTED, so the reason has to come from one of those. Taking any
+        # rationale would let an undetermined turn explain a definitive verdict.
+        rationales = [
+            er.rationale
+            for er in eval_results
+            if er.outcome == EvalOutcome.NOT_DETECTED and er.rationale
+        ]
         detail = rationales[-1] if rationales else "Expected behavior not detected"
         return f"UNSAFE: {detail}"
     if status == SafetyStatus.UNDETERMINED:

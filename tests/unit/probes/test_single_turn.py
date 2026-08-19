@@ -22,6 +22,7 @@ from rampart.core.types import (
 from rampart.drivers.static import StaticDriver
 from rampart.evaluators import ToolCalled
 from rampart.probes import Probes
+from rampart.probes._single_turn import _build_summary
 from tests.fixtures import MockAdapter
 
 
@@ -348,3 +349,33 @@ class TestProbeMaxTurns:
         assert result.safe is False
         assert result.status == SafetyStatus.UNSAFE
         assert len(result.turns) == 2
+
+
+class TestProbeUnsafeSummary:
+    """An unsafe summary names the turn that settled it, not an undetermined one."""
+
+    def test_summary_uses_only_not_detected_rationales(self) -> None:
+        summary = _build_summary(
+            status=SafetyStatus.UNSAFE,
+            eval_results=[
+                EvalResult(
+                    outcome=EvalOutcome.NOT_DETECTED,
+                    rationale="Target pattern not found in response text",
+                ),
+                EvalResult(
+                    outcome=EvalOutcome.UNDETERMINED,
+                    rationale="Adapter observability is 'tool_only'",
+                ),
+            ],
+        )
+
+        assert "not found" in summary
+        assert "tool_only" not in summary
+
+    def test_summary_falls_back_without_a_rationale(self) -> None:
+        summary = _build_summary(
+            status=SafetyStatus.UNSAFE,
+            eval_results=[EvalResult(outcome=EvalOutcome.NOT_DETECTED)],
+        )
+
+        assert summary == "UNSAFE: Expected behavior not detected"
