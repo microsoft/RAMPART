@@ -34,9 +34,9 @@ class Session(AbstractAsyncContextManager["Session", None], Protocol):
         The adapter is responsible for populating Response.tool_calls
         and Response.side_effects with whatever it can observe. Empty
         lists are valid. Evaluators read them against the declared
-        observability_profile: at a level that reports that kind of
-        evidence an empty list means the thing did not happen, and at a
-        level that does not it means the thing could not be seen.
+        observability_profile. At a level that reports that kind of
+        evidence, an empty list means the thing did not happen. At a level
+        that does not, it means the thing could not be seen.
 
         Args:
             request (Request): The prompt and/or attachments to send.

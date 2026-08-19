@@ -166,9 +166,8 @@ class _AllEvaluator(BaseEvaluator):
         Returns:
             EvalResult: NOT_DETECTED if either operand is NOT_DETECTED;
                 otherwise UNDETERMINED if either operand is UNDETERMINED;
-                otherwise DETECTED. The DETECTED and UNDETERMINED outcomes are
-                the ones reached after both operands run, and they carry both
-                operands' evidence.
+                otherwise DETECTED. Only the DETECTED and UNDETERMINED
+                outcomes carry both operands' evidence.
         """
         left_result = await self._left.evaluate_async(context=context)
 

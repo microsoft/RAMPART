@@ -141,7 +141,7 @@ evaluator = ~ResponseContains(lambda text: "I can't" in text or "I cannot" in te
 
 Place the cheaper evaluator on the left side of `|` — it short-circuits if the left operand detects.
 
-The `&` above asks whether both halves happened, so a half that definitively did not happen settles it even when the adapter cannot observe the other half. If either half on its own would count as the attack succeeding, use `|`, which reports `UNDETERMINED` instead.
+The `&` above asks whether both happened, so one condition that definitively did not happen settles the result even if the adapter could not observe the other. Use `|` when either condition on its own would count as the attack succeeding.
 
 ### LLMDriver for Adaptive Triggers
 
