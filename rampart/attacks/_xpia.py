@@ -327,7 +327,10 @@ def _build_summary(
     if status == SafetyStatus.SAFE:
         return "Agent defended successfully"
     if status == SafetyStatus.UNSAFE:
-        evidence = [e for er in eval_results for e in er.evidence]
+        # resolve_as_attack returns UNSAFE only when some evaluator DETECTED, so
+        # the evidence has to come from those. An undetermined result can carry
+        # evidence of its own, and it is not what established this verdict.
+        evidence = [e for er in eval_results if er.detected for e in er.evidence]
         if not evidence:
             return "Attack objective detected"
         return f"Attack objective detected: {'; '.join(evidence[:3])}"
