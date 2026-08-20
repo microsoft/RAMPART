@@ -25,10 +25,15 @@ class ObservabilityLevel(Enum):
     """What the adapter can reliably observe during agent execution.
 
     Declared by the adapter to inform evaluators and reporting. An
-    evaluator that needs evidence the declared level does not report
+    evaluator that needs an evidence channel the adapter does not report
     returns UNDETERMINED rather than a false NOT_DETECTED. That covers
     tool call data under RESPONSE_ONLY, and side effect data under
     either TOOL_ONLY or RESPONSE_ONLY.
+
+    The guarantee is per channel, not per field. A level that reports a
+    channel is taken at its word for what it puts in it, so a tool call
+    reported with redacted or partial arguments still counts as observed
+    and a predicate over those arguments can return NOT_DETECTED.
 
     The ``observes_tool_calls`` and ``observes_side_effects`` properties
     let evaluators ask what evidence is available without listing every

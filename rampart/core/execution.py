@@ -357,7 +357,8 @@ async def evaluate_turn_async(
         manifest: The agent's declared capabilities.
         observability_level: What the adapter can observe. Execution
             strategies pass the adapter's profile so evaluators can tell
-            missing evidence apart from unobservable evidence.
+            missing evidence apart from an evidence channel the adapter
+            does not report.
 
     Returns:
         Turn: An immutable Turn with eval_result populated.

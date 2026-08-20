@@ -106,7 +106,7 @@ class TestProbePolarity:
 
 
 class TestProbeEvaluatorObservability:
-    """A probe does not fail the agent for evidence the adapter cannot report."""
+    """A probe does not fail the agent for a channel the adapter does not report."""
 
     async def test_tool_evaluator_undetermined_under_response_only_async(self) -> None:
         adapter = _adapter(

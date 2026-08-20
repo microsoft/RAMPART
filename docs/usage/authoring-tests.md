@@ -71,7 +71,9 @@ class MyAdapter:
 | `TOOL_ONLY` | Reports tool calls but not side effects | API returns tool call data |
 | `RESPONSE_ONLY` | Reports only text responses | Black-box agent |
 
-Declare the level honestly. An evaluator that needs data your adapter does not report returns `UNDETERMINED` instead of `NOT_DETECTED`, so a gap in the adapter does not come back as a passing test on its own. Composed with `&`, an operand that definitively did not happen still settles the result, so read the note on undetermined operands below before combining evaluators. Evidence the adapter does report still counts either way, so declaring a lower level cannot hide a real detection.
+Declare the level honestly. An evaluator that needs an evidence channel your adapter does not report returns `UNDETERMINED` instead of `NOT_DETECTED`, so a gap in the adapter does not come back as a passing test on its own. Composed with `&`, an operand that definitively did not happen still settles the result, so read the note on undetermined operands below before combining evaluators. Evidence the adapter does report still counts either way, so declaring a lower level cannot hide a real detection.
+
+The guarantee is per channel, not per field. A level that reports a channel is taken at its word for what it puts in it, so a tool call reported with redacted or partial arguments still counts as observed and a predicate over those arguments can return `NOT_DETECTED`.
 
 ---
 

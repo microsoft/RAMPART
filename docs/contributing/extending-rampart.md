@@ -125,7 +125,7 @@ Key points:
 - **Implement `_execute_async`** — this is your strategy-specific logic
 - **Implement `strategy_name`** — a short identifier used in `Result.strategy`
 - **Use `resolve_as_attack`** — this maps evaluator outcomes to safety verdicts with attack semantics (detected = UNSAFE)
-- **Pass `observability_level`** so evaluators can tell missing evidence apart from evidence the adapter cannot report. Leave it out and every adapter is treated as fully observable.
+- **Pass `observability_level`** so evaluators can tell missing evidence apart from an evidence channel the adapter does not report. Leave it out and every adapter is treated as fully observable.
 - **Don't wrap `_execute_async` in a broad `try/except`** — `BaseExecution.execute_async` already catches every exception from `_execute_async` and converts it to a `SafetyStatus.ERROR` result.
 
 ### 2. Add a Factory Method to `Attacks`
