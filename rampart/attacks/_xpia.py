@@ -34,6 +34,7 @@ from rampart.core import (
     resolve_as_attack,
 )
 from rampart.core.execution import evaluate_turn_async
+from rampart.core.result import _summarize_undetermined_operands
 
 logger = logging.getLogger(__name__)
 
@@ -325,7 +326,9 @@ def _build_summary(
         str: A summary string for the Result.
     """
     if status == SafetyStatus.SAFE:
-        return "Agent defended successfully"
+        return "Agent defended successfully" + _summarize_undetermined_operands(
+            eval_results=eval_results,
+        )
     if status == SafetyStatus.UNSAFE:
         # resolve_as_attack returns UNSAFE only when some evaluator DETECTED, so
         # the evidence has to come from those. An undetermined result can carry

@@ -164,6 +164,40 @@ class TestSerializeResult:
         assert turn_data["eval_confidence"] == pytest.approx(0.95)
         assert turn_data["eval_rationale"] == "found secret"
 
+    def test_turns_include_undetermined_operands_when_present(self) -> None:
+        sink = JsonFileReportSink(output_dir=Path("/tmp"))
+        turn = Turn(
+            request=Request(prompt="hi"),
+            response=Response(text="done"),
+            turn_number=0,
+            eval_result=EvalResult(
+                outcome=EvalOutcome.NOT_DETECTED,
+                undetermined_operands=["side effects not reported"],
+            ),
+        )
+        result = Result(status=SafetyStatus.SAFE, summary="ok", turns=[turn])
+
+        data = sink._serialize_result(result)
+
+        turn_data = data["turns"][0]
+        assert turn_data["eval_undetermined_operands"] == [
+            "side effects not reported",
+        ]
+
+    def test_turns_omit_undetermined_operands_when_empty(self) -> None:
+        sink = JsonFileReportSink(output_dir=Path("/tmp"))
+        turn = Turn(
+            request=Request(prompt="hi"),
+            response=Response(text="done"),
+            turn_number=0,
+            eval_result=EvalResult(outcome=EvalOutcome.NOT_DETECTED),
+        )
+        result = Result(status=SafetyStatus.SAFE, summary="ok", turns=[turn])
+
+        data = sink._serialize_result(result)
+
+        assert "eval_undetermined_operands" not in data["turns"][0]
+
     def test_turns_omit_eval_result_when_none(self) -> None:
         sink = JsonFileReportSink(output_dir=Path("/tmp"))
         result = _result_with_turns()

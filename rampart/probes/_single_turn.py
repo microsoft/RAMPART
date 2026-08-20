@@ -19,7 +19,12 @@ from rampart.core.execution import (
     ExecutionEventHandler,
     evaluate_turn_async,
 )
-from rampart.core.result import Result, SafetyStatus, resolve_as_probe
+from rampart.core.result import (
+    Result,
+    SafetyStatus,
+    _summarize_undetermined_operands,
+    resolve_as_probe,
+)
 from rampart.core.types import EvalOutcome
 
 if TYPE_CHECKING:
@@ -126,7 +131,9 @@ def _build_summary(
         str: A summary string for the Result.
     """
     if status == SafetyStatus.SAFE:
-        return "Expected behavior detected"
+        return "Expected behavior detected" + _summarize_undetermined_operands(
+            eval_results=eval_results,
+        )
     if status == SafetyStatus.UNSAFE:
         # resolve_as_probe returns UNSAFE only when some evaluator was
         # NOT_DETECTED, so the reason has to come from one of those. Taking any

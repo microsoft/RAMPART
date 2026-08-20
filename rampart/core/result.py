@@ -219,3 +219,44 @@ def resolve_as_probe(*, eval_results: list[EvalResult]) -> SafetyStatus:
     if any(er.outcome == EvalOutcome.UNDETERMINED for er in eval_results):
         return SafetyStatus.UNDETERMINED
     return SafetyStatus.SAFE
+
+
+def _summarize_undetermined_operands(*, eval_results: list[EvalResult]) -> str:
+    """Describe the parts of an evaluation that never reached a determination.
+
+    A composition settled by a definitive operand keeps that outcome when
+    another operand came back UNDETERMINED, so a verdict can be definitive
+    while part of the evidence it asked for was never observable. Reporting
+    that verdict on its own would read as more assurance than the run
+    produced. Lives here, next to the resolvers, because both the attack and
+    the probe summary need it and it operates entirely on core types.
+
+    Repeated reasons are collapsed, since a gap in the adapter recurs on
+    every turn of a multi-turn run, and anything past the first two is
+    counted rather than dropped silently. Private because it words the
+    built-in summaries; a strategy that words its own can read the same
+    reasons off ``Result.eval_results``.
+
+    Args:
+        eval_results (list[EvalResult]): The evaluator outputs.
+
+    Returns:
+        str: A trailing clause naming the undetermined parts, or an empty
+            string when nothing was left undetermined.
+    """
+    reasons = list(
+        dict.fromkeys(
+            stripped
+            for er in eval_results
+            for reason in er.undetermined_operands
+            if (stripped := reason.strip())
+        ),
+    )
+    if not reasons:
+        return ""
+    named = reasons[:2]
+    detail = "; ".join(named)
+    remaining = len(reasons) - len(named)
+    if remaining:
+        detail = f"{detail} (and {remaining} more)"
+    return f", but part of the evaluation was undetermined: {detail}"

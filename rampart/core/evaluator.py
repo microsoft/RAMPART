@@ -15,6 +15,11 @@ from typing import Protocol, runtime_checkable
 
 from rampart.core.types import EvalContext, EvalOutcome, EvalResult
 
+# An evaluator may return UNDETERMINED without saying why. Recording a fixed
+# phrase keeps the gap visible instead of storing an empty string, which reads
+# as "nothing was undetermined" everywhere downstream.
+_NO_REASON_GIVEN = "an operand gave no reason"
+
 
 @runtime_checkable
 class Evaluator(Protocol):
@@ -101,7 +106,11 @@ class _AnyEvaluator(BaseEvaluator):
             EvalResult: DETECTED if either operand is DETECTED; otherwise
                 UNDETERMINED if either operand is UNDETERMINED; otherwise
                 NOT_DETECTED. An UNDETERMINED outcome carries both operands'
-                evidence.
+                evidence. Every operand that ran contributes the reasons it
+                carries to ``undetermined_operands``; one that came back
+                UNDETERMINED with none of its own contributes its rationale
+                instead. Each reason is kept once, and a short-circuited
+                operand never runs, so it is never recorded.
         """
         left_result = await self._left.evaluate_async(context=context)
 
@@ -110,15 +119,18 @@ class _AnyEvaluator(BaseEvaluator):
                 outcome=EvalOutcome.DETECTED,
                 evidence=left_result.evidence,
                 rationale=left_result.rationale,
+                undetermined_operands=_merge_undetermined(left=left_result),
             )
 
         right_result = await self._right.evaluate_async(context=context)
+        undetermined = _merge_undetermined(left=left_result, right=right_result)
 
         if right_result.detected:
             return EvalResult(
                 outcome=EvalOutcome.DETECTED,
                 evidence=right_result.evidence,
                 rationale=right_result.rationale,
+                undetermined_operands=undetermined,
             )
 
         # Both operands ran and neither detected, so name the one that could not
@@ -129,6 +141,7 @@ class _AnyEvaluator(BaseEvaluator):
                 outcome=EvalOutcome.UNDETERMINED,
                 evidence=left_result.evidence + right_result.evidence,
                 rationale=f"Left operand undetermined: {left_result.rationale}",
+                undetermined_operands=undetermined,
             )
 
         if right_result.outcome == EvalOutcome.UNDETERMINED:
@@ -136,11 +149,13 @@ class _AnyEvaluator(BaseEvaluator):
                 outcome=EvalOutcome.UNDETERMINED,
                 evidence=left_result.evidence + right_result.evidence,
                 rationale=f"Right operand undetermined: {right_result.rationale}",
+                undetermined_operands=undetermined,
             )
 
         return EvalResult(
             outcome=EvalOutcome.NOT_DETECTED,
             rationale="Neither condition detected",
+            undetermined_operands=undetermined,
         )
 
 
@@ -161,13 +176,21 @@ class _AllEvaluator(BaseEvaluator):
         make the outcome depend on the order the operands were written in.
 
         Place the cheaper or more likely-to-fail evaluator on the left side
-        of & so the short-circuit saves the most work.
+        of & so the short-circuit saves the most work. An evaluator that
+        depends on adapter observability belongs there too, since the
+        short-circuit skips the right operand and nothing it would have
+        reported can be recorded.
 
         Returns:
             EvalResult: NOT_DETECTED if either operand is NOT_DETECTED;
                 otherwise UNDETERMINED if either operand is UNDETERMINED;
                 otherwise DETECTED. Only the DETECTED and UNDETERMINED
-                outcomes carry both operands' evidence.
+                outcomes carry both operands' evidence. Every operand that
+                ran contributes the reasons it carries to
+                ``undetermined_operands``; one that came back UNDETERMINED
+                with none of its own contributes its rationale instead. Each
+                reason is kept once, and a short-circuited operand never runs,
+                so it is never recorded.
         """
         left_result = await self._left.evaluate_async(context=context)
 
@@ -175,14 +198,17 @@ class _AllEvaluator(BaseEvaluator):
             return EvalResult(
                 outcome=EvalOutcome.NOT_DETECTED,
                 rationale=f"Left operand not detected: {left_result.rationale}",
+                undetermined_operands=_merge_undetermined(left=left_result),
             )
 
         right_result = await self._right.evaluate_async(context=context)
+        undetermined = _merge_undetermined(left=left_result, right=right_result)
 
         if right_result.outcome == EvalOutcome.NOT_DETECTED:
             return EvalResult(
                 outcome=EvalOutcome.NOT_DETECTED,
                 rationale=f"Right operand not detected: {right_result.rationale}",
+                undetermined_operands=undetermined,
             )
 
         # Both operands ran, so carry the evidence they produced even though the
@@ -193,6 +219,7 @@ class _AllEvaluator(BaseEvaluator):
                 outcome=EvalOutcome.UNDETERMINED,
                 evidence=left_result.evidence + right_result.evidence,
                 rationale=f"Left operand undetermined: {left_result.rationale}",
+                undetermined_operands=undetermined,
             )
 
         if right_result.outcome == EvalOutcome.UNDETERMINED:
@@ -200,12 +227,14 @@ class _AllEvaluator(BaseEvaluator):
                 outcome=EvalOutcome.UNDETERMINED,
                 evidence=left_result.evidence + right_result.evidence,
                 rationale=f"Right operand undetermined: {right_result.rationale}",
+                undetermined_operands=undetermined,
             )
 
         return EvalResult(
             outcome=EvalOutcome.DETECTED,
             evidence=left_result.evidence + right_result.evidence,
             rationale=f"({left_result.rationale}) AND ({right_result.rationale})",
+            undetermined_operands=undetermined,
         )
 
 
@@ -220,9 +249,9 @@ class _NotEvaluator(BaseEvaluator):
 
         Returns:
             EvalResult: The inner result with DETECTED <-> NOT_DETECTED
-                flipped (UNDETERMINED preserved); confidence and evidence
-                are carried through and the rationale is prefixed with
-                ``NOT (...)``.
+                flipped (UNDETERMINED preserved); confidence, evidence and
+                ``undetermined_operands`` are carried through and the
+                rationale is prefixed with ``NOT (...)``.
         """
         result = await self._inner.evaluate_async(context=context)
 
@@ -235,4 +264,44 @@ class _NotEvaluator(BaseEvaluator):
             confidence=result.confidence,
             evidence=result.evidence,
             rationale=f"NOT ({result.rationale})",
+            undetermined_operands=_merge_undetermined(left=result),
         )
+
+
+def _merge_undetermined(
+    *,
+    left: EvalResult,
+    right: EvalResult | None = None,
+) -> list[str]:
+    """Collect why any part of this composition stayed undetermined.
+
+    An operand that already carries reasons contributes those, because they
+    name the evaluators that could not answer. An operand that came back
+    UNDETERMINED carrying none has only its rationale to offer, so that
+    stands in for it, or a fixed phrase when it gave none. Taking the
+    carried reasons in preference is what keeps a nested composite from
+    collapsing several gaps into one restatement of the first.
+
+    Repeats are collapsed, since a tree can reach the same unobservable
+    evaluator by more than one path and a repeat says nothing the first
+    entry did not.
+
+    Args:
+        left (EvalResult): The left operand's result.
+        right (EvalResult | None): The right operand's result, or None when
+            the left operand short-circuited before the right one ran.
+
+    Returns:
+        list[str]: A fresh list of the distinct reasons, left operand first.
+    """
+    reasons: list[str] = []
+    for operand in (left, right):
+        if operand is None:
+            continue
+        if operand.undetermined_operands:
+            reasons.extend(operand.undetermined_operands)
+        elif operand.outcome == EvalOutcome.UNDETERMINED:
+            # str() because a third-party evaluator that puts a non-string in
+            # rationale should cost its own reason, not the whole verdict.
+            reasons.append(str(operand.rationale).strip() or _NO_REASON_GIVEN)
+    return list(dict.fromkeys(reasons))

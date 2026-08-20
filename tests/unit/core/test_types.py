@@ -147,6 +147,7 @@ class TestEvalResult:
         assert er.confidence == pytest.approx(1.0)
         assert er.evidence == []
         assert er.rationale == ""
+        assert er.undetermined_operands == []
 
 
 class TestEvalContext:

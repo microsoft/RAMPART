@@ -111,12 +111,14 @@ def _make_eval_result(
     confidence: float = 0.9,
     evidence: list[str] | None = None,
     rationale: str = "because",
+    undetermined_operands: list[str] | None = None,
 ) -> EvalResult:
     return EvalResult(
         outcome=outcome,
         confidence=confidence,
         evidence=evidence or [],
         rationale=rationale,
+        undetermined_operands=undetermined_operands or [],
     )
 
 
@@ -349,6 +351,23 @@ class TestSerializationRoundTrip:
         assert outcome is EvalOutcome.NOT_DETECTED
         assert recovered["n"][0].turns[0].eval_result.evidence == ["e1", "e2"]
 
+    def test_undetermined_operands_round_trip(self) -> None:
+        eval_result = _make_eval_result(
+            outcome=EvalOutcome.NOT_DETECTED,
+            undetermined_operands=["side effects not reported"],
+        )
+        turn = _make_turn(eval_result=eval_result, turn_number=1)
+        result = _make_result(turns=[turn])
+        session = _make_session_with_results(
+            results_by_nodeid={"n": [result]},
+        )
+        payload = _serialize_session_results(session=session)
+        recovered = _deserialize_report_results(data=payload)
+        assert recovered["n"][0].turns[0].eval_result is not None
+        assert recovered["n"][0].turns[0].eval_result.undetermined_operands == [
+            "side effects not reported",
+        ]
+
     def test_datetime_round_trip(self) -> None:
         when = datetime(2026, 1, 1, 12, 0, 0, tzinfo=UTC)
         turn = _make_turn(timestamp=when)
@@ -516,6 +535,68 @@ class TestDeserializationSecurity:
         }
         result = _deserialize_report_results(data=payload)["n"][0]
         assert result.turns[0].response.text == "DANGER"
+
+    def test_strips_ansi_from_undetermined_operands(self) -> None:
+        payload: dict[str, Any] = {
+            "schema": SCHEMA_VERSION,
+            "nodeid": "n",
+            "results": [
+                {
+                    "safe": True,
+                    "status": "safe",
+                    "summary": "x",
+                    "observability_level": "response_only",
+                    "turns": [
+                        {
+                            "request": {"prompt": "p"},
+                            "response": {"text": "t"},
+                            "eval_result": {
+                                "outcome": "not_detected",
+                                "undetermined_operands": [
+                                    "\x1b[31mDANGER\x1b[0m",
+                                ],
+                            },
+                        },
+                    ],
+                },
+            ],
+        }
+        result = _deserialize_report_results(data=payload)["n"][0]
+        assert result.turns[0].eval_result is not None
+        assert result.turns[0].eval_result.undetermined_operands == ["DANGER"]
+
+    def test_undetermined_operands_stay_distinct_after_stripping(self) -> None:
+        payload: dict[str, Any] = {
+            "schema": SCHEMA_VERSION,
+            "nodeid": "n",
+            "results": [
+                {
+                    "safe": True,
+                    "status": "safe",
+                    "summary": "x",
+                    "observability_level": "response_only",
+                    "turns": [
+                        {
+                            "request": {"prompt": "p"},
+                            "response": {"text": "t"},
+                            "eval_result": {
+                                "outcome": "not_detected",
+                                "undetermined_operands": [
+                                    "no side effects",
+                                    "\x1b[31mno side effects\x1b[0m",
+                                    "\x1b]0;title\x07",
+                                ],
+                            },
+                        },
+                    ],
+                },
+            ],
+        }
+        result = _deserialize_report_results(data=payload)["n"][0]
+        assert result.turns[0].eval_result is not None
+        assert result.turns[0].eval_result.undetermined_operands == [
+            "no side effects",
+        ]
 
     def test_nan_inf_in_duration_coerced_to_zero(self) -> None:
         session = _make_session_with_results(

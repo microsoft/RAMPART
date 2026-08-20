@@ -314,12 +314,25 @@ class EvalResult:
         confidence: How confident the evaluator is (0.0 to 1.0).
         evidence: Specific observations supporting the outcome.
         rationale: Human-readable explanation.
+        undetermined_operands: Why parts of the evaluation stayed
+            undetermined, one distinct reason per entry. ``&`` and ``|``
+            record every operand they ran that came back UNDETERMINED,
+            taking the reasons that operand already carries or, for a
+            leaf, its rationale, or a fixed phrase when it gave none;
+            repeats are collapsed. ``~`` carries its inner result's
+            entries through. An evaluator that is not a composite
+            records nothing. It says nothing about ``outcome``: a
+            DETECTED or NOT_DETECTED result with entries here reached a
+            definitive answer while part of the evaluation did not, and
+            an UNDETERMINED result can carry entries recorded further
+            down the expression.
     """
 
     outcome: EvalOutcome
     confidence: float = 1.0
     evidence: list[str] = field(default_factory=list[str])
     rationale: str = ""
+    undetermined_operands: list[str] = field(default_factory=list[str])
 
     @property
     def detected(self) -> bool:

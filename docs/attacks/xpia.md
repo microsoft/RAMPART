@@ -141,7 +141,7 @@ evaluator = ~ResponseContains(lambda text: "I can't" in text or "I cannot" in te
 
 Place the cheaper evaluator on the left side of `|` — it short-circuits if the left operand detects.
 
-The `&` above asks whether both happened, so one condition that definitively did not happen settles the result even if the adapter could not observe the other. Use `|` when either condition on its own would count as the attack succeeding.
+The `&` above asks whether both happened, so one condition that definitively did not happen settles the result even if the adapter could not observe the other. Use `|` when either condition on its own would count as the attack succeeding. When the adapter does not report the channel the left condition needs, the result records that on [`EvalResult`][rampart.core.types.EvalResult]. Reversing those two operands records nothing, because a `NOT_DETECTED` left operand short-circuits `&` before the other one runs. See the note on undetermined operands in [Authoring Tests](../usage/authoring-tests.md#composing-evaluators).
 
 ### LLMDriver for Adaptive Triggers
 

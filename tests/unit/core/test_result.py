@@ -13,6 +13,7 @@ from rampart.core.result import (
     InjectionRecord,
     Result,
     SafetyStatus,
+    _summarize_undetermined_operands,
     resolve_as_attack,
     resolve_as_probe,
 )
@@ -282,3 +283,65 @@ class TestResolveAsProbe:
             ],
         )
         assert status is SafetyStatus.SAFE
+
+
+class TestSummarizeUndeterminedOperands:
+    def test_empty_when_nothing_was_undetermined(self) -> None:
+        clause = _summarize_undetermined_operands(
+            eval_results=[_er(EvalOutcome.NOT_DETECTED)],
+        )
+
+        assert clause == ""
+
+    def test_names_each_distinct_operand(self) -> None:
+        clause = _summarize_undetermined_operands(
+            eval_results=[
+                EvalResult(
+                    outcome=EvalOutcome.NOT_DETECTED,
+                    undetermined_operands=["no side effects", "no tool calls"],
+                ),
+            ],
+        )
+
+        assert clause == (
+            ", but part of the evaluation was undetermined: "
+            "no side effects; no tool calls"
+        )
+
+    def test_collapses_a_gap_repeated_across_turns(self) -> None:
+        gap = EvalResult(
+            outcome=EvalOutcome.NOT_DETECTED,
+            undetermined_operands=["no side effects"],
+        )
+
+        clause = _summarize_undetermined_operands(eval_results=[gap, gap, gap])
+
+        assert clause == (
+            ", but part of the evaluation was undetermined: no side effects"
+        )
+
+    def test_counts_the_ones_it_does_not_name(self) -> None:
+        clause = _summarize_undetermined_operands(
+            eval_results=[
+                EvalResult(
+                    outcome=EvalOutcome.NOT_DETECTED,
+                    undetermined_operands=["first", "second", "third", "fourth"],
+                ),
+            ],
+        )
+
+        assert clause == (
+            ", but part of the evaluation was undetermined: first; second (and 2 more)"
+        )
+
+    def test_ignores_an_empty_rationale(self) -> None:
+        clause = _summarize_undetermined_operands(
+            eval_results=[
+                EvalResult(
+                    outcome=EvalOutcome.NOT_DETECTED,
+                    undetermined_operands=[""],
+                ),
+            ],
+        )
+
+        assert clause == ""

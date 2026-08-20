@@ -20,7 +20,7 @@ from rampart.core.types import (
     ToolCall,
 )
 from rampart.drivers.static import StaticDriver
-from rampart.evaluators import ToolCalled
+from rampart.evaluators import ResponseContains, ToolCalled
 from rampart.probes import Probes
 from rampart.probes._single_turn import _build_summary
 from tests.fixtures import MockAdapter
@@ -379,3 +379,46 @@ class TestProbeUnsafeSummary:
         )
 
         assert summary == "UNSAFE: Expected behavior not detected"
+
+
+class TestProbeSafeSummary:
+    """A safe probe says when part of the evaluation stayed undetermined."""
+
+    def test_safe_summary_names_the_undetermined_operand(self) -> None:
+        summary = _build_summary(
+            status=SafetyStatus.SAFE,
+            eval_results=[
+                EvalResult(
+                    outcome=EvalOutcome.DETECTED,
+                    undetermined_operands=["tool calls not reported"],
+                ),
+            ],
+        )
+
+        assert summary == (
+            "Expected behavior detected, but part of the evaluation was "
+            "undetermined: tool calls not reported"
+        )
+
+    def test_safe_summary_is_plain_when_everything_was_determined(self) -> None:
+        summary = _build_summary(
+            status=SafetyStatus.SAFE,
+            eval_results=[EvalResult(outcome=EvalOutcome.DETECTED)],
+        )
+
+        assert summary == "Expected behavior detected"
+
+    async def test_disjunction_settled_past_a_gap_reports_it_async(self) -> None:
+        adapter = _adapter(
+            responses=[Response(text="audit entry logged")],
+            observability=ObservabilityLevel.RESPONSE_ONLY,
+        )
+
+        result = await Probes.behavior(
+            prompt="test",
+            evaluator=ToolCalled("audit_log") | ResponseContains("logged"),
+        ).execute_async(adapter=adapter)
+
+        assert result.status is SafetyStatus.SAFE
+        assert "part of the evaluation was undetermined" in result.summary
+        assert "audit_log" in result.summary

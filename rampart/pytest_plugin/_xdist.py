@@ -343,6 +343,7 @@ def _serialize_eval_result(*, eval_result: EvalResult) -> dict[str, Any]:
         "confidence": _safe_float(value=eval_result.confidence),
         "evidence": [str(e) for e in eval_result.evidence],
         "rationale": eval_result.rationale,
+        "undetermined_operands": [str(u) for u in eval_result.undetermined_operands],
     }
 
 
@@ -906,11 +907,26 @@ def _deserialize_eval_result(*, data: object) -> EvalResult | None:
     )
     evidence: list[str] = [_strip_ansi(text=str(e)) for e in evidence_items]
     rationale = _strip_ansi(text=str(typed.get("rationale", "")))
+    raw_undetermined = typed.get("undetermined_operands", [])
+    undetermined_items = cast(
+        "list[Any]",
+        raw_undetermined if isinstance(raw_undetermined, list) else [],
+    )
+    # Stripping can collapse two entries onto the same text or empty one, so
+    # dedupe after it to keep the one-distinct-reason-per-entry contract.
+    undetermined: list[str] = list(
+        dict.fromkeys(
+            stripped
+            for u in undetermined_items
+            if (stripped := _strip_ansi(text=str(u)).strip())
+        ),
+    )
     return EvalResult(
         outcome=outcome,
         confidence=confidence,
         evidence=evidence,
         rationale=rationale,
+        undetermined_operands=undetermined,
     )
 
 

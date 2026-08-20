@@ -396,3 +396,189 @@ class TestCompositionChaining:
 
         result = await second.evaluate_async(context=_ctx())
         assert result.outcome is EvalOutcome.NOT_DETECTED
+
+
+class TestUndeterminedOperands:
+    """A settled outcome still says which operand was never determined."""
+
+    async def test_and_records_the_operand_it_settled_past_async(self) -> None:
+        left = _StubEvaluator(
+            outcome=EvalOutcome.UNDETERMINED,
+            rationale="side effects not reported",
+        )
+        composed = left & _StubEvaluator(outcome=EvalOutcome.NOT_DETECTED)
+
+        result = await composed.evaluate_async(context=_ctx())
+
+        assert result.outcome is EvalOutcome.NOT_DETECTED
+        assert result.undetermined_operands == ["side effects not reported"]
+
+    async def test_or_records_the_operand_it_settled_past_async(self) -> None:
+        left = _StubEvaluator(
+            outcome=EvalOutcome.UNDETERMINED,
+            rationale="tool calls not reported",
+        )
+        composed = left | _StubEvaluator(outcome=EvalOutcome.DETECTED)
+
+        result = await composed.evaluate_async(context=_ctx())
+
+        assert result.outcome is EvalOutcome.DETECTED
+        assert result.undetermined_operands == ["tool calls not reported"]
+
+    async def test_records_every_operand_that_ran_undetermined_async(self) -> None:
+        detected = EvalOutcome.DETECTED
+        not_detected = EvalOutcome.NOT_DETECTED
+        undetermined = EvalOutcome.UNDETERMINED
+        expected = {
+            ("&", detected, detected): [],
+            ("&", detected, not_detected): [],
+            ("&", detected, undetermined): ["right"],
+            ("&", not_detected, detected): [],
+            ("&", not_detected, not_detected): [],
+            ("&", not_detected, undetermined): [],
+            ("&", undetermined, detected): ["left"],
+            ("&", undetermined, not_detected): ["left"],
+            ("&", undetermined, undetermined): ["left", "right"],
+            ("|", detected, detected): [],
+            ("|", detected, not_detected): [],
+            ("|", detected, undetermined): [],
+            ("|", not_detected, detected): [],
+            ("|", not_detected, not_detected): [],
+            ("|", not_detected, undetermined): ["right"],
+            ("|", undetermined, detected): ["left"],
+            ("|", undetermined, not_detected): ["left"],
+            ("|", undetermined, undetermined): ["left", "right"],
+        }
+
+        for (operator, left, right), reasons in expected.items():
+            operands = (
+                _StubEvaluator(outcome=left, rationale="left"),
+                _StubEvaluator(outcome=right, rationale="right"),
+            )
+            composed = (
+                operands[0] & operands[1]
+                if operator == "&"
+                else operands[0] | operands[1]
+            )
+
+            result = await composed.evaluate_async(context=_ctx())
+
+            assert result.undetermined_operands == reasons, f"{left} {operator} {right}"
+
+    async def test_a_nested_gap_is_named_not_restated_async(self) -> None:
+        channels = ["first", "second", "third", "fourth"]
+        either = _StubEvaluator(outcome=EvalOutcome.UNDETERMINED, rationale=channels[0])
+        for channel in channels[1:]:
+            either |= _StubEvaluator(
+                outcome=EvalOutcome.UNDETERMINED,
+                rationale=channel,
+            )
+        composed = either & _StubEvaluator(outcome=EvalOutcome.NOT_DETECTED)
+
+        result = await composed.evaluate_async(context=_ctx())
+
+        assert result.outcome is EvalOutcome.NOT_DETECTED
+        assert result.undetermined_operands == channels
+
+    async def test_a_gap_reached_by_two_paths_is_recorded_once_async(self) -> None:
+        gap = _StubEvaluator(outcome=EvalOutcome.UNDETERMINED, rationale="cannot look")
+        composed = gap & (gap & _StubEvaluator(outcome=EvalOutcome.NOT_DETECTED))
+
+        result = await composed.evaluate_async(context=_ctx())
+
+        assert result.undetermined_operands == ["cannot look"]
+
+    async def test_short_circuit_cannot_record_an_operand_it_skipped_async(
+        self,
+    ) -> None:
+        right = _StubEvaluator(outcome=EvalOutcome.UNDETERMINED)
+        composed = _StubEvaluator(outcome=EvalOutcome.NOT_DETECTED) & right
+
+        result = await composed.evaluate_async(context=_ctx())
+
+        assert result.outcome is EvalOutcome.NOT_DETECTED
+        assert right.call_count == 0
+        assert result.undetermined_operands == []
+
+    async def test_survives_another_level_of_composition_async(self) -> None:
+        inner = _StubEvaluator(
+            outcome=EvalOutcome.UNDETERMINED,
+            rationale="cannot look",
+        ) & _StubEvaluator(outcome=EvalOutcome.NOT_DETECTED)
+        expected = ["cannot look"]
+
+        for composed in (
+            inner | _StubEvaluator(outcome=EvalOutcome.NOT_DETECTED),
+            inner & _StubEvaluator(outcome=EvalOutcome.DETECTED),
+            _StubEvaluator(outcome=EvalOutcome.NOT_DETECTED) | inner,
+        ):
+            result = await composed.evaluate_async(context=_ctx())
+
+            assert result.undetermined_operands == expected
+
+    async def test_the_same_gap_reached_twice_is_recorded_once_async(self) -> None:
+        gap = _StubEvaluator(
+            outcome=EvalOutcome.UNDETERMINED,
+            rationale="cannot look",
+        ) & _StubEvaluator(outcome=EvalOutcome.NOT_DETECTED)
+
+        result = await (gap | gap).evaluate_async(context=_ctx())
+
+        assert result.undetermined_operands == ["cannot look"]
+
+    async def test_an_operand_without_a_reason_is_still_recorded_async(self) -> None:
+        for rationale in ("", "   ", "\t"):
+            silent = _StubEvaluator(
+                outcome=EvalOutcome.UNDETERMINED,
+                rationale=rationale,
+            )
+
+            for composed in (
+                silent & _StubEvaluator(outcome=EvalOutcome.NOT_DETECTED),
+                silent | _StubEvaluator(outcome=EvalOutcome.DETECTED),
+            ):
+                result = await composed.evaluate_async(context=_ctx())
+
+                assert result.undetermined_operands == ["an operand gave no reason"]
+
+    async def test_a_settled_three_operand_tree_names_every_gap_once_async(
+        self,
+    ) -> None:
+        for first in _OUTCOMES:
+            for second in _OUTCOMES:
+                for third in _OUTCOMES:
+                    outcomes = (first, second, third)
+                    operands = [
+                        _StubEvaluator(outcome=outcome, rationale=f"g{index}")
+                        for index, outcome in enumerate(outcomes)
+                    ]
+                    for composed in (
+                        (operands[0] & operands[1]) | operands[2],
+                        (operands[0] | operands[1]) & operands[2],
+                        operands[0] & (operands[1] | operands[2]),
+                        operands[0] | (operands[1] & operands[2]),
+                    ):
+                        for operand in operands:
+                            operand.call_count = 0
+
+                        result = await composed.evaluate_async(context=_ctx())
+
+                        ran_undetermined = [
+                            f"g{index}"
+                            for index, operand in enumerate(operands)
+                            if operand.call_count
+                            and outcomes[index] is EvalOutcome.UNDETERMINED
+                        ]
+                        recorded = result.undetermined_operands
+                        assert recorded == ran_undetermined
+
+    async def test_not_carries_it_through_the_flip_async(self) -> None:
+        inner = _StubEvaluator(
+            outcome=EvalOutcome.UNDETERMINED,
+            rationale="cannot look",
+        ) & _StubEvaluator(outcome=EvalOutcome.NOT_DETECTED)
+
+        result = await (~inner).evaluate_async(context=_ctx())
+
+        assert result.outcome is EvalOutcome.DETECTED
+        assert result.undetermined_operands == ["cannot look"]
