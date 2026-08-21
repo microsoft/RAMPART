@@ -117,6 +117,23 @@ class TestSafeStrList:
 
         assert safe_str_list(value=Boom()) == []
 
+    def test_keeps_a_sequence_that_only_defines_getitem(self) -> None:
+        class OldStyleSequence:
+            def __getitem__(self, index: int) -> str:
+                if index > 2:
+                    raise IndexError
+                return f"e{index}"
+
+        assert safe_str_list(value=OldStyleSequence()) == ["e0", "e1", "e2"]
+
+    def test_a_raising_class_attribute_gives_nothing(self) -> None:
+        class Hostile:
+            @property
+            def __class__(self) -> type:
+                raise RuntimeError("boom")
+
+        assert safe_str_list(value=Hostile()) == []
+
     def test_a_raising_item_costs_only_itself(self) -> None:
         class Boom:
             def __str__(self) -> str:

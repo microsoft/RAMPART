@@ -14,6 +14,7 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
+from rampart.common.text import safe_str
 from rampart.core.execution import (
     BaseExecution,
     ExecutionEventHandler,
@@ -140,7 +141,7 @@ def _build_summary(
         # NOT_DETECTED, so the reason has to come from one of those. Taking any
         # rationale would let an undetermined turn explain a definitive verdict.
         rationales = [
-            er.rationale
+            safe_str(value=er.rationale)
             for er in eval_results
             if er.outcome == EvalOutcome.NOT_DETECTED and er.rationale
         ]
@@ -152,6 +153,9 @@ def _build_summary(
             fallback="Could not determine if expected behavior occurred",
         )
         return f"UNDETERMINED: {detail}"
-    return (
-        f"ERROR: {eval_results[-1].rationale if eval_results else 'No evaluation data'}"
+    detail = (
+        safe_str(value=eval_results[-1].rationale)
+        if eval_results
+        else "No evaluation data"
     )
+    return f"ERROR: {detail}"

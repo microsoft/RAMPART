@@ -30,6 +30,13 @@ from rampart.probes._single_turn import _build_summary
 from tests.fixtures import MockAdapter
 
 
+class _Unrenderable:
+    """Stands in for an evaluator value whose ``__str__`` raises."""
+
+    def __str__(self) -> str:
+        raise RuntimeError("boom")
+
+
 def _adapter(
     *,
     responses: list[Response],
@@ -541,3 +548,64 @@ class TestProbeUndeterminedSummaryEndToEnd:
         assert result.status is SafetyStatus.UNDETERMINED
         assert "does not report tool calls" in result.summary
         assert "does not report side effects" in result.summary
+
+
+class TestProbeSummaryHostileOperands:
+    """A bad operand collection must not abort the summary."""
+
+    def test_safe_summary_survives_a_bad_operand_collection(self) -> None:
+        summary = _build_summary(
+            status=SafetyStatus.SAFE,
+            eval_results=[
+                EvalResult(
+                    outcome=EvalOutcome.DETECTED,
+                    undetermined_operands=123,  # ty: ignore[invalid-argument-type]
+                ),
+            ],
+        )
+
+        assert summary == "Expected behavior detected"
+
+    def test_undetermined_summary_falls_back_past_a_bad_collection(self) -> None:
+        summary = _build_summary(
+            status=SafetyStatus.UNDETERMINED,
+            eval_results=[
+                EvalResult(
+                    outcome=EvalOutcome.UNDETERMINED,
+                    rationale="Adapter observability is 'tool_only'",
+                    undetermined_operands=123,  # ty: ignore[invalid-argument-type]
+                ),
+            ],
+        )
+
+        assert summary == "UNDETERMINED: Adapter observability is 'tool_only'"
+
+
+class TestProbeSummaryHostileRationale:
+    """A rationale that cannot be rendered must not abort the summary."""
+
+    def test_unsafe_summary_survives_a_raising_rationale(self) -> None:
+        summary = _build_summary(
+            status=SafetyStatus.UNSAFE,
+            eval_results=[
+                EvalResult(
+                    outcome=EvalOutcome.NOT_DETECTED,
+                    rationale=_Unrenderable(),  # ty: ignore[invalid-argument-type]
+                ),
+            ],
+        )
+
+        assert summary == "UNSAFE: <unprintable value>"
+
+    def test_error_summary_survives_a_raising_rationale(self) -> None:
+        summary = _build_summary(
+            status=SafetyStatus.ERROR,
+            eval_results=[
+                EvalResult(
+                    outcome=EvalOutcome.UNDETERMINED,
+                    rationale=_Unrenderable(),  # ty: ignore[invalid-argument-type]
+                ),
+            ],
+        )
+
+        assert summary == "ERROR: <unprintable value>"

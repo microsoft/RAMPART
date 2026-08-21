@@ -3,6 +3,8 @@
 
 """Tests for rampart.core.evaluator — Evaluator protocol, BaseEvaluator, composition."""
 
+import pytest
+
 from rampart.core.evaluator import BaseEvaluator, Evaluator
 from rampart.core.types import (
     EvalContext,
@@ -584,3 +586,102 @@ class TestUndeterminedOperands:
 
         assert result.outcome is EvalOutcome.DETECTED
         assert result.undetermined_operands == ["cannot look"]
+
+
+class _HostileEvidenceEvaluator(BaseEvaluator):
+    """Returns an evidence collection that cannot be iterated."""
+
+    def __init__(self, *, outcome: EvalOutcome) -> None:
+        self._outcome = outcome
+
+    async def evaluate_async(self, *, context: EvalContext) -> EvalResult:
+        """Return a result whose evidence is not a list."""
+        return EvalResult(
+            outcome=self._outcome,
+            evidence=123,  # ty: ignore[invalid-argument-type]
+            rationale="hostile",
+        )
+
+
+class TestCompositionToleratesHostileEvidence:
+    """A bad evidence collection must not cost the composed verdict."""
+
+    @pytest.mark.parametrize("left", _OUTCOMES)
+    @pytest.mark.parametrize("right", _OUTCOMES)
+    @pytest.mark.parametrize("operator", ["and", "or"])
+    async def test_hostile_left_evidence_keeps_the_verdict_async(
+        self,
+        left: EvalOutcome,
+        right: EvalOutcome,
+        operator: str,
+    ) -> None:
+        hostile = _HostileEvidenceEvaluator(outcome=left)
+        readable = _StubEvaluator(outcome=right)
+        composed = hostile & readable if operator == "and" else hostile | readable
+
+        result = await composed.evaluate_async(context=_ctx())
+
+        assert all(isinstance(e, str) for e in result.evidence)
+        assert "123" not in result.evidence
+
+    @pytest.mark.parametrize("left", _OUTCOMES)
+    @pytest.mark.parametrize("right", _OUTCOMES)
+    @pytest.mark.parametrize("operator", ["and", "or"])
+    async def test_hostile_right_evidence_keeps_the_verdict_async(
+        self,
+        left: EvalOutcome,
+        right: EvalOutcome,
+        operator: str,
+    ) -> None:
+        readable = _StubEvaluator(outcome=left)
+        hostile = _HostileEvidenceEvaluator(outcome=right)
+        composed = readable & hostile if operator == "and" else readable | hostile
+
+        result = await composed.evaluate_async(context=_ctx())
+
+        assert all(isinstance(e, str) for e in result.evidence)
+        assert "123" not in result.evidence
+
+    @pytest.mark.parametrize(
+        "outcome",
+        [EvalOutcome.DETECTED, EvalOutcome.NOT_DETECTED],
+    )
+    async def test_negation_normalizes_evidence_it_flips_async(
+        self,
+        outcome: EvalOutcome,
+    ) -> None:
+        result = await (~_HostileEvidenceEvaluator(outcome=outcome)).evaluate_async(
+            context=_ctx(),
+        )
+
+        assert result.evidence == []
+
+    async def test_negation_passes_an_undetermined_result_through_async(self) -> None:
+        # `~` returns the inner result unchanged when it is UNDETERMINED, as it
+        # does on main, so nothing about it is normalized here.
+        inner = _HostileEvidenceEvaluator(outcome=EvalOutcome.UNDETERMINED)
+
+        result = await (~inner).evaluate_async(context=_ctx())
+
+        assert result.outcome is EvalOutcome.UNDETERMINED
+        assert result.evidence == 123
+
+    async def test_conjunction_keeps_readable_evidence_async(self) -> None:
+        composed = _HostileEvidenceEvaluator(
+            outcome=EvalOutcome.DETECTED,
+        ) & _StubEvaluator(outcome=EvalOutcome.DETECTED)
+
+        result = await composed.evaluate_async(context=_ctx())
+
+        assert result.outcome is EvalOutcome.DETECTED
+        assert result.evidence == ["stub:detected"]
+
+    async def test_disjunction_keeps_readable_evidence_async(self) -> None:
+        composed = _HostileEvidenceEvaluator(
+            outcome=EvalOutcome.UNDETERMINED,
+        ) | _StubEvaluator(outcome=EvalOutcome.UNDETERMINED)
+
+        result = await composed.evaluate_async(context=_ctx())
+
+        assert result.outcome is EvalOutcome.UNDETERMINED
+        assert result.evidence == ["stub:undetermined"]

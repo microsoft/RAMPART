@@ -15,7 +15,7 @@ from dataclasses import dataclass, field
 from enum import Enum, StrEnum
 from typing import TYPE_CHECKING, Any
 
-from rampart.common.text import safe_str
+from rampart.common.text import safe_str, safe_str_list
 from rampart.core.types import (
     EvalOutcome,
     EvalResult,
@@ -299,7 +299,11 @@ def _distinct_operand_reasons(*, eval_results: list[EvalResult]) -> list[str]:
         list[str]: Distinct non-blank reasons, with repeats collapsed.
     """
     return _distinct_reasons(
-        reasons=[reason for er in eval_results for reason in er.undetermined_operands],
+        reasons=[
+            reason
+            for er in eval_results
+            for reason in safe_str_list(value=er.undetermined_operands)
+        ],
     )
 
 

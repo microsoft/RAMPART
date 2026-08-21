@@ -28,6 +28,13 @@ from rampart.core.types import (
 )
 
 
+class _RaisingIter:
+    """Stands in for an evaluator whose operand collection cannot be iterated."""
+
+    def __iter__(self) -> object:
+        raise RuntimeError("boom")
+
+
 def _er(outcome: EvalOutcome) -> EvalResult:
     """Shorthand to build an EvalResult with a given outcome."""
     return EvalResult(outcome=outcome)
@@ -382,6 +389,52 @@ class TestSummarizeUndeterminedOperands:
         )
 
         assert clause == ""
+
+
+class TestSummaryPathToleratesHostileEvaluatorData:
+    """Evaluator-supplied collections must not abort summary construction."""
+
+    @pytest.mark.parametrize(
+        "operands",
+        [123, _RaisingIter()],
+        ids=["non-iterable", "raising-iter"],
+    )
+    def test_safe_clause_survives_a_bad_operand_collection(
+        self,
+        operands: object,
+    ) -> None:
+        clause = _summarize_undetermined_operands(
+            eval_results=[
+                EvalResult(
+                    outcome=EvalOutcome.NOT_DETECTED,
+                    undetermined_operands=operands,  # ty: ignore[invalid-argument-type]
+                ),
+            ],
+        )
+
+        assert clause == ""
+
+    @pytest.mark.parametrize(
+        "operands",
+        [123, _RaisingIter()],
+        ids=["non-iterable", "raising-iter"],
+    )
+    def test_undetermined_detail_survives_a_bad_operand_collection(
+        self,
+        operands: object,
+    ) -> None:
+        detail = _explain_undetermined(
+            eval_results=[
+                EvalResult(
+                    outcome=EvalOutcome.UNDETERMINED,
+                    rationale="the real reason",
+                    undetermined_operands=operands,  # ty: ignore[invalid-argument-type]
+                ),
+            ],
+            fallback="nothing to say",
+        )
+
+        assert detail == "the real reason"
 
 
 class TestExplainUndetermined:

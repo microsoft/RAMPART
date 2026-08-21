@@ -118,7 +118,7 @@ class _AnyEvaluator(BaseEvaluator):
         if left_result.detected:
             return EvalResult(
                 outcome=EvalOutcome.DETECTED,
-                evidence=left_result.evidence,
+                evidence=safe_str_list(value=left_result.evidence),
                 rationale=left_result.rationale,
                 undetermined_operands=_merge_undetermined(left=left_result),
             )
@@ -129,7 +129,7 @@ class _AnyEvaluator(BaseEvaluator):
         if right_result.detected:
             return EvalResult(
                 outcome=EvalOutcome.DETECTED,
-                evidence=right_result.evidence,
+                evidence=safe_str_list(value=right_result.evidence),
                 rationale=right_result.rationale,
                 undetermined_operands=undetermined,
             )
@@ -140,7 +140,10 @@ class _AnyEvaluator(BaseEvaluator):
         if left_result.outcome == EvalOutcome.UNDETERMINED:
             return EvalResult(
                 outcome=EvalOutcome.UNDETERMINED,
-                evidence=left_result.evidence + right_result.evidence,
+                evidence=(
+                    safe_str_list(value=left_result.evidence)
+                    + safe_str_list(value=right_result.evidence)
+                ),
                 rationale=(
                     "Left operand undetermined: "
                     f"{safe_str(value=left_result.rationale)}"
@@ -151,7 +154,10 @@ class _AnyEvaluator(BaseEvaluator):
         if right_result.outcome == EvalOutcome.UNDETERMINED:
             return EvalResult(
                 outcome=EvalOutcome.UNDETERMINED,
-                evidence=left_result.evidence + right_result.evidence,
+                evidence=(
+                    safe_str_list(value=left_result.evidence)
+                    + safe_str_list(value=right_result.evidence)
+                ),
                 rationale=(
                     "Right operand undetermined: "
                     f"{safe_str(value=right_result.rationale)}"
@@ -230,7 +236,10 @@ class _AllEvaluator(BaseEvaluator):
         if left_result.outcome == EvalOutcome.UNDETERMINED:
             return EvalResult(
                 outcome=EvalOutcome.UNDETERMINED,
-                evidence=left_result.evidence + right_result.evidence,
+                evidence=(
+                    safe_str_list(value=left_result.evidence)
+                    + safe_str_list(value=right_result.evidence)
+                ),
                 rationale=(
                     "Left operand undetermined: "
                     f"{safe_str(value=left_result.rationale)}"
@@ -241,7 +250,10 @@ class _AllEvaluator(BaseEvaluator):
         if right_result.outcome == EvalOutcome.UNDETERMINED:
             return EvalResult(
                 outcome=EvalOutcome.UNDETERMINED,
-                evidence=left_result.evidence + right_result.evidence,
+                evidence=(
+                    safe_str_list(value=left_result.evidence)
+                    + safe_str_list(value=right_result.evidence)
+                ),
                 rationale=(
                     "Right operand undetermined: "
                     f"{safe_str(value=right_result.rationale)}"
@@ -251,7 +263,10 @@ class _AllEvaluator(BaseEvaluator):
 
         return EvalResult(
             outcome=EvalOutcome.DETECTED,
-            evidence=left_result.evidence + right_result.evidence,
+            evidence=(
+                safe_str_list(value=left_result.evidence)
+                + safe_str_list(value=right_result.evidence)
+            ),
             rationale=(
                 f"({safe_str(value=left_result.rationale)}) "
                 f"AND ({safe_str(value=right_result.rationale)})"
@@ -284,7 +299,7 @@ class _NotEvaluator(BaseEvaluator):
         return EvalResult(
             outcome=flipped,
             confidence=result.confidence,
-            evidence=result.evidence,
+            evidence=safe_str_list(value=result.evidence),
             rationale=f"NOT ({safe_str(value=result.rationale)})",
             undetermined_operands=_merge_undetermined(left=result),
         )

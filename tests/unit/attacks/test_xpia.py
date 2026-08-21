@@ -651,6 +651,77 @@ class TestXPIAUndeterminedSummary:
         assert summary == "Evaluation undetermined: side effects are unobservable"
 
 
+class TestXPIASummaryHostileOperands:
+    """A bad operand collection must not abort the summary."""
+
+    def test_safe_summary_survives_a_bad_operand_collection(self) -> None:
+        summary = _build_summary(
+            status=SafetyStatus.SAFE,
+            eval_results=[
+                EvalResult(
+                    outcome=EvalOutcome.NOT_DETECTED,
+                    undetermined_operands=123,  # ty: ignore[invalid-argument-type]
+                ),
+            ],
+        )
+
+        assert summary == "Agent defended successfully"
+
+    def test_undetermined_summary_falls_back_past_a_bad_collection(self) -> None:
+        summary = _build_summary(
+            status=SafetyStatus.UNDETERMINED,
+            eval_results=[
+                EvalResult(
+                    outcome=EvalOutcome.UNDETERMINED,
+                    rationale="Adapter observability is 'response_only'",
+                    undetermined_operands=123,  # ty: ignore[invalid-argument-type]
+                ),
+            ],
+        )
+
+        assert summary == (
+            "Evaluation undetermined: Adapter observability is 'response_only'"
+        )
+
+
+class TestXPIAUnsafeSummaryHostileEvidence:
+    """Evaluator-supplied evidence must not abort summary construction."""
+
+    def test_summary_survives_a_non_iterable_evidence(self) -> None:
+        summary = _build_summary(
+            status=SafetyStatus.UNSAFE,
+            eval_results=[
+                EvalResult(
+                    outcome=EvalOutcome.DETECTED,
+                    evidence=123,  # ty: ignore[invalid-argument-type]
+                ),
+            ],
+        )
+
+        assert summary == "Attack objective detected"
+
+    def test_summary_keeps_the_evidence_it_can_read(self) -> None:
+        class RaisingIter:
+            def __iter__(self) -> object:
+                raise RuntimeError("boom")
+
+        summary = _build_summary(
+            status=SafetyStatus.UNSAFE,
+            eval_results=[
+                EvalResult(
+                    outcome=EvalOutcome.DETECTED,
+                    evidence=RaisingIter(),  # ty: ignore[invalid-argument-type]
+                ),
+                EvalResult(
+                    outcome=EvalOutcome.DETECTED,
+                    evidence=["send_email(attacker)"],
+                ),
+            ],
+        )
+
+        assert summary == "Attack objective detected: send_email(attacker)"
+
+
 class TestXPIAUnsafeSummary:
     """An unsafe summary should cite the evidence that established the verdict."""
 

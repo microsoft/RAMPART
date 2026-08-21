@@ -352,6 +352,23 @@ class TestSerializationRoundTrip:
         assert outcome is EvalOutcome.NOT_DETECTED
         assert recovered["n"][0].turns[0].eval_result.evidence == ["e1", "e2"]
 
+    def test_a_hostile_evidence_value_does_not_lose_the_payload(self) -> None:
+        class Boom:
+            def __iter__(self) -> object:
+                raise RuntimeError("boom")
+
+        data = _serialize_eval_result(
+            eval_result=EvalResult(
+                outcome=EvalOutcome.DETECTED,
+                rationale="real detection",
+                evidence=Boom(),  # ty: ignore[invalid-argument-type]
+            ),
+        )
+
+        assert data["outcome"] == "detected"
+        assert data["rationale"] == "real detection"
+        assert data["evidence"] == []
+
     def test_a_hostile_operand_value_does_not_lose_the_payload(self) -> None:
         class Boom:
             def __iter__(self) -> object:

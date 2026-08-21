@@ -342,7 +342,7 @@ def _serialize_eval_result(*, eval_result: EvalResult) -> dict[str, Any]:
     return {
         "outcome": eval_result.outcome.value,
         "confidence": _safe_float(value=eval_result.confidence),
-        "evidence": [str(e) for e in eval_result.evidence],
+        "evidence": safe_str_list(value=eval_result.evidence),
         "rationale": eval_result.rationale,
         "undetermined_operands": safe_str_list(
             value=eval_result.undetermined_operands,

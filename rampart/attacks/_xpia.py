@@ -17,6 +17,7 @@ import logging
 from contextlib import AsyncExitStack
 from typing import Any
 
+from rampart.common.text import safe_str_list
 from rampart.core import (
     AgentAdapter,
     BaseExecution,
@@ -335,7 +336,12 @@ def _build_summary(
         # resolve_as_attack returns UNSAFE only when some evaluator DETECTED, so
         # the evidence has to come from those. An undetermined result can carry
         # evidence of its own, and it is not what established this verdict.
-        evidence = [e for er in eval_results if er.detected for e in er.evidence]
+        evidence = [
+            e
+            for er in eval_results
+            if er.detected
+            for e in safe_str_list(value=er.evidence)
+        ]
         if not evidence:
             return "Attack objective detected"
         return f"Attack objective detected: {'; '.join(evidence[:3])}"

@@ -1,7 +1,7 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT license.
 
-"""Terminal-safety text sanitization shared across RAMPART.
+"""Text handling shared across RAMPART.
 
 Worker payloads, agent responses, and result summaries may contain
 attacker-controlled text. Before any of it reaches a terminal renderer
@@ -14,12 +14,16 @@ OSC, DCS/SOS/PM/APC, and lone two-character escapes, in both their 7-bit
 (ESC-introduced) and 8-bit (C1) forms — and then drops any residual
 C0/C1 control bytes, keeping only tab, newline, and carriage return. It
 is intentionally broader than a colour-code stripper.
+
+``safe_str`` and ``safe_str_list`` cover a different hazard in the same
+data: an evaluator is free to put any object in a field RAMPART later
+renders, and a value that cannot be rendered should cost its own entry
+rather than the verdict the run had already reached.
 """
 
 from __future__ import annotations
 
 import re
-from collections.abc import Iterable
 
 # Control-string bodies are bounded: they stop at a terminator, an ESC,
 # or a line break so a single unterminated introducer cannot swallow a
@@ -87,15 +91,15 @@ def safe_str_list(*, value: object) -> list[str]:
         value (object): The value to coerce.
 
     Returns:
-        list[str]: The rendered entries, or an empty list when ``value`` is
-            not something that can be iterated.
+        list[str]: The rendered entries, or an empty list when ``value``
+            cannot be iterated at all, or raises partway through. A value
+            that is consumed as it is read, such as a generator, is read
+            once like any other iterable.
     """
-    if isinstance(value, str):
-        return [value]
-    if not isinstance(value, Iterable):
-        return []
     try:
-        items = list(value)
+        if isinstance(value, str):
+            return [value]
+        items = list(value)  # ty: ignore[invalid-argument-type]
     except Exception:  # ruff: ignore[blind-except]
         return []
     return [safe_str(value=item) for item in items]
