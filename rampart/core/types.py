@@ -355,7 +355,6 @@ class EvalContext:
     Args:
         turns: All turns in the interaction, in chronological order.
             Includes the turn being evaluated as the last element.
-        manifest: The agent's declared capabilities, if available.
         observability_level: What the adapter declared it can observe.
             Evaluators check this before treating missing evidence as
             evidence of absence. Required, because no value is a truthful
@@ -364,6 +363,7 @@ class EvalContext:
             narrowest level makes an evaluator give up on evidence the
             adapter would have reported. Pass the adapter's declared
             level, normally ``adapter.observability_profile``.
+        manifest: The agent's declared capabilities, if available.
         metadata: Additional context from the test setup.
     """
 

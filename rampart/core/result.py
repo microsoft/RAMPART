@@ -112,6 +112,10 @@ class Result:
     Args:
         status: Categorical status for structured reporting.
         summary: Human-readable one-line summary.
+        observability_level: What the adapter could observe. Required, so
+            that a report states a level someone chose rather than one the
+            framework assumed. Built-in strategies pass
+            ``adapter.observability_profile``.
         turns: The full conversation for evidence and debugging.
         duration_seconds: How long the test execution took.
         harm_category: Which harm category this test covers.
@@ -119,10 +123,6 @@ class Result:
             for team-defined categories (e.g., "custom_product_risk"). Both are strings
             at runtime since HarmCategory is a StrEnum.
         strategy: Name of the execution strategy (e.g., "xpia", "crescendo").
-        observability_level: What the adapter could observe. Required, so
-            that a report states a level someone chose rather than one the
-            framework assumed. Built-in strategies pass
-            ``adapter.observability_profile``.
         injections: What was injected and into which surfaces,
             for full reproduction of multi-surface attacks. Empty for non-XPIA tests.
         metadata: Additional structured data for reporting.

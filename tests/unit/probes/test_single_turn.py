@@ -520,6 +520,10 @@ class TestProbeSafeSummary:
         assert "part of the evaluation was undetermined" in result.summary
         assert "audit_log" in result.summary
 
+
+class TestProbeUndeterminedSummaryEndToEnd:
+    """An undetermined probe names every channel it could not observe."""
+
     async def test_disjunction_names_both_unobservable_channels_async(self) -> None:
         # The composite words its rationale after the operand it reported
         # first, so only an end-to-end run proves both gaps are recorded and
