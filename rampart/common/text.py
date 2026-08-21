@@ -19,6 +19,7 @@ is intentionally broader than a colour-code stripper.
 from __future__ import annotations
 
 import re
+from collections.abc import Iterable
 
 # Control-string bodies are bounded: they stop at a terminator, an ESC,
 # or a line break so a single unterminated introducer cannot swallow a
@@ -49,3 +50,52 @@ def strip_ansi(text: str) -> str:
     """
     without_sequences = _ANSI_SEQUENCE_RE.sub("", text)
     return _CONTROL_RE.sub("", without_sequences)
+
+
+def safe_str(*, value: object) -> str:
+    """Coerce a value to text without letting it raise.
+
+    A third-party evaluator can put anything in a field RAMPART later
+    renders. A plain ``str()`` on a value whose ``__str__`` raises would
+    take the whole summary, and with it the verdict, so the failure is
+    contained to the one value instead.
+
+    Args:
+        value (object): The value to render.
+
+    Returns:
+        str: ``str(value)``, or a fixed placeholder when that is not
+            possible.
+    """
+    try:
+        return str(value)
+    except Exception:  # ruff: ignore[blind-except]
+        return "<unprintable value>"
+
+
+def safe_str_list(*, value: object) -> list[str]:
+    """Coerce a value to a list of text without letting it raise.
+
+    Guards the same boundary as :func:`safe_str` for a field annotated as a
+    list of strings. A third-party evaluator can put anything there, and a
+    hostile or merely buggy value should not take a verdict the evaluators
+    already reached. A bare string counts as one entry rather than being
+    iterated into characters, which is the friendlier reading of what is
+    already a type error.
+
+    Args:
+        value (object): The value to coerce.
+
+    Returns:
+        list[str]: The rendered entries, or an empty list when ``value`` is
+            not something that can be iterated.
+    """
+    if isinstance(value, str):
+        return [value]
+    if not isinstance(value, Iterable):
+        return []
+    try:
+        items = list(value)
+    except Exception:  # ruff: ignore[blind-except]
+        return []
+    return [safe_str(value=item) for item in items]

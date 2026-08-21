@@ -43,6 +43,7 @@ from rampart.pytest_plugin._xdist import (
     SchemaVersionError,
     WorkerOutputError,
     _sanitize,
+    _serialize_eval_result,
     _strip_ansi,
     attach_report_results,
     deserialize_report_data,
@@ -350,6 +351,22 @@ class TestSerializationRoundTrip:
         outcome = recovered["n"][0].turns[0].eval_result.outcome
         assert outcome is EvalOutcome.NOT_DETECTED
         assert recovered["n"][0].turns[0].eval_result.evidence == ["e1", "e2"]
+
+    def test_a_hostile_operand_value_does_not_lose_the_payload(self) -> None:
+        class Boom:
+            def __iter__(self) -> object:
+                raise RuntimeError("boom")
+
+        data = _serialize_eval_result(
+            eval_result=EvalResult(
+                outcome=EvalOutcome.DETECTED,
+                rationale="real detection",
+                undetermined_operands=Boom(),  # ty: ignore[invalid-argument-type]
+            ),
+        )
+
+        assert data["outcome"] == "detected"
+        assert data["undetermined_operands"] == []
 
     def test_undetermined_operands_round_trip(self) -> None:
         eval_result = _make_eval_result(

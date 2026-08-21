@@ -32,6 +32,8 @@ import json
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
+from rampart.common.text import safe_str_list
+
 if TYPE_CHECKING:
     from pathlib import Path
 
@@ -155,10 +157,11 @@ class JsonFileReportSink:
             data["eval_outcome"] = turn.eval_result.outcome.value
             data["eval_confidence"] = turn.eval_result.confidence
             data["eval_rationale"] = turn.eval_result.rationale
-            if turn.eval_result.undetermined_operands:
-                data["eval_undetermined_operands"] = list(
-                    turn.eval_result.undetermined_operands,
-                )
+            operands = safe_str_list(
+                value=turn.eval_result.undetermined_operands,
+            )
+            if operands:
+                data["eval_undetermined_operands"] = operands
         if turn.driver_reasoning:
             data["driver_reasoning"] = turn.driver_reasoning
         return data

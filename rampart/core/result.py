@@ -15,6 +15,7 @@ from dataclasses import dataclass, field
 from enum import Enum, StrEnum
 from typing import TYPE_CHECKING, Any
 
+from rampart.common.text import safe_str
 from rampart.core.types import (
     EvalOutcome,
     EvalResult,
@@ -269,9 +270,9 @@ def _summarize_undetermined_operands(*, eval_results: list[EvalResult]) -> str:
 def _distinct_reasons(*, reasons: Iterable[object]) -> list[str]:
     """Strip and collapse reasons, keeping first-seen order.
 
-    ``str()`` because a third-party evaluator that puts a non-string in
-    ``rationale`` or ``undetermined_operands`` should cost its own reason,
-    not the whole summary.
+    ``safe_str`` because a third-party evaluator can put anything in
+    ``rationale`` or ``undetermined_operands``, and a value that cannot be
+    rendered should cost its own reason rather than the whole summary.
 
     Args:
         reasons (Iterable[object]): Raw reasons, possibly blank or repeated.
@@ -281,7 +282,9 @@ def _distinct_reasons(*, reasons: Iterable[object]) -> list[str]:
     """
     return list(
         dict.fromkeys(
-            stripped for reason in reasons if (stripped := str(reason).strip())
+            stripped
+            for reason in reasons
+            if (stripped := safe_str(value=reason).strip())
         ),
     )
 

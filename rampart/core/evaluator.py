@@ -13,6 +13,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Protocol, runtime_checkable
 
+from rampart.common.text import safe_str, safe_str_list
 from rampart.core.types import EvalContext, EvalOutcome, EvalResult
 
 # An evaluator may return UNDETERMINED without saying why. Recording a fixed
@@ -140,7 +141,10 @@ class _AnyEvaluator(BaseEvaluator):
             return EvalResult(
                 outcome=EvalOutcome.UNDETERMINED,
                 evidence=left_result.evidence + right_result.evidence,
-                rationale=f"Left operand undetermined: {left_result.rationale}",
+                rationale=(
+                    "Left operand undetermined: "
+                    f"{safe_str(value=left_result.rationale)}"
+                ),
                 undetermined_operands=undetermined,
             )
 
@@ -148,7 +152,10 @@ class _AnyEvaluator(BaseEvaluator):
             return EvalResult(
                 outcome=EvalOutcome.UNDETERMINED,
                 evidence=left_result.evidence + right_result.evidence,
-                rationale=f"Right operand undetermined: {right_result.rationale}",
+                rationale=(
+                    "Right operand undetermined: "
+                    f"{safe_str(value=right_result.rationale)}"
+                ),
                 undetermined_operands=undetermined,
             )
 
@@ -197,7 +204,10 @@ class _AllEvaluator(BaseEvaluator):
         if left_result.outcome == EvalOutcome.NOT_DETECTED:
             return EvalResult(
                 outcome=EvalOutcome.NOT_DETECTED,
-                rationale=f"Left operand not detected: {left_result.rationale}",
+                rationale=(
+                    "Left operand not detected: "
+                    f"{safe_str(value=left_result.rationale)}"
+                ),
                 undetermined_operands=_merge_undetermined(left=left_result),
             )
 
@@ -207,7 +217,10 @@ class _AllEvaluator(BaseEvaluator):
         if right_result.outcome == EvalOutcome.NOT_DETECTED:
             return EvalResult(
                 outcome=EvalOutcome.NOT_DETECTED,
-                rationale=f"Right operand not detected: {right_result.rationale}",
+                rationale=(
+                    "Right operand not detected: "
+                    f"{safe_str(value=right_result.rationale)}"
+                ),
                 undetermined_operands=undetermined,
             )
 
@@ -218,7 +231,10 @@ class _AllEvaluator(BaseEvaluator):
             return EvalResult(
                 outcome=EvalOutcome.UNDETERMINED,
                 evidence=left_result.evidence + right_result.evidence,
-                rationale=f"Left operand undetermined: {left_result.rationale}",
+                rationale=(
+                    "Left operand undetermined: "
+                    f"{safe_str(value=left_result.rationale)}"
+                ),
                 undetermined_operands=undetermined,
             )
 
@@ -226,14 +242,20 @@ class _AllEvaluator(BaseEvaluator):
             return EvalResult(
                 outcome=EvalOutcome.UNDETERMINED,
                 evidence=left_result.evidence + right_result.evidence,
-                rationale=f"Right operand undetermined: {right_result.rationale}",
+                rationale=(
+                    "Right operand undetermined: "
+                    f"{safe_str(value=right_result.rationale)}"
+                ),
                 undetermined_operands=undetermined,
             )
 
         return EvalResult(
             outcome=EvalOutcome.DETECTED,
             evidence=left_result.evidence + right_result.evidence,
-            rationale=f"({left_result.rationale}) AND ({right_result.rationale})",
+            rationale=(
+                f"({safe_str(value=left_result.rationale)}) "
+                f"AND ({safe_str(value=right_result.rationale)})"
+            ),
             undetermined_operands=undetermined,
         )
 
@@ -263,7 +285,7 @@ class _NotEvaluator(BaseEvaluator):
             outcome=flipped,
             confidence=result.confidence,
             evidence=result.evidence,
-            rationale=f"NOT ({result.rationale})",
+            rationale=f"NOT ({safe_str(value=result.rationale)})",
             undetermined_operands=_merge_undetermined(left=result),
         )
 
@@ -298,10 +320,14 @@ def _merge_undetermined(
     for operand in (left, right):
         if operand is None:
             continue
-        if operand.undetermined_operands:
-            reasons.extend(operand.undetermined_operands)
+        carried = safe_str_list(value=operand.undetermined_operands)
+        if carried:
+            reasons.extend(carried)
         elif operand.outcome == EvalOutcome.UNDETERMINED:
-            # str() because a third-party evaluator that puts a non-string in
-            # rationale should cost its own reason, not the whole verdict.
-            reasons.append(str(operand.rationale).strip() or _NO_REASON_GIVEN)
+            # safe_str because a third-party evaluator can put anything in
+            # rationale, and a value that cannot be rendered should cost its
+            # own reason rather than the whole verdict.
+            reasons.append(
+                safe_str(value=operand.rationale).strip() or _NO_REASON_GIVEN,
+            )
     return list(dict.fromkeys(reasons))

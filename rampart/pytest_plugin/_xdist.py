@@ -24,6 +24,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Any, cast
 
 from rampart.common.deprecation import emit_deprecation_warning
+from rampart.common.text import safe_str_list
 from rampart.common.text import strip_ansi as _strip_ansi_impl
 from rampart.core.result import (
     HarmCategory,
@@ -343,7 +344,9 @@ def _serialize_eval_result(*, eval_result: EvalResult) -> dict[str, Any]:
         "confidence": _safe_float(value=eval_result.confidence),
         "evidence": [str(e) for e in eval_result.evidence],
         "rationale": eval_result.rationale,
-        "undetermined_operands": [str(u) for u in eval_result.undetermined_operands],
+        "undetermined_operands": safe_str_list(
+            value=eval_result.undetermined_operands,
+        ),
     }
 
 
