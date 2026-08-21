@@ -475,6 +475,23 @@ class TestExplainUndetermined:
 
         assert detail == "the downgrade had a reason"
 
+    def test_ignores_settled_results_when_an_operand_gave_no_reason(self) -> None:
+        # The verdict is undetermined because of the second result. A gap
+        # carried by a result that reached a definitive answer did not cause
+        # it, so it must not be offered as the explanation.
+        detail = _explain_undetermined(
+            eval_results=[
+                EvalResult(
+                    outcome=EvalOutcome.NOT_DETECTED,
+                    undetermined_operands=["turn 1: side effects unobservable"],
+                ),
+                EvalResult(outcome=EvalOutcome.UNDETERMINED, rationale=""),
+            ],
+            fallback="nothing to say",
+        )
+
+        assert detail == "nothing to say"
+
     def test_falls_back_when_no_reason_exists(self) -> None:
         detail = _explain_undetermined(
             eval_results=[_er(EvalOutcome.UNDETERMINED)],

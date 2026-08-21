@@ -304,24 +304,22 @@ def _distinct_operand_reasons(*, eval_results: list[EvalResult]) -> list[str]:
 
 
 def _render_reasons(*, reasons: list[str]) -> str:
-    """Name the first two distinct reasons and count the rest.
+    """Name the first two reasons and count the rest.
 
-    Collapses repeats itself rather than trusting the caller to have done
-    it. The same gap recurs on every turn of a multi-turn run, so a caller
-    that forgets would print one reason twice and then miscount the
-    remainder.
+    Formats only. Deciding which reasons are distinct belongs to whoever
+    gathered them, and both callers reach this through ``_distinct_reasons``,
+    which is also what their emptiness checks read.
 
     Args:
-        reasons (list[str]): Reasons to render, in preference order.
+        reasons (list[str]): Distinct reasons, in the order to name them.
 
     Returns:
         str: The first two joined, with a count of any remainder so that
             nothing is dropped without saying so.
     """
-    distinct = _distinct_reasons(reasons=reasons)
-    named = distinct[:2]
+    named = reasons[:2]
     detail = "; ".join(named)
-    remaining = len(distinct) - len(named)
+    remaining = len(reasons) - len(named)
     if remaining:
         detail = f"{detail} (and {remaining} more)"
     return detail
@@ -344,11 +342,13 @@ def _explain_undetermined(*, eval_results: list[EvalResult], fallback: str) -> s
     reached, so they are not allowed to speak over an operand that really did
     stay undetermined.
 
-    They are read only when nothing else offered a reason. That is what the
-    ``_adjust_for_observability`` case looks like: the verdict was SAFE, so
-    every result is settled, and the downgrade to UNDETERMINED is itself an
-    observability finding. The gap those operands recorded is the whole
-    explanation, and the alternative is a fixed phrase that names nothing.
+    They are read only when no result stayed undetermined at all. That is the
+    ``_adjust_for_observability`` case: the verdict was SAFE, so every result
+    is settled, and the downgrade to UNDETERMINED is itself an observability
+    finding. The gap those operands recorded is the whole explanation, and the
+    alternative is a fixed phrase that names nothing. An operand that stayed
+    undetermined and explained nothing keeps that fixed phrase instead, since
+    a gap another turn settled around is not why this verdict was missed.
 
     Args:
         eval_results (list[EvalResult]): The evaluator outputs.
@@ -364,7 +364,7 @@ def _explain_undetermined(*, eval_results: list[EvalResult], fallback: str) -> s
         # rationale of only whitespace falls through instead of rendering
         # a summary with nothing after the colon.
         reasons = _distinct_reasons(reasons=[er.rationale for er in undetermined])
-    if not reasons:
+    if not reasons and not undetermined:
         reasons = _distinct_operand_reasons(eval_results=eval_results)
     if not reasons:
         return fallback
