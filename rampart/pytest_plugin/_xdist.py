@@ -580,7 +580,10 @@ def _truncated_result_data(
             max_bytes=_TRUNCATED_ATTRIBUTION_MAX_BYTES,
         ),
         "strategy": "xdist-transport",
-        "observability_level": ObservabilityLevel.RESPONSE_ONLY.value,
+        # The real level, not a constant. The marker replaces a result that
+        # was too big to send, and the level it was gathered under is not the
+        # part that overflowed.
+        "observability_level": result.observability_level.value,
         "injections": [],
         "metadata": {
             "_pytest_test_name": _bounded_attribution(

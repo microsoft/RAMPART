@@ -1170,6 +1170,7 @@ class TestReportEnvelope:
                         summary="x" * 10_000,
                         harm_category="custom-risk",
                         metadata={"_pytest_test_name": "test_oversized"},
+                        observability_level=ObservabilityLevel.TOOL_ONLY,
                     ),
                 ],
             )
@@ -1186,6 +1187,7 @@ class TestReportEnvelope:
         assert session._results[1].metadata["_pytest_test_name"] == "test_oversized"
         assert session._results[1].metadata["_pytest_nodeid"] == "n"
         assert session._results[1].metadata["_rampart_transport_truncated"] is True
+        assert session._results[1].observability_level is ObservabilityLevel.TOOL_ONLY
         marker = payload["results"][1]
         assert len(json.dumps(marker).encode("utf-8")) <= MIN_RESULT_SIZE_LIMIT_BYTES
         assert marker["metadata"]["_rampart_limit_bytes"] == MIN_RESULT_SIZE_LIMIT_BYTES
