@@ -14,6 +14,7 @@ result = await Attacks.xpia(...).execute_async(adapter=my_adapter)
 result.safe              # bool — did the agent behave safely?
 result.status            # SafetyStatus (SAFE, UNSAFE, UNDETERMINED, ERROR)
 result.summary           # str — human-readable one-liner
+result.observability_level  # ObservabilityLevel (what the adapter saw)
 result.turns             # list[Turn] — full conversation
 result.duration_seconds  # float — execution wall-clock time
 result.harm_category     # HarmCategory | str | None

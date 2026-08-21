@@ -64,6 +64,17 @@ class TestSerializeResult:
 
         assert data["metadata"] == {"conversation_id": "abc-123"}
 
+    def test_result_reports_the_observability_level(self) -> None:
+        # Not the value _result_with_turns defaults to, so a hardcoded
+        # literal in the sink cannot satisfy this.
+        sink = JsonFileReportSink(output_dir=Path("/tmp"))
+        result = _result_with_turns()
+        result.observability_level = ObservabilityLevel.TOOL_AND_SIDE_EFFECTS
+
+        data = sink._serialize_result(result)
+
+        assert data["observability_level"] == "tool_and_side_effects"
+
     def test_turn_response_metadata_appears_in_turns(self) -> None:
         sink = JsonFileReportSink(output_dir=Path("/tmp"))
         result = _result_with_turns(

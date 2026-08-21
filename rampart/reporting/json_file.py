@@ -118,6 +118,7 @@ class JsonFileReportSink:
             if result.harm_category
             else None,
             "strategy": result.strategy,
+            "observability_level": result.observability_level.value,
             "duration_seconds": result.duration_seconds,
             "metadata": result.metadata,
             "turns": [self._serialize_turn(t) for t in result.turns],
