@@ -13,6 +13,7 @@ from rampart.core.result import (
     InjectionRecord,
     Result,
     SafetyStatus,
+    _explain_undetermined,
     _summarize_undetermined_operands,
     resolve_as_attack,
     resolve_as_probe,
@@ -345,3 +346,126 @@ class TestSummarizeUndeterminedOperands:
         )
 
         assert clause == ""
+
+
+class TestExplainUndetermined:
+    """Why an evaluation came back undetermined, in priority order."""
+
+    def test_prefers_the_operand_reasons_over_the_composite_rationale(self) -> None:
+        detail = _explain_undetermined(
+            eval_results=[
+                EvalResult(
+                    outcome=EvalOutcome.UNDETERMINED,
+                    rationale="Left operand undetermined: no tool calls",
+                    undetermined_operands=["no tool calls", "no side effects"],
+                ),
+            ],
+            fallback="nothing to say",
+        )
+
+        assert detail == "no tool calls; no side effects"
+
+    def test_collapses_a_reason_repeated_across_turns(self) -> None:
+        same = "Adapter observability is 'tool_only'"
+        detail = _explain_undetermined(
+            eval_results=[
+                EvalResult(
+                    outcome=EvalOutcome.UNDETERMINED,
+                    undetermined_operands=[same],
+                )
+                for _ in range(3)
+            ],
+            fallback="nothing to say",
+        )
+
+        assert detail == same
+
+    def test_collapses_a_rationale_repeated_across_turns(self) -> None:
+        # A leaf evaluator words the same rationale on every turn of a
+        # multi-turn run, so the fallback has to collapse them too.
+        same = "Adapter observability is 'tool_only'"
+        detail = _explain_undetermined(
+            eval_results=[
+                EvalResult(outcome=EvalOutcome.UNDETERMINED, rationale=same)
+                for _ in range(3)
+            ],
+            fallback="nothing to say",
+        )
+
+        assert detail == same
+
+    def test_counts_the_reasons_it_does_not_name(self) -> None:
+        detail = _explain_undetermined(
+            eval_results=[
+                EvalResult(
+                    outcome=EvalOutcome.UNDETERMINED,
+                    undetermined_operands=["a", "b", "c", "d"],
+                ),
+            ],
+            fallback="nothing to say",
+        )
+
+        assert detail == "a; b (and 2 more)"
+
+    def test_ignores_a_settled_result_while_an_operand_stayed_undetermined(
+        self,
+    ) -> None:
+        detail = _explain_undetermined(
+            eval_results=[
+                EvalResult(
+                    outcome=EvalOutcome.NOT_DETECTED,
+                    undetermined_operands=["settled, so not the reason"],
+                ),
+                EvalResult(
+                    outcome=EvalOutcome.UNDETERMINED,
+                    rationale="the real reason",
+                ),
+            ],
+            fallback="nothing to say",
+        )
+
+        assert detail == "the real reason"
+
+    def test_reads_settled_results_when_nothing_else_gave_a_reason(self) -> None:
+        detail = _explain_undetermined(
+            eval_results=[
+                EvalResult(
+                    outcome=EvalOutcome.NOT_DETECTED,
+                    undetermined_operands=["the downgrade had a reason"],
+                ),
+            ],
+            fallback="nothing to say",
+        )
+
+        assert detail == "the downgrade had a reason"
+
+    def test_falls_back_when_no_reason_exists(self) -> None:
+        detail = _explain_undetermined(
+            eval_results=[_er(EvalOutcome.UNDETERMINED)],
+            fallback="nothing to say",
+        )
+
+        assert detail == "nothing to say"
+
+    def test_falls_back_when_the_only_rationale_is_blank(self) -> None:
+        detail = _explain_undetermined(
+            eval_results=[
+                EvalResult(outcome=EvalOutcome.UNDETERMINED, rationale="   "),
+            ],
+            fallback="nothing to say",
+        )
+
+        assert detail == "nothing to say"
+
+    def test_ignores_blank_reasons(self) -> None:
+        detail = _explain_undetermined(
+            eval_results=[
+                EvalResult(
+                    outcome=EvalOutcome.UNDETERMINED,
+                    undetermined_operands=["   ", ""],
+                ),
+            ],
+            fallback="nothing to say",
+        )
+
+        assert detail == "nothing to say"

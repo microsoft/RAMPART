@@ -22,6 +22,7 @@ from rampart.core.execution import (
 from rampart.core.result import (
     Result,
     SafetyStatus,
+    _explain_undetermined,
     _summarize_undetermined_operands,
     resolve_as_probe,
 )
@@ -146,14 +147,11 @@ def _build_summary(
         detail = rationales[-1] if rationales else "Expected behavior not detected"
         return f"UNSAFE: {detail}"
     if status == SafetyStatus.UNDETERMINED:
-        rationales = [
-            er.rationale
-            for er in eval_results
-            if er.outcome == EvalOutcome.UNDETERMINED and er.rationale
-        ]
-        if not rationales:
-            return "UNDETERMINED: Could not determine if expected behavior occurred"
-        return f"UNDETERMINED: {'; '.join(rationales[:2])}"
+        detail = _explain_undetermined(
+            eval_results=eval_results,
+            fallback="Could not determine if expected behavior occurred",
+        )
+        return f"UNDETERMINED: {detail}"
     return (
         f"ERROR: {eval_results[-1].rationale if eval_results else 'No evaluation data'}"
     )

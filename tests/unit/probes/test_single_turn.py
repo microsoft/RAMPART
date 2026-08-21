@@ -20,7 +20,11 @@ from rampart.core.types import (
     ToolCall,
 )
 from rampart.drivers.static import StaticDriver
-from rampart.evaluators import ResponseContains, ToolCalled
+from rampart.evaluators import (
+    ResponseContains,
+    SideEffectOccurred,
+    ToolCalled,
+)
 from rampart.probes import Probes
 from rampart.probes._single_turn import _build_summary
 from tests.fixtures import MockAdapter
@@ -381,6 +385,99 @@ class TestProbeUnsafeSummary:
         assert summary == "UNSAFE: Expected behavior not detected"
 
 
+class TestProbeUndeterminedSummary:
+    """An undetermined summary should name every gap that was carried up."""
+
+    def test_summary_names_every_operand_gap(self) -> None:
+        summary = _build_summary(
+            status=SafetyStatus.UNDETERMINED,
+            eval_results=[
+                EvalResult(
+                    outcome=EvalOutcome.UNDETERMINED,
+                    rationale="Left operand undetermined: tool calls unobservable",
+                    undetermined_operands=[
+                        "tool calls unobservable",
+                        "side effects unobservable",
+                    ],
+                ),
+            ],
+        )
+
+        assert "tool calls unobservable" in summary
+        assert "side effects unobservable" in summary
+
+    def test_summary_deduplicates_operand_reasons(self) -> None:
+        summary = _build_summary(
+            status=SafetyStatus.UNDETERMINED,
+            eval_results=[
+                EvalResult(
+                    outcome=EvalOutcome.UNDETERMINED,
+                    undetermined_operands=["same gap"],
+                ),
+                EvalResult(
+                    outcome=EvalOutcome.UNDETERMINED,
+                    undetermined_operands=["same gap"],
+                ),
+            ],
+        )
+
+        assert summary == "UNDETERMINED: same gap"
+
+    def test_summary_counts_the_gaps_it_does_not_name(self) -> None:
+        summary = _build_summary(
+            status=SafetyStatus.UNDETERMINED,
+            eval_results=[
+                EvalResult(
+                    outcome=EvalOutcome.UNDETERMINED,
+                    undetermined_operands=["gap a", "gap b", "gap c", "gap d"],
+                ),
+            ],
+        )
+
+        assert summary == "UNDETERMINED: gap a; gap b (and 2 more)"
+
+    def test_summary_ignores_operands_carried_by_a_settled_result(self) -> None:
+        summary = _build_summary(
+            status=SafetyStatus.UNDETERMINED,
+            eval_results=[
+                EvalResult(
+                    outcome=EvalOutcome.NOT_DETECTED,
+                    undetermined_operands=["gap that did not settle the verdict"],
+                ),
+                EvalResult(
+                    outcome=EvalOutcome.UNDETERMINED,
+                    rationale="Adapter observability is 'tool_only'",
+                ),
+            ],
+        )
+
+        assert "tool_only" in summary
+        assert "did not settle" not in summary
+
+    def test_summary_falls_back_to_the_rationale(self) -> None:
+        summary = _build_summary(
+            status=SafetyStatus.UNDETERMINED,
+            eval_results=[
+                EvalResult(
+                    outcome=EvalOutcome.UNDETERMINED,
+                    rationale="Adapter observability is 'response_only'",
+                ),
+            ],
+        )
+
+        assert summary == "UNDETERMINED: Adapter observability is 'response_only'"
+
+    def test_summary_falls_back_without_a_rationale(self) -> None:
+        summary = _build_summary(
+            status=SafetyStatus.UNDETERMINED,
+            eval_results=[EvalResult(outcome=EvalOutcome.UNDETERMINED)],
+        )
+
+        assert summary == (
+            "UNDETERMINED: Could not determine if expected behavior occurred"
+        )
+
+
 class TestProbeSafeSummary:
     """A safe probe says when part of the evaluation stayed undetermined."""
 
@@ -422,3 +519,21 @@ class TestProbeSafeSummary:
         assert result.status is SafetyStatus.SAFE
         assert "part of the evaluation was undetermined" in result.summary
         assert "audit_log" in result.summary
+
+    async def test_disjunction_names_both_unobservable_channels_async(self) -> None:
+        # The composite words its rationale after the operand it reported
+        # first, so only an end-to-end run proves both gaps are recorded and
+        # both reach the summary.
+        adapter = _adapter(
+            responses=[Response(text="nothing to see")],
+            observability=ObservabilityLevel.RESPONSE_ONLY,
+        )
+
+        result = await Probes.behavior(
+            prompt="test",
+            evaluator=ToolCalled("x") | SideEffectOccurred("y"),
+        ).execute_async(adapter=adapter)
+
+        assert result.status is SafetyStatus.UNDETERMINED
+        assert "does not report tool calls" in result.summary
+        assert "does not report side effects" in result.summary

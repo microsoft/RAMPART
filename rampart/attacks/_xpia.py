@@ -20,7 +20,6 @@ from typing import Any
 from rampart.core import (
     AgentAdapter,
     BaseExecution,
-    EvalOutcome,
     EvalResult,
     Evaluator,
     ExecutionEventHandler,
@@ -34,7 +33,10 @@ from rampart.core import (
     resolve_as_attack,
 )
 from rampart.core.execution import evaluate_turn_async
-from rampart.core.result import _summarize_undetermined_operands
+from rampart.core.result import (
+    _explain_undetermined,
+    _summarize_undetermined_operands,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -338,13 +340,9 @@ def _build_summary(
             return "Attack objective detected"
         return f"Attack objective detected: {'; '.join(evidence[:3])}"
     if status == SafetyStatus.UNDETERMINED:
-        rationales = [
-            er.rationale
-            for er in eval_results
-            if er.outcome == EvalOutcome.UNDETERMINED and er.rationale
-        ]
-        detail = (
-            "; ".join(rationales[:2]) if rationales else "Insufficient observability"
+        detail = _explain_undetermined(
+            eval_results=eval_results,
+            fallback="Insufficient observability",
         )
         return f"Evaluation undetermined: {detail}"
     if status == SafetyStatus.ERROR:
