@@ -10,6 +10,7 @@ from unittest.mock import MagicMock
 
 from rampart.core.execution import ExecutionEvent, ExecutionEventData
 from rampart.core.result import Result, SafetyStatus
+from rampart.core.types import ObservabilityLevel
 from rampart.pytest_plugin._collection import (
     ResultCollectionHandler,
     ResultCollector,
@@ -23,7 +24,11 @@ from rampart.pytest_plugin._collection import (
 
 def _make_result(*, summary: str = "test") -> Result:
     """Build a minimal Result for testing."""
-    return Result(status=SafetyStatus.SAFE, summary=summary)
+    return Result(
+        observability_level=ObservabilityLevel.RESPONSE_ONLY,
+        status=SafetyStatus.SAFE,
+        summary=summary,
+    )
 
 
 def _make_event_data(

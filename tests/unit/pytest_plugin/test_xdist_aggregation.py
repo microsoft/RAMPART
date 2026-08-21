@@ -194,12 +194,17 @@ class TestStreamedResultTransport:
             import pytest
             from rampart import record_result
             from rampart.core.result import Result, SafetyStatus
+            from rampart.core.types import ObservabilityLevel
 
             @pytest.mark.asyncio
             @pytest.mark.harm("async")
             async def test_async_stream_async():
                 await asyncio.gather(asyncio.sleep(0), asyncio.sleep(0))
-                record_result(Result(status=SafetyStatus.SAFE, summary="async"))
+                record_result(Result(
+                    status=SafetyStatus.SAFE,
+                    summary="async",
+                    observability_level=ObservabilityLevel.RESPONSE_ONLY,
+                ))
             """,
         )
         result = configured_pytester.runpytest(
@@ -222,12 +227,14 @@ class TestStreamedResultTransport:
             import pytest
             from rampart import record_result
             from rampart.core.result import Result, SafetyStatus
+            from rampart.core.types import ObservabilityLevel
 
             @pytest.fixture
             def failing_setup():
                 record_result(Result(
                     status=SafetyStatus.ERROR,
                     summary="setup-failed",
+                    observability_level=ObservabilityLevel.RESPONSE_ONLY,
                 ))
                 raise RuntimeError("setup failed")
 
@@ -257,12 +264,14 @@ class TestStreamedResultTransport:
             import pytest
             from rampart import record_result
             from rampart.core.result import Result, SafetyStatus
+            from rampart.core.types import ObservabilityLevel
 
             @pytest.fixture
             def skipped_setup():
                 record_result(Result(
                     status=SafetyStatus.UNDETERMINED,
                     summary="setup-skipped",
+                    observability_level=ObservabilityLevel.RESPONSE_ONLY,
                 ))
                 pytest.skip("setup skipped")
 
@@ -292,12 +301,14 @@ class TestStreamedResultTransport:
             import pytest
             from rampart import record_result
             from rampart.core.result import Result, SafetyStatus
+            from rampart.core.types import ObservabilityLevel
 
             @pytest.fixture
             def recorded_setup():
                 record_result(Result(
                     status=SafetyStatus.SAFE,
                     summary="setup",
+                    observability_level=ObservabilityLevel.RESPONSE_ONLY,
                 ))
 
             @pytest.mark.harm("setup")
@@ -305,6 +316,7 @@ class TestStreamedResultTransport:
                 record_result(Result(
                     status=SafetyStatus.SAFE,
                     summary="call",
+                    observability_level=ObservabilityLevel.RESPONSE_ONLY,
                 ))
             """,
         )
@@ -330,6 +342,7 @@ class TestStreamedResultTransport:
             import pytest
             from rampart import record_result
             from rampart.core.result import Result, SafetyStatus
+            from rampart.core.types import ObservabilityLevel
 
             @pytest.fixture
             def record_during_teardown():
@@ -337,6 +350,7 @@ class TestStreamedResultTransport:
                 record_result(Result(
                     status=SafetyStatus.SAFE,
                     summary="teardown-only",
+                    observability_level=ObservabilityLevel.RESPONSE_ONLY,
                 ))
 
             @pytest.mark.harm("teardown")
@@ -364,10 +378,15 @@ class TestStreamedResultTransport:
             import pytest
             from rampart import record_result
             from rampart.core.result import Result, SafetyStatus
+            from rampart.core.types import ObservabilityLevel
 
             @pytest.mark.harm("each")
             def test_each():
-                record_result(Result(status=SafetyStatus.SAFE, summary="each"))
+                record_result(Result(
+                    status=SafetyStatus.SAFE,
+                    summary="each",
+                    observability_level=ObservabilityLevel.RESPONSE_ONLY,
+                ))
             """,
         )
         result = configured_pytester.runpytest(
@@ -397,12 +416,14 @@ class TestStreamedResultTransport:
             import pytest
             from rampart import record_result
             from rampart.core.result import Result, SafetyStatus
+            from rampart.core.types import ObservabilityLevel
 
             @pytest.mark.harm("crash")
             def test_0_stream_before_crash():
                 record_result(Result(
                     status=SafetyStatus.SAFE,
                     summary="survived",
+                    observability_level=ObservabilityLevel.RESPONSE_ONLY,
                 ))
 
             def test_1_crash_worker():
@@ -430,16 +451,22 @@ class TestStreamedResultTransport:
             import pytest
             from rampart import record_result
             from rampart.core.result import Result, SafetyStatus
+            from rampart.core.types import ObservabilityLevel
 
             @pytest.mark.harm("cap")
             def test_0_normal():
-                record_result(Result(status=SafetyStatus.SAFE, summary="normal"))
+                record_result(Result(
+                    status=SafetyStatus.SAFE,
+                    summary="normal",
+                    observability_level=ObservabilityLevel.RESPONSE_ONLY,
+                ))
 
             @pytest.mark.harm("cap")
             def test_1_oversized():
                 record_result(Result(
                     status=SafetyStatus.SAFE,
                     summary="x" * 5000,
+                    observability_level=ObservabilityLevel.RESPONSE_ONLY,
                 ))
             """,
         )
@@ -605,12 +632,14 @@ class TestXdistMetadata:
             import pytest
             from rampart import record_result
             from rampart.core.result import Result, SafetyStatus
+            from rampart.core.types import ObservabilityLevel
 
             @pytest.mark.harm("cap")
             def test_oversized():
                 record_result(Result(
                     status=SafetyStatus.SAFE,
                     summary="x" * 10_000,
+                    observability_level=ObservabilityLevel.RESPONSE_ONLY,
                 ))
             """,
         )

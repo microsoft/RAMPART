@@ -29,6 +29,7 @@ from rampart.core.types import (
     EvalContext,
     EvalOutcome,
     EvalResult,
+    ObservabilityLevel,
     Payload,
     PayloadFormat,
     Request,
@@ -75,7 +76,11 @@ def _make_ctx(*turns: Turn, manifest: AppManifest | None = None) -> EvalContext:
                 response=Response(text="hi"),
             ),
         )
-    return EvalContext(turns=list(turns), manifest=manifest)
+    return EvalContext(
+        observability_level=ObservabilityLevel.TOOL_AND_SIDE_EFFECTS,
+        turns=list(turns),
+        manifest=manifest,
+    )
 
 
 class _FakeSender:
@@ -336,7 +341,11 @@ class TestTranscriptScope:
         assert "second user prompt" in user_message
 
     async def test_empty_transcript_uses_placeholder_async(self) -> None:
-        _, sender = await _evaluate_async(context=EvalContext(turns=[]))
+        _, sender = await _evaluate_async(
+            context=EvalContext(
+                observability_level=ObservabilityLevel.TOOL_AND_SIDE_EFFECTS, turns=[]
+            )
+        )
         _, user_message = sender.calls[0]
         assert user_message == "(empty transcript)"
 

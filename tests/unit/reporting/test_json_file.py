@@ -15,6 +15,7 @@ from rampart.core.result import HarmCategory, Result, SafetyStatus
 from rampart.core.types import (
     EvalOutcome,
     EvalResult,
+    ObservabilityLevel,
     Request,
     Response,
     SideEffect,
@@ -41,6 +42,7 @@ def _result_with_turns(
         turn_number=0,
     )
     return Result(
+        observability_level=ObservabilityLevel.RESPONSE_ONLY,
         status=SafetyStatus.SAFE,
         summary="ok",
         turns=[turn],
@@ -94,6 +96,7 @@ class TestSerializeResult:
         )
         turn = Turn(request=Request(prompt="hi"), response=response, turn_number=0)
         result = Result(
+            observability_level=ObservabilityLevel.RESPONSE_ONLY,
             status=SafetyStatus.UNSAFE,
             summary="memory poisoned",
             turns=[turn],
@@ -127,6 +130,7 @@ class TestSerializeResult:
         )
         turn = Turn(request=Request(prompt="hi"), response=response, turn_number=0)
         result = Result(
+            observability_level=ObservabilityLevel.RESPONSE_ONLY,
             status=SafetyStatus.UNSAFE,
             summary="exfiltration",
             turns=[turn],
@@ -152,6 +156,7 @@ class TestSerializeResult:
             ),
         )
         result = Result(
+            observability_level=ObservabilityLevel.RESPONSE_ONLY,
             status=SafetyStatus.UNSAFE,
             summary="bad",
             turns=[turn],
@@ -175,7 +180,12 @@ class TestSerializeResult:
                 undetermined_operands=["side effects not reported"],
             ),
         )
-        result = Result(status=SafetyStatus.SAFE, summary="ok", turns=[turn])
+        result = Result(
+            observability_level=ObservabilityLevel.RESPONSE_ONLY,
+            status=SafetyStatus.SAFE,
+            summary="ok",
+            turns=[turn],
+        )
 
         data = sink._serialize_result(result)
 
@@ -192,7 +202,12 @@ class TestSerializeResult:
             turn_number=0,
             eval_result=EvalResult(outcome=EvalOutcome.NOT_DETECTED),
         )
-        result = Result(status=SafetyStatus.SAFE, summary="ok", turns=[turn])
+        result = Result(
+            observability_level=ObservabilityLevel.RESPONSE_ONLY,
+            status=SafetyStatus.SAFE,
+            summary="ok",
+            turns=[turn],
+        )
 
         data = sink._serialize_result(result)
 
@@ -216,6 +231,7 @@ class TestSerializeResult:
             driver_reasoning="Trying a different angle",
         )
         result = Result(
+            observability_level=ObservabilityLevel.RESPONSE_ONLY,
             status=SafetyStatus.SAFE,
             summary="ok",
             turns=[turn],

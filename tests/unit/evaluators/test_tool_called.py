@@ -34,6 +34,7 @@ def _ctx_with_tool_calls(
 def _multi_turn_ctx(turns_tool_calls: list[list[ToolCall]]) -> EvalContext:
     """Build an EvalContext with multiple turns, each with its own tool calls."""
     return EvalContext(
+        observability_level=ObservabilityLevel.TOOL_AND_SIDE_EFFECTS,
         turns=[
             Turn(
                 request=Request(prompt=f"turn-{i}"),

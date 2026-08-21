@@ -51,6 +51,7 @@ Protocols and ABCs that define RAMPART's extension points. Implement these to co
         - ExecutionEventData
         - ExecutionEventHandler
         - ExecutionHandlerFactory
+        - evaluate_turn_async
         - register_default_handler_factory
         - clear_default_handler_factory
 

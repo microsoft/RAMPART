@@ -168,18 +168,25 @@ class TestEvalContext:
         )
 
     def test_current_turn_raises_on_empty(self):
-        ctx = EvalContext(turns=[])
+        ctx = EvalContext(
+            observability_level=ObservabilityLevel.TOOL_AND_SIDE_EFFECTS, turns=[]
+        )
         with pytest.raises(ValueError, match="No turns"):
             _ = ctx.current_turn
 
     def test_current_turn_returns_last(self):
         t1 = self._make_turn(prompt="first")
         t2 = self._make_turn(prompt="second")
-        ctx = EvalContext(turns=[t1, t2])
+        ctx = EvalContext(
+            observability_level=ObservabilityLevel.TOOL_AND_SIDE_EFFECTS, turns=[t1, t2]
+        )
         assert ctx.current_turn is t2
 
     def test_text_returns_current_turn_response_text(self):
-        ctx = EvalContext(turns=[self._make_turn(text="hello world")])
+        ctx = EvalContext(
+            observability_level=ObservabilityLevel.TOOL_AND_SIDE_EFFECTS,
+            turns=[self._make_turn(text="hello world")],
+        )
         assert ctx.text == "hello world"
 
     def test_all_tool_calls_spans_turns(self):
@@ -188,11 +195,16 @@ class TestEvalContext:
         tc3 = ToolCall(name="tool_c")
         t1 = self._make_turn(tool_calls=[tc1, tc2])
         t2 = self._make_turn(tool_calls=[tc3])
-        ctx = EvalContext(turns=[t1, t2])
+        ctx = EvalContext(
+            observability_level=ObservabilityLevel.TOOL_AND_SIDE_EFFECTS, turns=[t1, t2]
+        )
         assert ctx.all_tool_calls == [tc1, tc2, tc3]
 
     def test_all_tool_calls_empty(self):
-        ctx = EvalContext(turns=[self._make_turn()])
+        ctx = EvalContext(
+            observability_level=ObservabilityLevel.TOOL_AND_SIDE_EFFECTS,
+            turns=[self._make_turn()],
+        )
         assert ctx.all_tool_calls == []
 
     def test_all_side_effects_spans_turns(self):
@@ -200,7 +212,9 @@ class TestEvalContext:
         se2 = SideEffect(kind="file")
         t1 = self._make_turn(side_effects=[se1])
         t2 = self._make_turn(side_effects=[se2])
-        ctx = EvalContext(turns=[t1, t2])
+        ctx = EvalContext(
+            observability_level=ObservabilityLevel.TOOL_AND_SIDE_EFFECTS, turns=[t1, t2]
+        )
         assert ctx.all_side_effects == [se1, se2]
 
     def test_from_response(self):
@@ -208,7 +222,11 @@ class TestEvalContext:
             text="answer",
             tool_calls=[ToolCall(name="calc")],
         )
-        ctx = EvalContext.from_response(response=r, prompt="question")
+        ctx = EvalContext.from_response(
+            observability_level=ObservabilityLevel.TOOL_AND_SIDE_EFFECTS,
+            response=r,
+            prompt="question",
+        )
         assert len(ctx.turns) == 1
         assert ctx.turns[0].request.prompt == "question"
         assert ctx.turns[0].response is r
@@ -217,13 +235,21 @@ class TestEvalContext:
 
     def test_from_response_defaults(self):
         r = Response(text="hi")
-        ctx = EvalContext.from_response(response=r)
+        ctx = EvalContext.from_response(
+            observability_level=ObservabilityLevel.TOOL_AND_SIDE_EFFECTS, response=r
+        )
         assert ctx.turns[0].request.prompt == ""
         assert ctx.manifest is None
 
-    def test_observability_level_defaults_to_no_declared_limit(self) -> None:
-        ctx = EvalContext(turns=[])
-        assert ctx.observability_level is ObservabilityLevel.TOOL_AND_SIDE_EFFECTS
+    def test_observability_level_is_required(self) -> None:
+        with pytest.raises(TypeError, match="observability_level"):
+            EvalContext(turns=[])  # ty: ignore[missing-argument]
+
+    def test_from_response_requires_observability_level(self) -> None:
+        with pytest.raises(TypeError, match="observability_level"):
+            EvalContext.from_response(  # ty: ignore[missing-argument]
+                response=Response(text="hi"),
+            )
 
     def test_from_response_carries_observability_level(self) -> None:
         ctx = EvalContext.from_response(

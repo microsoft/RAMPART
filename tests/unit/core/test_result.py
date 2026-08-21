@@ -80,19 +80,39 @@ class TestInjectionRecord:
 
 
 class TestResult:
+    def test_observability_level_is_required(self) -> None:
+        with pytest.raises(TypeError, match="observability_level"):
+            Result(  # ty: ignore[missing-argument]
+                status=SafetyStatus.SAFE,
+                summary="ok",
+            )
+
     def test_bool_returns_safe_true(self) -> None:
-        r = Result(status=SafetyStatus.SAFE, summary="ok")
+        r = Result(
+            observability_level=ObservabilityLevel.RESPONSE_ONLY,
+            status=SafetyStatus.SAFE,
+            summary="ok",
+        )
         assert bool(r) is True
 
     def test_bool_returns_safe_false(self) -> None:
-        r = Result(status=SafetyStatus.UNSAFE, summary="bad")
+        r = Result(
+            observability_level=ObservabilityLevel.RESPONSE_ONLY,
+            status=SafetyStatus.UNSAFE,
+            summary="bad",
+        )
         assert bool(r) is False
 
     def test_assert_safe_pattern(self) -> None:
-        safe_result = Result(status=SafetyStatus.SAFE, summary="ok")
+        safe_result = Result(
+            observability_level=ObservabilityLevel.RESPONSE_ONLY,
+            status=SafetyStatus.SAFE,
+            summary="ok",
+        )
         assert safe_result, safe_result.summary
 
         unsafe_result = Result(
+            observability_level=ObservabilityLevel.RESPONSE_ONLY,
             status=SafetyStatus.UNSAFE,
             summary="attack detected",
         )
@@ -100,13 +120,21 @@ class TestResult:
             assert unsafe_result, unsafe_result.summary
 
     def test_repr(self) -> None:
-        r = Result(status=SafetyStatus.SAFE, summary="Agent defended")
+        r = Result(
+            observability_level=ObservabilityLevel.RESPONSE_ONLY,
+            status=SafetyStatus.SAFE,
+            summary="Agent defended",
+        )
         assert "safe=True" in repr(r)
         assert "safe" in repr(r)
         assert "Agent defended" in repr(r)
 
     def test_defaults(self) -> None:
-        r = Result(status=SafetyStatus.SAFE, summary="ok")
+        r = Result(
+            observability_level=ObservabilityLevel.RESPONSE_ONLY,
+            status=SafetyStatus.SAFE,
+            summary="ok",
+        )
         assert r.turns == []
         assert r.eval_results == []
         assert r.duration_seconds == pytest.approx(0.0)
@@ -118,6 +146,7 @@ class TestResult:
 
     def test_harm_category_accepts_enum(self) -> None:
         r = Result(
+            observability_level=ObservabilityLevel.RESPONSE_ONLY,
             status=SafetyStatus.SAFE,
             summary="ok",
             harm_category=HarmCategory.DATA_EXFILTRATION,
@@ -127,6 +156,7 @@ class TestResult:
 
     def test_harm_category_accepts_plain_string(self) -> None:
         r = Result(
+            observability_level=ObservabilityLevel.RESPONSE_ONLY,
             status=SafetyStatus.SAFE,
             summary="ok",
             harm_category="custom_product_risk",
@@ -138,7 +168,11 @@ class TestResultEvalResultsProperty:
     """eval_results is a property derived from turns."""
 
     def test_empty_turns_gives_empty_eval_results(self) -> None:
-        r = Result(status=SafetyStatus.SAFE, summary="ok")
+        r = Result(
+            observability_level=ObservabilityLevel.RESPONSE_ONLY,
+            status=SafetyStatus.SAFE,
+            summary="ok",
+        )
         assert r.eval_results == []
 
     def test_turns_with_eval_results_returned_in_order(self) -> None:
@@ -157,6 +191,7 @@ class TestResultEvalResultsProperty:
             ),
         ]
         r = Result(
+            observability_level=ObservabilityLevel.RESPONSE_ONLY,
             status=SafetyStatus.UNSAFE,
             summary="bad",
             turns=turns,
@@ -177,6 +212,7 @@ class TestResultEvalResultsProperty:
             ),
         ]
         r = Result(
+            observability_level=ObservabilityLevel.RESPONSE_ONLY,
             status=SafetyStatus.UNSAFE,
             summary="bad",
             turns=turns,

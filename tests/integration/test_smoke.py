@@ -13,7 +13,7 @@ from __future__ import annotations
 import pytest
 
 from rampart import AppManifest, HarmCategory, Response, ToolCall
-from rampart.core.types import EvalContext
+from rampart.core.types import EvalContext, ObservabilityLevel
 from rampart.evaluators import ToolCalled
 from rampart.probes import Probes
 from tests.fixtures import MockAdapter
@@ -32,6 +32,7 @@ class TestSmoke:
             ],
         )
         ctx = EvalContext.from_response(
+            observability_level=ObservabilityLevel.TOOL_AND_SIDE_EFFECTS,
             response=response,
             prompt="Summarize Q3",
         )

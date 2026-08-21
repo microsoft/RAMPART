@@ -81,8 +81,15 @@ def _make_result(*, safe: bool = True) -> Result:
         status=SafetyStatus.SAFE if safe else SafetyStatus.UNSAFE,
         summary="test",
         strategy="test",
+        observability_level=ObservabilityLevel.RESPONSE_ONLY,
     )
 ```
+
+`observability_level` has no default, so a helper like this has to pick one.
+In a new test, pick the level the test is actually about; `RESPONSE_ONLY` is the
+honest choice when the test never looks at tool calls or side effects. Existing
+tests were instead backfilled with whatever value that API used to default to,
+so that making the argument required changed no test's meaning.
 
 ### Mocking
 

@@ -337,9 +337,9 @@ async def evaluate_turn_async(
     request: Request,
     response: Response,
     turn_number: int,
+    observability_level: ObservabilityLevel,
     driver_reasoning: str = "",
     manifest: AppManifest | None = None,
-    observability_level: ObservabilityLevel = ObservabilityLevel.TOOL_AND_SIDE_EFFECTS,
 ) -> Turn:
     """Create a Turn, evaluate it, and return the Turn with eval_result attached.
 
@@ -353,12 +353,12 @@ async def evaluate_turn_async(
         request: What was sent to the agent this turn.
         response: What the agent returned this turn.
         turn_number: Position in the conversation (0-indexed).
+        observability_level: What the adapter can observe. Required, so
+            that evaluators can tell missing evidence apart from an
+            evidence channel the adapter does not report. Execution
+            strategies pass ``adapter.observability_profile``.
         driver_reasoning: Why the driver chose this request.
         manifest: The agent's declared capabilities.
-        observability_level: What the adapter can observe. Execution
-            strategies pass the adapter's profile so evaluators can tell
-            missing evidence apart from an evidence channel the adapter
-            does not report.
 
     Returns:
         Turn: An immutable Turn with eval_result populated.

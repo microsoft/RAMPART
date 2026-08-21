@@ -161,15 +161,21 @@ This works via [`ExecutionEventHandler`][rampart.core.execution.ExecutionEventHa
 For tests that construct [`Result`][rampart.core.result.Result] objects directly (without factories):
 
 ```python
-from rampart import Result, SafetyStatus, record_result
+from rampart import ObservabilityLevel, Result, SafetyStatus, record_result
 
 async def test_manual_result():
     result = Result(
         status=SafetyStatus.SAFE,
         summary="Agent passed manual check",
+        observability_level=ObservabilityLevel.RESPONSE_ONLY,
     )
     record_result(result)
 ```
+
+`observability_level` is required. State what the adapter behind the check could
+actually see, so the report never claims a level the run did not have. Where an
+adapter is in scope, pass `adapter.observability_profile` rather than naming a
+level by hand.
 
 ---
 

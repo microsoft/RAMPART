@@ -8,6 +8,7 @@ from __future__ import annotations
 import pytest
 
 from rampart.core.result import HarmCategory, Result, SafetyStatus
+from rampart.core.types import ObservabilityLevel
 from rampart.reporting.sink import PopulationSummary, ReportSink, TestRunReport
 
 
@@ -35,16 +36,19 @@ class TestByHarmCategory:
         report = TestRunReport(
             results=[
                 Result(
+                    observability_level=ObservabilityLevel.RESPONSE_ONLY,
                     status=SafetyStatus.SAFE,
                     summary="ok",
                     harm_category=HarmCategory.DATA_EXFILTRATION,
                 ),
                 Result(
+                    observability_level=ObservabilityLevel.RESPONSE_ONLY,
                     status=SafetyStatus.UNSAFE,
                     summary="bad",
                     harm_category=HarmCategory.DATA_EXFILTRATION,
                 ),
                 Result(
+                    observability_level=ObservabilityLevel.RESPONSE_ONLY,
                     status=SafetyStatus.SAFE,
                     summary="ok2",
                     harm_category=HarmCategory.JAILBREAK,
@@ -60,11 +64,13 @@ class TestByHarmCategory:
         report = TestRunReport(
             results=[
                 Result(
+                    observability_level=ObservabilityLevel.RESPONSE_ONLY,
                     status=SafetyStatus.SAFE,
                     summary="ok",
                     harm_category="custom_risk",
                 ),
                 Result(
+                    observability_level=ObservabilityLevel.RESPONSE_ONLY,
                     status=SafetyStatus.SAFE,
                     summary="ok2",
                     harm_category="custom_risk",
@@ -79,6 +85,7 @@ class TestByHarmCategory:
         report = TestRunReport(
             results=[
                 Result(
+                    observability_level=ObservabilityLevel.RESPONSE_ONLY,
                     status=SafetyStatus.SAFE,
                     summary="ok",
                     harm_category=None,
@@ -94,16 +101,19 @@ class TestByHarmCategory:
         report = TestRunReport(
             results=[
                 Result(
+                    observability_level=ObservabilityLevel.RESPONSE_ONLY,
                     status=SafetyStatus.SAFE,
                     summary="a",
                     harm_category=HarmCategory.DATA_EXFILTRATION,
                 ),
                 Result(
+                    observability_level=ObservabilityLevel.RESPONSE_ONLY,
                     status=SafetyStatus.SAFE,
                     summary="b",
                     harm_category=None,
                 ),
                 Result(
+                    observability_level=ObservabilityLevel.RESPONSE_ONLY,
                     status=SafetyStatus.SAFE,
                     summary="c",
                     harm_category="team_specific",
@@ -129,8 +139,16 @@ class TestPopulationSummary:
     def test_all_safe(self) -> None:
         report = TestRunReport(
             results=[
-                Result(status=SafetyStatus.SAFE, summary="ok"),
-                Result(status=SafetyStatus.SAFE, summary="ok2"),
+                Result(
+                    observability_level=ObservabilityLevel.RESPONSE_ONLY,
+                    status=SafetyStatus.SAFE,
+                    summary="ok",
+                ),
+                Result(
+                    observability_level=ObservabilityLevel.RESPONSE_ONLY,
+                    status=SafetyStatus.SAFE,
+                    summary="ok2",
+                ),
             ],
         )
 
@@ -144,9 +162,21 @@ class TestPopulationSummary:
     def test_mixed_results(self) -> None:
         report = TestRunReport(
             results=[
-                Result(status=SafetyStatus.SAFE, summary="ok"),
-                Result(status=SafetyStatus.UNSAFE, summary="bad"),
-                Result(status=SafetyStatus.UNDETERMINED, summary="?"),
+                Result(
+                    observability_level=ObservabilityLevel.RESPONSE_ONLY,
+                    status=SafetyStatus.SAFE,
+                    summary="ok",
+                ),
+                Result(
+                    observability_level=ObservabilityLevel.RESPONSE_ONLY,
+                    status=SafetyStatus.UNSAFE,
+                    summary="bad",
+                ),
+                Result(
+                    observability_level=ObservabilityLevel.RESPONSE_ONLY,
+                    status=SafetyStatus.UNDETERMINED,
+                    summary="?",
+                ),
             ],
         )
 
@@ -168,9 +198,21 @@ class TestPopulationSummary:
     def test_error_excluded_from_attack_success_rate(self) -> None:
         report = TestRunReport(
             results=[
-                Result(status=SafetyStatus.SAFE, summary="ok"),
-                Result(status=SafetyStatus.UNSAFE, summary="bad"),
-                Result(status=SafetyStatus.ERROR, summary="infra"),
+                Result(
+                    observability_level=ObservabilityLevel.RESPONSE_ONLY,
+                    status=SafetyStatus.SAFE,
+                    summary="ok",
+                ),
+                Result(
+                    observability_level=ObservabilityLevel.RESPONSE_ONLY,
+                    status=SafetyStatus.UNSAFE,
+                    summary="bad",
+                ),
+                Result(
+                    observability_level=ObservabilityLevel.RESPONSE_ONLY,
+                    status=SafetyStatus.ERROR,
+                    summary="infra",
+                ),
             ],
         )
 
@@ -183,8 +225,16 @@ class TestPopulationSummary:
     def test_all_errors(self) -> None:
         report = TestRunReport(
             results=[
-                Result(status=SafetyStatus.ERROR, summary="err1"),
-                Result(status=SafetyStatus.ERROR, summary="err2"),
+                Result(
+                    observability_level=ObservabilityLevel.RESPONSE_ONLY,
+                    status=SafetyStatus.ERROR,
+                    summary="err1",
+                ),
+                Result(
+                    observability_level=ObservabilityLevel.RESPONSE_ONLY,
+                    status=SafetyStatus.ERROR,
+                    summary="err2",
+                ),
             ],
         )
 
@@ -198,16 +248,19 @@ class TestPopulationSummary:
         report = TestRunReport(
             results=[
                 Result(
+                    observability_level=ObservabilityLevel.RESPONSE_ONLY,
                     status=SafetyStatus.SAFE,
                     summary="ok",
                     harm_category=HarmCategory.DATA_EXFILTRATION,
                 ),
                 Result(
+                    observability_level=ObservabilityLevel.RESPONSE_ONLY,
                     status=SafetyStatus.UNSAFE,
                     summary="bad",
                     harm_category=HarmCategory.JAILBREAK,
                 ),
                 Result(
+                    observability_level=ObservabilityLevel.RESPONSE_ONLY,
                     status=SafetyStatus.SAFE,
                     summary="ok2",
                     harm_category=HarmCategory.DATA_EXFILTRATION,
@@ -224,11 +277,13 @@ class TestPopulationSummary:
         report = TestRunReport(
             results=[
                 Result(
+                    observability_level=ObservabilityLevel.RESPONSE_ONLY,
                     status=SafetyStatus.SAFE,
                     summary="ok",
                     harm_category="custom",
                 ),
                 Result(
+                    observability_level=ObservabilityLevel.RESPONSE_ONLY,
                     status=SafetyStatus.UNSAFE,
                     summary="bad",
                     harm_category="other",
@@ -244,6 +299,7 @@ class TestPopulationSummary:
         report = TestRunReport(
             results=[
                 Result(
+                    observability_level=ObservabilityLevel.RESPONSE_ONLY,
                     status=SafetyStatus.SAFE,
                     summary="ok",
                     harm_category=HarmCategory.DATA_EXFILTRATION,

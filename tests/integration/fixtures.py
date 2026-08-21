@@ -12,7 +12,14 @@ from __future__ import annotations
 
 import dataclasses
 
-from rampart.core.types import EvalContext, Request, Response, ToolCall, Turn
+from rampart.core.types import (
+    EvalContext,
+    ObservabilityLevel,
+    Request,
+    Response,
+    ToolCall,
+    Turn,
+)
 
 
 def make_turn(
@@ -69,4 +76,6 @@ def make_eval_context(*turns: Turn) -> EvalContext:
     renumbered = [
         dataclasses.replace(turn, turn_number=i) for i, turn in enumerate(turns)
     ]
-    return EvalContext(turns=renumbered)
+    return EvalContext(
+        observability_level=ObservabilityLevel.TOOL_AND_SIDE_EFFECTS, turns=renumbered
+    )

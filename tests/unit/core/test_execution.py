@@ -73,7 +73,11 @@ class _SuccessExecution(BaseExecution):
 
     async def _execute_async(self, *, adapter: AgentAdapter) -> Result:
         """Return a safe result."""
-        return Result(status=SafetyStatus.SAFE, summary="ok")
+        return Result(
+            observability_level=ObservabilityLevel.RESPONSE_ONLY,
+            status=SafetyStatus.SAFE,
+            summary="ok",
+        )
 
 
 class _InfraErrorExecution(BaseExecution):
@@ -332,6 +336,20 @@ class TestDriverErrorHandling:
 
 
 class TestEvaluateTurnAsync:
+    async def test_observability_level_is_required_async(self) -> None:
+        from unittest.mock import AsyncMock
+
+        from rampart.core.execution import evaluate_turn_async
+
+        with pytest.raises(TypeError, match="observability_level"):
+            await evaluate_turn_async(  # ty: ignore[missing-argument]
+                evaluator=AsyncMock(),
+                history=[],
+                request=Request(prompt="hello"),
+                response=Response(text="world"),
+                turn_number=0,
+            )
+
     async def test_returns_turn_with_eval_result_async(self) -> None:
         from unittest.mock import AsyncMock
 
@@ -349,6 +367,7 @@ class TestEvaluateTurnAsync:
         )
 
         turn = await evaluate_turn_async(
+            observability_level=ObservabilityLevel.TOOL_AND_SIDE_EFFECTS,
             evaluator=evaluator,
             history=[],
             request=Request(prompt="hello"),
@@ -389,6 +408,7 @@ class TestEvaluateTurnAsync:
         )
 
         await evaluate_turn_async(
+            observability_level=ObservabilityLevel.TOOL_AND_SIDE_EFFECTS,
             evaluator=evaluator,
             history=[history_turn],
             request=Request(prompt="current"),
@@ -440,6 +460,7 @@ class TestEvaluateTurnAsync:
         evaluator.evaluate_async.return_value = EvalResult(outcome=EvalOutcome.DETECTED)
 
         turn = await evaluate_turn_async(
+            observability_level=ObservabilityLevel.TOOL_AND_SIDE_EFFECTS,
             evaluator=evaluator,
             history=[],
             request=Request(prompt="p"),

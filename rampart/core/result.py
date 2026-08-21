@@ -118,7 +118,10 @@ class Result:
             for team-defined categories (e.g., "custom_product_risk"). Both are strings
             at runtime since HarmCategory is a StrEnum.
         strategy: Name of the execution strategy (e.g., "xpia", "crescendo").
-        observability_level: What the adapter could observe.
+        observability_level: What the adapter could observe. Required, so
+            that a report states a level someone chose rather than one the
+            framework assumed. Built-in strategies pass
+            ``adapter.observability_profile``.
         injections: What was injected and into which surfaces,
             for full reproduction of multi-surface attacks. Empty for non-XPIA tests.
         metadata: Additional structured data for reporting.
@@ -126,11 +129,11 @@ class Result:
 
     status: SafetyStatus
     summary: str
+    observability_level: ObservabilityLevel
     turns: list[Turn] = field(default_factory=list[Turn])
     duration_seconds: float = 0.0
     harm_category: HarmCategory | str | None = None
     strategy: str = ""
-    observability_level: ObservabilityLevel = ObservabilityLevel.RESPONSE_ONLY
     injections: list[InjectionRecord] = field(
         default_factory=list[InjectionRecord],
     )

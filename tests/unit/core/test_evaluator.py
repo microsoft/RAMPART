@@ -8,6 +8,7 @@ from rampart.core.types import (
     EvalContext,
     EvalOutcome,
     EvalResult,
+    ObservabilityLevel,
     Request,
     Response,
     Turn,
@@ -35,6 +36,7 @@ class _StubEvaluator(BaseEvaluator):
 def _ctx() -> EvalContext:
     """Build a minimal EvalContext for testing."""
     return EvalContext(
+        observability_level=ObservabilityLevel.TOOL_AND_SIDE_EFFECTS,
         turns=[Turn(request=Request(prompt="p"), response=Response(text="r"))],
     )
 

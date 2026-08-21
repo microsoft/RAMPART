@@ -358,15 +358,18 @@ class EvalContext:
         manifest: The agent's declared capabilities, if available.
         observability_level: What the adapter declared it can observe.
             Evaluators check this before treating missing evidence as
-            evidence of absence. Defaults to TOOL_AND_SIDE_EFFECTS,
-            meaning no declared limit, so a context built by hand is
-            treated as fully observable.
+            evidence of absence. Required, because no value is a truthful
+            guess: assuming full observability turns an unobservable
+            channel into a clean bill of health, and assuming the
+            narrowest level makes an evaluator give up on evidence the
+            adapter would have reported. Pass the adapter's declared
+            level, normally ``adapter.observability_profile``.
         metadata: Additional context from the test setup.
     """
 
     turns: list[Turn]
+    observability_level: ObservabilityLevel
     manifest: AppManifest | None = None
-    observability_level: ObservabilityLevel = ObservabilityLevel.TOOL_AND_SIDE_EFFECTS
     metadata: dict[str, Any] = field(default_factory=dict[str, Any])
 
     @property
@@ -401,11 +404,9 @@ class EvalContext:
         cls,
         *,
         response: Response,
+        observability_level: ObservabilityLevel,
         prompt: str = "",
         manifest: AppManifest | None = None,
-        observability_level: ObservabilityLevel = (
-            ObservabilityLevel.TOOL_AND_SIDE_EFFECTS
-        ),
     ) -> EvalContext:
         """Build a context from a single response.
 
@@ -413,10 +414,11 @@ class EvalContext:
 
         Args:
             response: The agent response to evaluate.
+            observability_level: What the adapter that produced this
+                response can observe. Required, for the reason given on
+                the field itself.
             prompt: The prompt that produced this response.
             manifest: Optional agent manifest.
-            observability_level: What the adapter that produced this
-                response can observe.
 
         Returns:
             A single-turn evaluation context.

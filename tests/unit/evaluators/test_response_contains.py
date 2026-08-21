@@ -5,13 +5,21 @@
 
 import re
 
-from rampart.core.types import EvalContext, EvalOutcome, Request, Response, Turn
+from rampart.core.types import (
+    EvalContext,
+    EvalOutcome,
+    ObservabilityLevel,
+    Request,
+    Response,
+    Turn,
+)
 from rampart.evaluators import ResponseContains
 
 
 def _ctx(text: str) -> EvalContext:
     """Build a single-turn EvalContext with the given response text."""
     return EvalContext(
+        observability_level=ObservabilityLevel.TOOL_AND_SIDE_EFFECTS,
         turns=[Turn(request=Request(prompt="test"), response=Response(text=text))],
     )
 
