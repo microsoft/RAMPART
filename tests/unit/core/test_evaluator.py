@@ -685,3 +685,188 @@ class TestCompositionToleratesHostileEvidence:
 
         assert result.outcome is EvalOutcome.UNDETERMINED
         assert result.evidence == ["stub:undetermined"]
+
+
+class _Unrenderable:
+    """Stands in for an evaluator value whose ``__str__`` raises."""
+
+    def __str__(self) -> str:
+        raise RuntimeError("boom")
+
+
+class _HostileRationaleEvaluator(BaseEvaluator):
+    """Returns a rationale that cannot be rendered."""
+
+    def __init__(self, *, outcome: EvalOutcome) -> None:
+        self._outcome = outcome
+
+    async def evaluate_async(self, *, context: EvalContext) -> EvalResult:
+        """Return a result whose rationale raises when it is rendered."""
+        return EvalResult(
+            outcome=self._outcome,
+            evidence=["hostile"],
+            rationale=_Unrenderable(),  # ty: ignore[invalid-argument-type]
+        )
+
+
+class _HostileOperandsEvaluator(BaseEvaluator):
+    """Returns an undetermined-operand collection that cannot be iterated."""
+
+    def __init__(self, *, outcome: EvalOutcome) -> None:
+        self._outcome = outcome
+
+    async def evaluate_async(self, *, context: EvalContext) -> EvalResult:
+        """Return a result whose undetermined_operands is not a list."""
+        return EvalResult(
+            outcome=self._outcome,
+            rationale="hostile",
+            undetermined_operands=123,  # ty: ignore[invalid-argument-type]
+        )
+
+
+async def _readable_outcome_async(
+    *,
+    left: EvalOutcome,
+    right: EvalOutcome,
+    operator: str,
+) -> EvalOutcome:
+    """Compose two readable stubs the same way, to compare a verdict against.
+
+    A differential oracle, not an independent one. The outcome table itself is
+    pinned by ``TestOrComposition``, ``TestAndComposition`` and
+    ``TestCompositionAlgebra``; what the sweeps below add is that swapping a
+    readable operand for a hostile one moves nothing.
+    """
+    first = _StubEvaluator(outcome=left)
+    second = _StubEvaluator(outcome=right)
+    composed = first & second if operator == "and" else first | second
+    result = await composed.evaluate_async(context=_ctx())
+    return result.outcome
+
+
+class TestCompositionToleratesHostileRationale:
+    """A rationale that cannot be rendered must not cost the composed verdict."""
+
+    @pytest.mark.parametrize("left", _OUTCOMES)
+    @pytest.mark.parametrize("right", _OUTCOMES)
+    @pytest.mark.parametrize("operator", ["and", "or"])
+    async def test_hostile_left_rationale_keeps_the_verdict_async(
+        self,
+        left: EvalOutcome,
+        right: EvalOutcome,
+        operator: str,
+    ) -> None:
+        hostile = _HostileRationaleEvaluator(outcome=left)
+        readable = _StubEvaluator(outcome=right)
+        composed = hostile & readable if operator == "and" else hostile | readable
+        expected = await _readable_outcome_async(
+            left=left,
+            right=right,
+            operator=operator,
+        )
+
+        result = await composed.evaluate_async(context=_ctx())
+
+        assert result.outcome is expected
+        assert all(isinstance(r, str) for r in result.undetermined_operands)
+
+    @pytest.mark.parametrize("left", _OUTCOMES)
+    @pytest.mark.parametrize("right", _OUTCOMES)
+    @pytest.mark.parametrize("operator", ["and", "or"])
+    async def test_hostile_right_rationale_keeps_the_verdict_async(
+        self,
+        left: EvalOutcome,
+        right: EvalOutcome,
+        operator: str,
+    ) -> None:
+        readable = _StubEvaluator(outcome=left)
+        hostile = _HostileRationaleEvaluator(outcome=right)
+        composed = readable & hostile if operator == "and" else readable | hostile
+        expected = await _readable_outcome_async(
+            left=left,
+            right=right,
+            operator=operator,
+        )
+
+        result = await composed.evaluate_async(context=_ctx())
+
+        assert result.outcome is expected
+        assert all(isinstance(r, str) for r in result.undetermined_operands)
+
+    @pytest.mark.parametrize(
+        "outcome",
+        [EvalOutcome.DETECTED, EvalOutcome.NOT_DETECTED],
+    )
+    async def test_negation_renders_the_rationale_it_flips_async(
+        self,
+        outcome: EvalOutcome,
+    ) -> None:
+        result = await (~_HostileRationaleEvaluator(outcome=outcome)).evaluate_async(
+            context=_ctx(),
+        )
+
+        assert result.rationale == "NOT (<unprintable value>)"
+
+
+class TestCompositionToleratesHostileOperands:
+    """A bad operand collection must not cost the composed verdict either."""
+
+    @pytest.mark.parametrize("left", _OUTCOMES)
+    @pytest.mark.parametrize("right", _OUTCOMES)
+    @pytest.mark.parametrize("operator", ["and", "or"])
+    async def test_hostile_left_operands_keep_the_verdict_async(
+        self,
+        left: EvalOutcome,
+        right: EvalOutcome,
+        operator: str,
+    ) -> None:
+        hostile = _HostileOperandsEvaluator(outcome=left)
+        readable = _StubEvaluator(outcome=right)
+        composed = hostile & readable if operator == "and" else hostile | readable
+        expected = await _readable_outcome_async(
+            left=left,
+            right=right,
+            operator=operator,
+        )
+
+        result = await composed.evaluate_async(context=_ctx())
+
+        assert result.outcome is expected
+        assert all(isinstance(r, str) for r in result.undetermined_operands)
+
+    @pytest.mark.parametrize("left", _OUTCOMES)
+    @pytest.mark.parametrize("right", _OUTCOMES)
+    @pytest.mark.parametrize("operator", ["and", "or"])
+    async def test_hostile_right_operands_keep_the_verdict_async(
+        self,
+        left: EvalOutcome,
+        right: EvalOutcome,
+        operator: str,
+    ) -> None:
+        readable = _StubEvaluator(outcome=left)
+        hostile = _HostileOperandsEvaluator(outcome=right)
+        composed = readable & hostile if operator == "and" else readable | hostile
+        expected = await _readable_outcome_async(
+            left=left,
+            right=right,
+            operator=operator,
+        )
+
+        result = await composed.evaluate_async(context=_ctx())
+
+        assert result.outcome is expected
+        assert all(isinstance(r, str) for r in result.undetermined_operands)
+
+    @pytest.mark.parametrize(
+        "outcome",
+        [EvalOutcome.DETECTED, EvalOutcome.NOT_DETECTED],
+    )
+    async def test_negation_normalizes_operands_it_flips_async(
+        self,
+        outcome: EvalOutcome,
+    ) -> None:
+        result = await (~_HostileOperandsEvaluator(outcome=outcome)).evaluate_async(
+            context=_ctx(),
+        )
+
+        assert result.undetermined_operands == []
