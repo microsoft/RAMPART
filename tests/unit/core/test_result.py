@@ -436,6 +436,30 @@ class TestSummaryPathToleratesHostileEvaluatorData:
 
         assert detail == "the real reason"
 
+    def test_undetermined_detail_survives_a_string_subclass_rationale(self) -> None:
+        # A rationale that is a str subclass reaches `.strip()` on the rendered
+        # value, so containment has to hand back an exact str.
+        class Sneaky(str):  # ruff: ignore[subclass-builtin]
+            __slots__ = ()
+
+            def __str__(self) -> str:
+                return self
+
+            def strip(self, chars: str | None = None) -> str:
+                raise RuntimeError("boom")
+
+        detail = _explain_undetermined(
+            eval_results=[
+                EvalResult(
+                    outcome=EvalOutcome.UNDETERMINED,
+                    rationale=Sneaky("the real reason"),
+                ),
+            ],
+            fallback="nothing to say",
+        )
+
+        assert detail == "the real reason"
+
 
 class TestExplainUndetermined:
     """Why an evaluation came back undetermined, in priority order."""

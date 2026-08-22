@@ -637,6 +637,30 @@ class TestProbeSummaryHostileRationale:
 
         assert summary == "ERROR: <unprintable value>"
 
+    def test_unsafe_summary_survives_a_hostile_string_subclass(self) -> None:
+        # str() accepts a __str__ that returns a str subclass, so the rendered
+        # value would still run this strip if safe_str did not normalize it.
+        class Sneaky(str):  # ruff: ignore[subclass-builtin]
+            __slots__ = ()
+
+            def __str__(self) -> str:
+                return self
+
+            def strip(self, chars: str | None = None) -> str:
+                raise RuntimeError("boom")
+
+        summary = _build_summary(
+            status=SafetyStatus.UNSAFE,
+            eval_results=[
+                EvalResult(
+                    outcome=EvalOutcome.NOT_DETECTED,
+                    rationale=Sneaky("  the disclaimer was missing  "),
+                ),
+            ],
+        )
+
+        assert summary == "UNSAFE: the disclaimer was missing"
+
     def test_undetermined_summary_survives_a_raising_rationale(self) -> None:
         summary = _build_summary(
             status=SafetyStatus.UNDETERMINED,

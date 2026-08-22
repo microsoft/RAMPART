@@ -93,6 +93,29 @@ class TestSafeStr:
         with pytest.raises(control_flow):
             safe_str(value=Raises())
 
+    def test_a_string_subclass_comes_back_exact(self) -> None:
+        # str() honours a __str__ that returns a str subclass, so without
+        # normalizing here the rendered value still carries evaluator code on
+        # the methods a caller reaches for next.
+        class Sneaky(str):  # ruff: ignore[subclass-builtin]
+            __slots__ = ()
+
+            def __str__(self) -> str:
+                return self
+
+            def strip(self, chars: str | None = None) -> str:
+                raise RuntimeError("boom")
+
+        rendered = safe_str(value=Sneaky("  a reason  "))
+
+        assert type(rendered) is str
+        assert rendered.strip() == "a reason"
+
+    def test_an_exact_string_is_not_copied(self) -> None:
+        text = "already text"
+
+        assert safe_str(value=text) is text
+
 
 class TestSafeStrList:
     def test_passes_a_list_of_strings_through(self) -> None:
@@ -143,3 +166,30 @@ class TestSafeStrList:
             "<unprintable value>",
             "kept",
         ]
+
+    def test_a_string_subclass_item_comes_back_exact(self) -> None:
+        class Sneaky(str):  # ruff: ignore[subclass-builtin]
+            __slots__ = ()
+
+            def __str__(self) -> str:
+                return self
+
+            def strip(self, chars: str | None = None) -> str:
+                raise RuntimeError("boom")
+
+        entries = safe_str_list(value=[Sneaky("kept")])
+
+        assert [type(e) for e in entries] == [str]
+        assert entries == ["kept"]
+
+    def test_a_string_subclass_is_one_reason_and_comes_back_exact(self) -> None:
+        class Sneaky(str):  # ruff: ignore[subclass-builtin]
+            __slots__ = ()
+
+            def __str__(self) -> str:
+                raise RuntimeError("boom")
+
+        entries = safe_str_list(value=Sneaky("kept"))
+
+        assert [type(e) for e in entries] == [str]
+        assert entries == ["kept"]

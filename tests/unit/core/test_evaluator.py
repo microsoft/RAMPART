@@ -709,6 +709,36 @@ class _HostileRationaleEvaluator(BaseEvaluator):
         )
 
 
+class _SneakyRationale(str):  # ruff: ignore[subclass-builtin]
+    """A rationale that is a str subclass and overrides what the code calls next.
+
+    ``str()`` accepts a ``__str__`` that returns a subclass, so containment has
+    to hand back an exact ``str`` or the rendered value still runs this code.
+    """
+
+    __slots__ = ()
+
+    def __str__(self) -> str:
+        return self
+
+    def strip(self, chars: str | None = None) -> str:
+        raise RuntimeError("boom")
+
+
+class _SneakyRationaleEvaluator(BaseEvaluator):
+    """Returns a rationale that is a hostile str subclass."""
+
+    def __init__(self, *, outcome: EvalOutcome) -> None:
+        self._outcome = outcome
+
+    async def evaluate_async(self, *, context: EvalContext) -> EvalResult:
+        """Return a result whose rationale is a hostile str subclass."""
+        return EvalResult(
+            outcome=self._outcome,
+            rationale=_SneakyRationale("the operand could not look"),
+        )
+
+
 class _HostileOperandsEvaluator(BaseEvaluator):
     """Returns an undetermined-operand collection that cannot be iterated."""
 
@@ -806,6 +836,84 @@ class TestCompositionToleratesHostileRationale:
         )
 
         assert result.rationale == "NOT (<unprintable value>)"
+
+    @pytest.mark.parametrize(
+        ("left", "operator", "right", "expected"),
+        [
+            (
+                EvalOutcome.NOT_DETECTED,
+                "and",
+                EvalOutcome.DETECTED,
+                "Left operand not detected: <unprintable value>",
+            ),
+            (
+                EvalOutcome.DETECTED,
+                "and",
+                EvalOutcome.NOT_DETECTED,
+                "Right operand not detected: <unprintable value>",
+            ),
+            (
+                EvalOutcome.UNDETERMINED,
+                "and",
+                EvalOutcome.DETECTED,
+                "Left operand undetermined: <unprintable value>",
+            ),
+            (
+                EvalOutcome.DETECTED,
+                "and",
+                EvalOutcome.UNDETERMINED,
+                "Right operand undetermined: <unprintable value>",
+            ),
+            (
+                EvalOutcome.DETECTED,
+                "and",
+                EvalOutcome.DETECTED,
+                "(<unprintable value>) AND (<unprintable value>)",
+            ),
+            (
+                EvalOutcome.UNDETERMINED,
+                "or",
+                EvalOutcome.NOT_DETECTED,
+                "Left operand undetermined: <unprintable value>",
+            ),
+            (
+                EvalOutcome.NOT_DETECTED,
+                "or",
+                EvalOutcome.UNDETERMINED,
+                "Right operand undetermined: <unprintable value>",
+            ),
+        ],
+    )
+    async def test_every_worded_rationale_names_the_contained_value_async(
+        self,
+        left: EvalOutcome,
+        operator: str,
+        right: EvalOutcome,
+        expected: str,
+    ) -> None:
+        # One case per branch that words a rationale of its own, so the content
+        # is pinned and not only the fact that the guard did not raise.
+        lhs = _HostileRationaleEvaluator(outcome=left)
+        rhs = _HostileRationaleEvaluator(outcome=right)
+        composed = lhs & rhs if operator == "and" else lhs | rhs
+
+        result = await composed.evaluate_async(context=_ctx())
+
+        assert result.rationale == expected
+
+    @pytest.mark.parametrize("operator", ["and", "or"])
+    async def test_a_string_subclass_rationale_is_recorded_async(
+        self,
+        operator: str,
+    ) -> None:
+        sneaky = _SneakyRationaleEvaluator(outcome=EvalOutcome.UNDETERMINED)
+        readable = _StubEvaluator(outcome=EvalOutcome.DETECTED)
+        composed = sneaky & readable if operator == "and" else sneaky | readable
+
+        result = await composed.evaluate_async(context=_ctx())
+
+        assert result.undetermined_operands == ["the operand could not look"]
+        assert [type(r) for r in result.undetermined_operands] == [str]
 
 
 class TestCompositionToleratesHostileOperands:

@@ -64,17 +64,26 @@ def safe_str(*, value: object) -> str:
     take the whole summary, and with it the verdict, so the failure is
     contained to the one value instead.
 
+    The result is always an exact ``str``. ``str()`` accepts a ``__str__``
+    that returns a ``str`` subclass, so without this the rendered value would
+    still carry evaluator code on the methods RAMPART calls next, such as
+    ``strip``, and containing the render would have moved the failure rather
+    than removed it. ``str.__str__`` is the C slot, so it cannot be overridden
+    and cannot raise, and it returns the argument unchanged when it is already
+    an exact ``str``.
+
     Args:
         value (object): The value to render.
 
     Returns:
-        str: ``str(value)``, or a fixed placeholder when that is not
-            possible.
+        str: ``str(value)`` as an exact ``str``, or a fixed placeholder when
+            that is not possible.
     """
     try:
-        return str(value)
+        rendered = str(value)
     except Exception:  # ruff: ignore[blind-except]
         return "<unprintable value>"
+    return str.__str__(rendered)  # ruff: ignore[unnecessary-dunder-call]
 
 
 def safe_str_list(*, value: object) -> list[str]:
@@ -91,14 +100,16 @@ def safe_str_list(*, value: object) -> list[str]:
         value (object): The value to coerce.
 
     Returns:
-        list[str]: The rendered entries, or an empty list when ``value``
-            cannot be iterated at all, or raises partway through. A value
-            that is consumed as it is read, such as a generator, is read
-            once like any other iterable.
+        list[str]: The rendered entries as exact ``str``, or an empty list
+            when ``value`` cannot be iterated at all, or raises partway
+            through. A value that is consumed as it is read, such as a
+            generator, is read once like any other iterable.
     """
     try:
         if isinstance(value, str):
-            return [value]
+            # str.__str__ rather than safe_str, so a subclass whose __str__
+            # raises still contributes the text it already holds.
+            return [str.__str__(value)]  # ruff: ignore[unnecessary-dunder-call]
         items = list(value)  # ty: ignore[invalid-argument-type]
     except Exception:  # ruff: ignore[blind-except]
         return []
