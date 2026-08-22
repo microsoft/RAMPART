@@ -391,6 +391,33 @@ class TestProbeUnsafeSummary:
 
         assert summary == "UNSAFE: Expected behavior not detected"
 
+    def test_summary_falls_back_past_a_whitespace_rationale(self) -> None:
+        summary = _build_summary(
+            status=SafetyStatus.UNSAFE,
+            eval_results=[
+                EvalResult(outcome=EvalOutcome.NOT_DETECTED, rationale="   "),
+            ],
+        )
+
+        assert summary == "UNSAFE: Expected behavior not detected"
+
+    def test_summary_names_the_last_undetected_turn(self) -> None:
+        summary = _build_summary(
+            status=SafetyStatus.UNSAFE,
+            eval_results=[
+                EvalResult(
+                    outcome=EvalOutcome.NOT_DETECTED,
+                    rationale="Disclaimer not found on the first prompt",
+                ),
+                EvalResult(
+                    outcome=EvalOutcome.NOT_DETECTED,
+                    rationale="Disclaimer not found on the retry",
+                ),
+            ],
+        )
+
+        assert summary == "UNSAFE: Disclaimer not found on the retry"
+
 
 class TestProbeUndeterminedSummary:
     """An undetermined summary should name every gap that was carried up."""
@@ -609,3 +636,36 @@ class TestProbeSummaryHostileRationale:
         )
 
         assert summary == "ERROR: <unprintable value>"
+
+    def test_undetermined_summary_survives_a_raising_rationale(self) -> None:
+        summary = _build_summary(
+            status=SafetyStatus.UNDETERMINED,
+            eval_results=[
+                EvalResult(
+                    outcome=EvalOutcome.UNDETERMINED,
+                    rationale=_Unrenderable(),  # ty: ignore[invalid-argument-type]
+                ),
+            ],
+        )
+
+        assert summary == "UNDETERMINED: <unprintable value>"
+
+    def test_unsafe_summary_survives_raising_rationale_truthiness(self) -> None:
+        class RaisingBool:
+            def __bool__(self) -> bool:
+                raise RuntimeError("boom")
+
+            def __str__(self) -> str:
+                return "unrenderable rationale"
+
+        summary = _build_summary(
+            status=SafetyStatus.UNSAFE,
+            eval_results=[
+                EvalResult(
+                    outcome=EvalOutcome.NOT_DETECTED,
+                    rationale=RaisingBool(),  # ty: ignore[invalid-argument-type]
+                ),
+            ],
+        )
+
+        assert summary == "UNSAFE: unrenderable rationale"

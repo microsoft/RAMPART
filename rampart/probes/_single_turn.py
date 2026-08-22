@@ -140,10 +140,15 @@ def _build_summary(
         # resolve_as_probe returns UNSAFE only when some evaluator was
         # NOT_DETECTED, so the reason has to come from one of those. Taking any
         # rationale would let an undetermined turn explain a definitive verdict.
+        #
+        # Rendered before the emptiness test, not after: a rationale whose
+        # truthiness raises would otherwise cost the verdict, and one that is
+        # only whitespace would render a summary with nothing after the colon.
         rationales = [
-            safe_str(value=er.rationale)
+            rendered
             for er in eval_results
-            if er.outcome == EvalOutcome.NOT_DETECTED and er.rationale
+            if er.outcome == EvalOutcome.NOT_DETECTED
+            and (rendered := safe_str(value=er.rationale).strip())
         ]
         detail = rationales[-1] if rationales else "Expected behavior not detected"
         return f"UNSAFE: {detail}"
