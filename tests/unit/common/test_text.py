@@ -197,10 +197,10 @@ class TestSafeStrList:
 
 class TestSafeFloat:
     def test_passes_a_finite_float_through(self) -> None:
-        assert safe_float(value=0.9) == 0.9
+        assert safe_float(value=0.9) == pytest.approx(0.9)
 
     def test_coerces_an_int(self) -> None:
-        assert safe_float(value=1) == 1.0
+        assert safe_float(value=1) == pytest.approx(1.0)
 
     @pytest.mark.parametrize(
         "value",
