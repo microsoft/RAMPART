@@ -335,7 +335,11 @@ def _merge_undetermined(
     for operand in (left, right):
         if operand is None:
             continue
-        carried = safe_str_list(value=operand.undetermined_operands)
+        carried = [
+            reason
+            for reason in safe_str_list(value=operand.undetermined_operands)
+            if reason.strip()
+        ]
         if carried:
             reasons.extend(carried)
         elif operand.outcome == EvalOutcome.UNDETERMINED:
