@@ -72,28 +72,13 @@ result = await Probes.behavior(
 ).execute_async(adapter=my_adapter)
 ```
 
-These are the migration forms for complete-transcript probe requirements:
-
-```python
-from rampart.evaluators import ResponseContains, ResponseScope
-
-# Every response must contain the expected term
-ResponseContains("Paris", scope=ResponseScope.ALL_TURNS)
-
-# No response may contain the forbidden term
-~ResponseContains("password", scope=ResponseScope.ANY_TURN)
-```
-
 !!! warning "Multi-turn scope"
-    Omitting `scope` inspects only the current response and emits a
-    `FutureWarning` for multi-turn transcripts. See
-    [Temporal Scope](../usage/authoring-tests.md#temporal-scope).
-
-    This release prepares evaluator semantics for final-trace verdicts. Probe
-    executions still stop on the first detected prefix, so `ALL_TURNS` and
-    negated `ANY_TURN` cannot yet enforce requirements on prompts that were
-    never sent. Choose an explicit scope now, but rely on the complete
-    transcript quantifier only after final-trace evaluation lands.
+    Choose positive and negated probe scopes from the
+    [Temporal Scope table](../usage/authoring-tests.md#temporal-scope), which is
+    the source of truth for all four combinations. Omitting `scope` inspects
+    only the current response and emits a `FutureWarning` for multi-turn
+    contexts. Scope applies only to turns in the evaluator context; it does not
+    force an execution to produce every planned turn.
 
 ---
 

@@ -153,12 +153,26 @@ ResponseContains("id_rsa", scope=ResponseScope.CURRENT_TURN)
     `ResponseScope.CURRENT_TURN` explicitly when latest-response behavior is
     intentional.
 
-    This is a preparatory API change. Executions continue to evaluate growing
-    prefixes until final-trace verdict cadence ships. In particular, probes
-    still stop on the first detected prefix, so `ALL_TURNS` and negated
-    `ANY_TURN` cannot yet enforce requirements on prompts that were never
-    sent. Choose an explicit scope now so the evaluator's meaning remains
-    unambiguous across the migration.
+    Scope quantifies only the turns present in the evaluator's `EvalContext`.
+    It does not control how many turns an execution produces or whether an
+    execution stops early.
+
+#### How Each Evaluator Sees the Transcript
+
+Built-in evaluators reach their temporal behavior in two ways. Quantifying
+evaluators compute deterministic matches across turns. Windowing evaluators
+choose how much transcript to give a judge that returns one holistic verdict.
+
+| Evaluator | Mechanism | Default | Configurable via |
+|---|---|---|---|
+| `ToolCalled` | quantifies (`ANY_TURN`) | any turn | — |
+| `SideEffectOccurred` | quantifies (`ANY_TURN`) | any turn | — |
+| `ResponseContains` | quantifies | current turn | `ResponseScope` |
+| `LLMJudge` | windows | full transcript | `TranscriptScope` |
+
+`ResponseScope.CURRENT_TURN` and `TranscriptScope.CURRENT_TURN` both select
+the last turn, but they belong to different enums and are not interchangeable.
+Pass the scope type declared by the evaluator you are configuring.
 
 ### [`SideEffectOccurred`][rampart.evaluators.side_effect.SideEffectOccurred] — Detect Side Effects
 
@@ -219,8 +233,8 @@ judge = LLMJudge(
 ```
 
 Use `TranscriptScope.FULL` when evidence from any earlier turn must affect the
-final verdict. Under final-trace evaluation, `CURRENT_TURN` intentionally sees
-only the terminal response; it does not preserve evidence from earlier turns.
+verdict. `CURRENT_TURN` intentionally gives the judge only the latest response.
+Like `ResponseScope`, it does not control how many turns an execution produces.
 
 **Custom persona.** The default judge identity is [`NEUTRAL_EVALUATOR`][rampart.evaluators.personas.NEUTRAL_EVALUATOR] — an impartial, literal evaluator. Override it when a different lens is useful:
 

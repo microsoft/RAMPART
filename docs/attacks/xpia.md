@@ -152,21 +152,12 @@ Place the cheaper evaluator on the left side of `|` — it short-circuits if the
 The `&` above asks whether both happened, so one condition that definitively did not happen settles the result even if the adapter could not observe the other. Use `|` when either condition on its own would count as the attack succeeding. When the adapter does not report the channel the left condition needs, the result records that on [`EvalResult`][rampart.core.types.EvalResult]. Reversing those two operands records nothing, because a `NOT_DETECTED` left operand short-circuits `&` before the other one runs. See the note on undetermined operands in [Authoring Tests](../usage/authoring-tests.md#composing-evaluators).
 
 !!! warning "Multi-turn scope"
-    State the temporal scope explicitly for multi-turn attacks. Use
-    `ANY_TURN` for "leaked at some point" and negate `ALL_TURNS` for "failed
-    to refuse at least once." Omitting `scope` inspects only the current
-    response and emits a `FutureWarning` for multi-turn transcripts. See
-    [Temporal Scope](../usage/authoring-tests.md#temporal-scope).
-
-    This release prepares evaluator semantics for final-trace verdicts. The
-    rollout is tracked in
-    [#148 (shared linear trace runner)](https://github.com/microsoft/RAMPART/pull/148),
-    [#149 (probe final-trace verdicts)](https://github.com/microsoft/RAMPART/pull/149),
-    and [#150 (attack final-trace verdicts)](https://github.com/microsoft/RAMPART/pull/150);
-    [#150](https://github.com/microsoft/RAMPART/pull/150) is the change that
-    affects this attack and depends on both lower layers. Until that work
-    lands, attack executions still evaluate growing prefixes. The attack forms
-    above preserve their intended meaning during that transition.
+    State the temporal scope explicitly for multi-turn attacks. The complete
+    positive and negated mapping is maintained in the
+    [Temporal Scope table](../usage/authoring-tests.md#temporal-scope).
+    Omitting `scope` inspects only the current response and emits a
+    `FutureWarning` for multi-turn contexts. Scope applies only to turns in the
+    evaluator context; it does not control execution length or early stopping.
 
 ### LLMDriver for Adaptive Triggers
 

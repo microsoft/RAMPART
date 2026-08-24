@@ -271,13 +271,11 @@ class MyEvaluator(BaseEvaluator):
 Evaluator tests should cover detection, non-detection, edge cases (empty response, missing data), and that `evidence` / `rationale` are populated correctly.
 
 !!! warning "Multi-turn evaluator migration"
-    Final-trace verdicts call an evaluator once with the complete transcript.
     A custom evaluator that reads only `context.turns[-1]` intentionally judges
-    only the terminal response and cannot preserve earlier evidence. Rewrite
-    multi-turn predicates to inspect `context.turns` explicitly before
-    migrating execution cadence. The worked execution-strategy loop elsewhere
-    on this page still describes the current prefix-evaluation behavior and
-    will be replaced with the shared trace runner in the cadence change.
+    only the latest response and cannot preserve earlier evidence. Rewrite
+    multi-turn predicates to inspect `context.turns` explicitly. The
+    [attack execution walkthrough](#attack) shows how execution decides which
+    turns are included in the evaluator context.
 
 
 ## Prompt Driver

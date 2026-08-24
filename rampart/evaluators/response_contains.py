@@ -20,6 +20,10 @@ if TYPE_CHECKING:
 class ResponseScope(Enum):
     """Which responses in the transcript the evaluator inspects.
 
+    Scope applies only to turns already present in ``EvalContext``. It does
+    not control how many turns an execution produces or whether execution
+    stops early.
+
     Attributes:
         ANY_TURN: Detect when at least one response matches.
         ALL_TURNS: Detect only when every response matches.
@@ -34,7 +38,7 @@ class ResponseScope(Enum):
 _UNSPECIFIED_SCOPE_WARNING = (
     "ResponseContains evaluated a multi-turn transcript without an explicit "
     "ResponseScope and inspected only the current response. Choose ANY_TURN, "
-    "ALL_TURNS, or CURRENT_TURN before migrating to final-trace evaluation."
+    "ALL_TURNS, or CURRENT_TURN to make the intended quantifier explicit."
 )
 
 
@@ -82,44 +86,109 @@ class ResponseContains(BaseEvaluator):
         scope = self._resolve_scope(context=context)
         if scope is ResponseScope.CURRENT_TURN:
             return self._evaluate_current_turn(context=context)
+        return self._evaluate_quantified(context=context, scope=scope)
 
+    def _evaluate_quantified(
+        self,
+        *,
+        context: EvalContext,
+        scope: ResponseScope,
+    ) -> EvalResult:
+        """Apply an ANY_TURN or ALL_TURNS quantifier to response matches.
+
+        Returns:
+            EvalResult: The quantified detection result.
+        """
         matches = [self._matches(turn.response.text) for turn in context.turns]
-        detected = any(matches) if scope is ResponseScope.ANY_TURN else all(matches)
+        if scope is ResponseScope.ANY_TURN:
+            return self._evaluate_any_turn(context=context, matches=matches)
+        return self._evaluate_all_turns(context=context, matches=matches)
 
-        if detected:
-            matched_turns = [
-                str(turn.turn_number)
-                for turn, matched in zip(context.turns, matches, strict=True)
-                if matched
-            ]
+    @staticmethod
+    def _evaluate_any_turn(
+        *,
+        context: EvalContext,
+        matches: list[bool],
+    ) -> EvalResult:
+        """Resolve existential matching across response turns.
+
+        Returns:
+            EvalResult: DETECTED when any response matches.
+        """
+        if any(matches):
             return EvalResult(
                 outcome=EvalOutcome.DETECTED,
-                evidence=[f"Pattern found on turn(s): {', '.join(matched_turns)}"],
-                rationale=(
-                    "At least one response contains the target pattern"
-                    if scope is ResponseScope.ANY_TURN
-                    else "Every response contains the target pattern"
-                ),
+                evidence=[
+                    ResponseContains._turns_label(
+                        context=context,
+                        matches=matches,
+                        wanted=True,
+                        prefix="Pattern found on turn(s)",
+                    ),
+                ],
+                rationale="At least one response contains the target pattern",
             )
-
-        missing_turns = [
-            str(turn.turn_number)
-            for turn, matched in zip(context.turns, matches, strict=True)
-            if not matched
-        ]
         return EvalResult(
             outcome=EvalOutcome.NOT_DETECTED,
-            evidence=(
-                [f"Pattern missing on turn(s): {', '.join(missing_turns)}"]
-                if scope is ResponseScope.ALL_TURNS
-                else []
-            ),
-            rationale=(
-                "No response contains the target pattern"
-                if scope is ResponseScope.ANY_TURN
-                else "Not every response contains the target pattern"
-            ),
+            rationale="No response contains the target pattern",
         )
+
+    @staticmethod
+    def _evaluate_all_turns(
+        *,
+        context: EvalContext,
+        matches: list[bool],
+    ) -> EvalResult:
+        """Resolve universal matching across response turns.
+
+        Returns:
+            EvalResult: DETECTED when every response matches.
+        """
+        if all(matches):
+            return EvalResult(
+                outcome=EvalOutcome.DETECTED,
+                evidence=[
+                    ResponseContains._turns_label(
+                        context=context,
+                        matches=matches,
+                        wanted=True,
+                        prefix="Pattern found on turn(s)",
+                    ),
+                ],
+                rationale="Every response contains the target pattern",
+            )
+        return EvalResult(
+            outcome=EvalOutcome.NOT_DETECTED,
+            evidence=[
+                ResponseContains._turns_label(
+                    context=context,
+                    matches=matches,
+                    wanted=False,
+                    prefix="Pattern missing on turn(s)",
+                ),
+            ],
+            rationale="Not every response contains the target pattern",
+        )
+
+    @staticmethod
+    def _turns_label(
+        *,
+        context: EvalContext,
+        matches: list[bool],
+        wanted: bool,
+        prefix: str,
+    ) -> str:
+        """Format matching or missing turn numbers for evidence.
+
+        Returns:
+            str: Evidence label containing the selected turn numbers.
+        """
+        turn_numbers = [
+            str(turn.turn_number)
+            for turn, matched in zip(context.turns, matches, strict=True)
+            if matched is wanted
+        ]
+        return f"{prefix}: {', '.join(turn_numbers)}"
 
     def _resolve_scope(self, *, context: EvalContext) -> ResponseScope:
         """Resolve the scope and warn about ambiguous multi-turn evaluation.
