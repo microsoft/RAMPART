@@ -609,6 +609,7 @@ Before committing code, ensure:
 | Convention | Code | Enforced by |
 |---|---|---|
 | Async `_async` suffix | `RMP001` | `tools/flake8_rampart.py`, a flake8 local plugin |
+| Lazy exports listed in `__all__` | `RMP002` | `tools/flake8_rampart.py`, a flake8 local plugin |
 
 ### Async naming (`RMP001`)
 
@@ -625,6 +626,16 @@ that ruff's `RUF102` accepts it instead of rejecting it as an unknown code.
 
 `RMP001` applies repo-wide, including to tests: the test standards require the
 `_async` suffix on async test names too.
+
+### Lazy public exports (`RMP002`)
+
+Modules that declare a literal `__lazy_imports__` dictionary MUST include every
+literal key in their literal `__all__` collection. Eager public exports may also
+appear in `__all__`; the lazy names are a subset, not an exhaustive public API.
+Both declarations MUST use literal forms: `__lazy_imports__` requires a dictionary
+with string keys, and `__all__` requires a list, tuple, or set containing only
+strings. Dynamic expressions are rejected because their values cannot be verified
+statically.
 [flake8-local]: https://flake8.pycqa.org/en/latest/user/configuration.html#using-local-plugins
 
 ---

@@ -119,7 +119,7 @@ ignore = [
 
 # RMP comes from the flake8 local plugin in tools/. Declaring it here stops
 # RUF102 (invalid-rule-code) from rejecting `# noqa: RMPXXX` as unknown.
-external = ["RMP001"]
+external = ["RMP001", "RMP002"]
 
 [tool.ruff.lint.per-file-ignores]
 "scripts/hatch_build.py" = [

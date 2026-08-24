@@ -10,6 +10,7 @@ extend-exclude = .venv,build,dist
 
 [flake8:local-plugins]
 extension =
-    RMP = flake8_rampart:RampartChecker
+    RMP001 = flake8_rampart:AsyncSuffixChecker
+    RMP002 = flake8_rampart:LazyExportChecker
 paths =
     ./tools
