@@ -5,7 +5,7 @@ import asyncio
 
 import pytest
 
-from rampart.common.text import safe_str, safe_str_list, strip_ansi
+from rampart.common.text import safe_float, safe_str, safe_str_list, strip_ansi
 
 
 class TestStripAnsi:
@@ -193,3 +193,46 @@ class TestSafeStrList:
 
         assert [type(e) for e in entries] == [str]
         assert entries == ["kept"]
+
+
+class TestSafeFloat:
+    def test_passes_a_finite_float_through(self) -> None:
+        assert safe_float(value=0.9) == 0.9
+
+    def test_coerces_an_int(self) -> None:
+        assert safe_float(value=1) == 1.0
+
+    @pytest.mark.parametrize(
+        "value",
+        [float("nan"), float("inf"), float("-inf")],
+    )
+    def test_non_finite_becomes_none(self, value: float) -> None:
+        assert safe_float(value=value) is None
+
+    def test_a_non_numeric_value_becomes_none(self) -> None:
+        assert safe_float(value="not a number") is None
+
+    def test_none_becomes_none(self) -> None:
+        assert safe_float(value=None) is None
+
+    def test_a_raising_float_costs_only_itself(self) -> None:
+        class Boom:
+            def __float__(self) -> float:
+                raise RuntimeError("boom")
+
+        assert safe_float(value=Boom()) is None
+
+    @pytest.mark.parametrize(
+        "control_flow",
+        [asyncio.CancelledError, KeyboardInterrupt, SystemExit, GeneratorExit],
+    )
+    def test_does_not_swallow_control_flow(
+        self,
+        control_flow: type[BaseException],
+    ) -> None:
+        class Raises:
+            def __float__(self) -> float:
+                raise control_flow
+
+        with pytest.raises(control_flow):
+            safe_float(value=Raises())

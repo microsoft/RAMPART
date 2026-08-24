@@ -18,11 +18,13 @@ is intentionally broader than a colour-code stripper.
 ``safe_str`` and ``safe_str_list`` cover a different hazard in the same
 data: an evaluator is free to put any object in a field RAMPART later
 renders, and a value that cannot be rendered should cost its own entry
-rather than the verdict the run had already reached.
+rather than the verdict the run had already reached. ``safe_float`` guards
+the same boundary for a numeric field a report serializes to JSON.
 """
 
 from __future__ import annotations
 
+import math
 import re
 
 # Control-string bodies are bounded: they stop at a terminator, an ESC,
@@ -114,3 +116,24 @@ def safe_str_list(*, value: object) -> list[str]:
     except Exception:  # ruff: ignore[blind-except]
         return []
     return [safe_str(value=item) for item in items]
+
+
+def safe_float(*, value: object) -> float | None:
+    """Coerce a value to a finite float for JSON safety, else None.
+
+    Guards the same boundary as :func:`safe_str` for a field annotated as a
+    float. JSON has no NaN or infinity, and a third-party evaluator can leave a
+    non-numeric value in a numeric field, so anything that is not a finite real
+    number becomes ``None`` rather than a serialization failure.
+
+    Args:
+        value (object): The value to coerce.
+
+    Returns:
+        float | None: ``value`` as a finite ``float``, else ``None``.
+    """
+    try:
+        number = float(value)  # ty: ignore[invalid-argument-type]
+    except Exception:  # ruff: ignore[blind-except]
+        return None
+    return number if math.isfinite(number) else None

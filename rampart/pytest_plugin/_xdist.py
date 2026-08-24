@@ -24,7 +24,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Any, cast
 
 from rampart.common.deprecation import emit_deprecation_warning
-from rampart.common.text import safe_str_list
+from rampart.common.text import safe_float, safe_str, safe_str_list
 from rampart.common.text import strip_ansi as _strip_ansi_impl
 from rampart.core.result import (
     HarmCategory,
@@ -315,15 +315,6 @@ def _sanitize_metadata(
     return sanitized
 
 
-def _safe_float(*, value: float) -> float | None:
-    """Coerce non-finite floats to None for JSON safety.
-
-    Returns:
-        float | None: ``value`` when finite, else ``None``.
-    """
-    return value if math.isfinite(value) else None
-
-
 def _isoformat(*, timestamp: datetime | None) -> str | None:
     """Convert a datetime to ISO 8601 string, or None.
 
@@ -341,9 +332,9 @@ def _serialize_eval_result(*, eval_result: EvalResult) -> dict[str, Any]:
     """
     return {
         "outcome": eval_result.outcome.value,
-        "confidence": _safe_float(value=eval_result.confidence),
+        "confidence": safe_float(value=eval_result.confidence),
         "evidence": safe_str_list(value=eval_result.evidence),
-        "rationale": eval_result.rationale,
+        "rationale": safe_str(value=eval_result.rationale),
         "undetermined_operands": safe_str_list(
             value=eval_result.undetermined_operands,
         ),
@@ -498,7 +489,7 @@ def _serialize_result(*, result: Result, nodeid: str) -> dict[str, Any]:
         "status": result.status.value,
         "summary": result.summary,
         "turns": [_serialize_turn(turn=t, nodeid=nodeid) for t in result.turns],
-        "duration_seconds": _safe_float(value=result.duration_seconds),
+        "duration_seconds": safe_float(value=result.duration_seconds),
         "harm_category": (
             str(result.harm_category) if result.harm_category is not None else None
         ),
@@ -753,7 +744,7 @@ def serialize_worker_data(
             {
                 "clone_nodeid": clone_nodeid,
                 "base_nodeid": spec.base_nodeid,
-                "threshold": _safe_float(value=spec.threshold) or 0.0,
+                "threshold": safe_float(value=spec.threshold) or 0.0,
             }
             for clone_nodeid, spec in session.trial_specs.items()
         ],
