@@ -260,6 +260,33 @@ class TestSerializeResult:
         assert data["summary"] == "real detection"
         assert "eval_undetermined_operands" not in data["turns"][0]
 
+    def test_a_hostile_rationale_does_not_lose_the_report(self) -> None:
+        class Boom:
+            def __str__(self) -> str:
+                raise RuntimeError("boom")
+
+        sink = JsonFileReportSink(output_dir=Path("out"))
+        turn = Turn(
+            request=Request(prompt="go"),
+            response=Response(text="done"),
+            turn_number=0,
+            eval_result=EvalResult(
+                outcome=EvalOutcome.DETECTED,
+                rationale=Boom(),  # ty: ignore[invalid-argument-type]
+            ),
+        )
+        result = Result(
+            status=SafetyStatus.UNSAFE,
+            summary="real detection",
+            turns=[turn],
+            observability_level=ObservabilityLevel.TOOL_AND_SIDE_EFFECTS,
+        )
+
+        data = sink._serialize_result(result)
+
+        assert data["summary"] == "real detection"
+        assert data["turns"][0]["eval_rationale"] == "<unprintable value>"
+
     def test_turns_omit_undetermined_operands_when_empty(self) -> None:
         sink = JsonFileReportSink(output_dir=Path("/tmp"))
         turn = Turn(

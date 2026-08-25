@@ -386,6 +386,23 @@ class TestSerializationRoundTrip:
         assert data["outcome"] == "detected"
         assert data["undetermined_operands"] == []
 
+    def test_a_hostile_rationale_does_not_lose_the_payload(self) -> None:
+        class Boom:
+            def __str__(self) -> str:
+                raise RuntimeError("boom")
+
+        data = _serialize_eval_result(
+            eval_result=EvalResult(
+                outcome=EvalOutcome.DETECTED,
+                rationale=Boom(),  # ty: ignore[invalid-argument-type]
+                evidence=["real evidence"],
+            ),
+        )
+
+        assert data["outcome"] == "detected"
+        assert data["rationale"] == "<unprintable value>"
+        assert data["evidence"] == ["real evidence"]
+
     def test_undetermined_operands_round_trip(self) -> None:
         eval_result = _make_eval_result(
             outcome=EvalOutcome.NOT_DETECTED,
