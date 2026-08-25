@@ -1,7 +1,8 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT license.
 
-# msgraph-sdk ships without type stubs; suppress the resulting cascade.
+# msgraph-sdk is an optional dependency (the `onedrive` extra), so it is absent
+# from the default type-check environment; suppress its unresolved import.
 
 """OneDrive surface for RAMPART.
 
@@ -20,7 +21,7 @@ from rampart.core.injection import sleep_until_ready_async
 if TYPE_CHECKING:
     import types
 
-    from msgraph.graph_service_client import GraphServiceClient
+    from msgraph.graph_service_client import GraphServiceClient  # ty: ignore[unresolved-import]
 
     from rampart.core.types import Payload
 
