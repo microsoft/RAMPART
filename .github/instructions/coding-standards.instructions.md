@@ -634,8 +634,8 @@ literal key in their literal `__all__` collection. Eager public exports may also
 appear in `__all__`; the lazy names are a subset, not an exhaustive public API.
 Both declarations MUST use literal forms: `__lazy_imports__` requires a dictionary
 with string keys, and `__all__` requires a list, tuple, or set containing only
-strings. Dynamic expressions are rejected because their values cannot be verified
-statically.
+strings. Each name MUST have exactly one direct module-level assignment. Additional
+writes and direct method calls are rejected; reads remain allowed.
 [flake8-local]: https://flake8.pycqa.org/en/latest/user/configuration.html#using-local-plugins
 
 ---

@@ -23,10 +23,12 @@ if TYPE_CHECKING:
 RMP001 = "RMP001 async function `{name}` must be named with an `_async` suffix"
 RMP002 = "RMP002 lazy export `{name}` must be included in `__all__`"
 RMP002_DYNAMIC_ALL = (
-    "RMP002 `__all__` must be a list, tuple, or set literal containing only strings"
+    "RMP002 `__all__` must be declared as one list, tuple, or set literal "
+    "containing only strings"
 )
 RMP002_DYNAMIC_REGISTRY = (
-    "RMP002 `__lazy_imports__` must be a dictionary literal with string keys"
+    "RMP002 `__lazy_imports__` must be declared as one dictionary literal "
+    "with string keys"
 )
 
 
@@ -42,34 +44,97 @@ def _is_dunder(name: str) -> bool:
     return name.startswith("__") and name.endswith("__")
 
 
-def _module_assignment(*, tree: ast.AST, name: str) -> ast.expr | None:
-    """Return the final module-level value assigned to a name.
+def _direct_assignment(
+    *,
+    statement: ast.stmt,
+    name: str,
+) -> tuple[ast.expr, ast.expr] | None:
+    """Return a direct assignment target and value for a name.
 
     Args:
-        tree (ast.AST): Parsed module syntax tree.
+        statement (ast.stmt): Module-level statement to inspect.
         name (str): Assignment target to find.
 
     Returns:
-        ast.expr | None: Assigned expression, or ``None`` when absent.
+        tuple[ast.expr, ast.expr] | None: Assignment target and value, or
+            ``None`` when the statement is not a direct assignment.
+    """
+    if isinstance(statement, ast.Assign) and len(statement.targets) == 1:
+        target = statement.targets[0]
+        if isinstance(target, ast.Name) and target.id == name:
+            return target, statement.value
+    elif (
+        isinstance(statement, ast.AnnAssign)
+        and isinstance(statement.target, ast.Name)
+        and statement.target.id == name
+        and statement.value is not None
+    ):
+        return statement.target, statement.value
+    return None
+
+
+def _unsupported_reference(*, statement: ast.stmt, name: str) -> ast.expr | None:
+    """Return a module-level write or direct call involving a name.
+
+    Args:
+        statement (ast.stmt): Module-level statement to inspect.
+        name (str): Governed declaration name.
+
+    Returns:
+        ast.expr | None: Unsupported expression, or ``None`` when absent.
+    """
+    for node in ast.walk(statement):
+        if isinstance(node, ast.Call):
+            root = node.func
+            while isinstance(root, (ast.Attribute, ast.Subscript)):
+                root = root.value
+            if isinstance(root, ast.Name) and root.id == name:
+                return node
+        if not isinstance(node, (ast.Attribute, ast.Name, ast.Subscript)):
+            continue
+        if not isinstance(node.ctx, (ast.Del, ast.Store)):
+            continue
+        if any(
+            isinstance(child, ast.Name) and child.id == name for child in ast.walk(node)
+        ):
+            return node
+    return None
+
+
+def _module_declaration(
+    *,
+    tree: ast.AST,
+    name: str,
+) -> tuple[ast.expr | None, ast.expr | None]:
+    """Return one direct declaration and any unsupported reference.
+
+    Args:
+        tree (ast.AST): Parsed module syntax tree.
+        name (str): Declaration name to inspect.
+
+    Returns:
+        tuple[ast.expr | None, ast.expr | None]: The sole assigned value and
+            an unsupported reference. A second assignment is unsupported and
+            returned as the reference.
     """
     if not isinstance(tree, ast.Module):
-        return None
+        return None, None
 
     value: ast.expr | None = None
     for statement in tree.body:
-        if (
-            isinstance(statement, ast.Assign)
-            and any(
-                isinstance(target, ast.Name) and target.id == name
-                for target in statement.targets
-            )
-        ) or (
-            isinstance(statement, ast.AnnAssign)
-            and isinstance(statement.target, ast.Name)
-            and statement.target.id == name
-        ):
-            value = statement.value
-    return value
+        assignment = _direct_assignment(statement=statement, name=name)
+        if assignment is not None:
+            target, assigned_value = assignment
+            if value is not None:
+                return None, target
+            value = assigned_value
+            continue
+
+        reference = _unsupported_reference(statement=statement, name=name)
+        if reference is not None:
+            return None, reference
+
+    return value, None
 
 
 def _literal_string_dict_keys(
@@ -128,7 +193,13 @@ def _lazy_export_violations(tree: ast.AST) -> Iterator[tuple[ast.expr, str]]:
     Yields:
         tuple[ast.expr, str]: Invalid expression and formatted violation.
     """
-    lazy_value = _module_assignment(tree=tree, name="__lazy_imports__")
+    lazy_value, lazy_reference = _module_declaration(
+        tree=tree,
+        name="__lazy_imports__",
+    )
+    if lazy_reference is not None:
+        yield lazy_reference, RMP002_DYNAMIC_REGISTRY
+        return
     if lazy_value is None:
         return
     lazy_exports = _literal_string_dict_keys(lazy_value)
@@ -136,14 +207,17 @@ def _lazy_export_violations(tree: ast.AST) -> Iterator[tuple[ast.expr, str]]:
         yield lazy_value, RMP002_DYNAMIC_REGISTRY
         return
 
-    all_value = _module_assignment(tree=tree, name="__all__")
+    all_value, all_reference = _module_declaration(tree=tree, name="__all__")
+    if all_reference is not None:
+        yield all_reference, RMP002_DYNAMIC_ALL
+        return
     if all_value is None:
-        public_names: set[str] = set()
-    else:
-        public_names = _literal_string_collection(all_value)
-        if public_names is None:
-            yield all_value, RMP002_DYNAMIC_ALL
-            return
+        yield lazy_value, RMP002_DYNAMIC_ALL
+        return
+    public_names = _literal_string_collection(all_value)
+    if public_names is None:
+        yield all_value, RMP002_DYNAMIC_ALL
+        return
 
     for name, key in lazy_exports:
         if name not in public_names:

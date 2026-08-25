@@ -85,6 +85,22 @@ __all__ = ["Eager", "Heavy"]
 
         assert _lazy_export_messages(source) == []
 
+    def test_reports_only_lazy_exports_missing_from_all(self) -> None:
+        source = """
+__lazy_imports__ = {
+    "Included": ("package.included", "Included"),
+    "MissingOne": ("package.missing", "MissingOne"),
+    "MissingTwo": ("package.missing", "MissingTwo"),
+}
+__all__ = ["Included"]
+"""
+
+        messages = _lazy_export_messages(source)
+
+        assert len(messages) == 2
+        assert "`MissingOne`" in messages[0]
+        assert "`MissingTwo`" in messages[1]
+
     def test_flags_lazy_export_when_all_is_absent(self) -> None:
         source = '__lazy_imports__ = {"Heavy": ("package.heavy", "Heavy")}'
 
@@ -113,6 +129,68 @@ __all__ = build_public_names()
 
         assert message.startswith("RMP002")
         assert "`__all__`" in message
+
+    @pytest.mark.parametrize(
+        ("mutation", "expected_name"),
+        [
+            ('__all__ += ["Heavy"]', "__all__"),
+            ('__all__.extend(["Heavy"])', "__all__"),
+            (
+                '__lazy_imports__["Other"] = ("package.other", "Other")',
+                "__lazy_imports__",
+            ),
+        ],
+    )
+    def test_rejects_incremental_construction(
+        self,
+        *,
+        mutation: str,
+        expected_name: str,
+    ) -> None:
+        source = f"""
+__lazy_imports__ = {{"Heavy": ("package.heavy", "Heavy")}}
+__all__ = ["Heavy"]
+{mutation}
+"""
+
+        (message,) = _lazy_export_messages(source)
+
+        assert message.startswith("RMP002")
+        assert f"`{expected_name}`" in message
+
+    @pytest.mark.parametrize("name", ["__all__", "__lazy_imports__"])
+    def test_rejects_multiple_assignments(self, *, name: str) -> None:
+        replacement = "{}" if name == "__lazy_imports__" else "[]"
+        source = f"""
+__lazy_imports__ = {{"Heavy": ("package.heavy", "Heavy")}}
+__all__ = ["Heavy"]
+{name} = {replacement}
+"""
+
+        (message,) = _lazy_export_messages(source)
+
+        assert message.startswith("RMP002")
+        assert f"`{name}`" in message
+
+    def test_allows_reads(self) -> None:
+        source = """
+__lazy_imports__ = {"Heavy": ("package.heavy", "Heavy")}
+__all__ = ["Heavy"]
+
+observed_exports = __all__
+observed_registry = __lazy_imports__
+
+def resolve(name):
+    return __lazy_imports__[name]
+
+def public_names():
+    return __all__
+
+class Namespace:
+    public = __all__
+"""
+
+        assert _lazy_export_messages(source) == []
 
     def test_reports_position_of_missing_key(self) -> None:
         source = """
