@@ -216,7 +216,7 @@ class TestSafeFloat:
         assert safe_float(value=None) is None
 
     @pytest.mark.parametrize("value", [True, False])
-    def test_a_bool_becomes_none(self, value: bool) -> None:
+    def test_a_bool_becomes_none(self, *, value: bool) -> None:
         # bool is an int subclass, so float(True) would be 1.0. The judge's
         # confidence parser rejects Boolean confidence, and the serializer
         # mirrors that rather than reporting it as a real number.
