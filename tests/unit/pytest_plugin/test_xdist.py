@@ -455,7 +455,7 @@ class TestSerializationRoundTrip:
         data = _serialize_eval_result(
             eval_result=EvalResult(
                 outcome=EvalOutcome.DETECTED,
-                confidence=True,  # ty: ignore[invalid-argument-type]
+                confidence=True,
                 rationale="r",
             ),
         )
