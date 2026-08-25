@@ -35,6 +35,27 @@ class _StubEvaluator(BaseEvaluator):
         )
 
 
+class _OperandCarrier(BaseEvaluator):
+    """Test helper that returns a chosen ``undetermined_operands`` collection."""
+
+    def __init__(
+        self,
+        *,
+        outcome: EvalOutcome,
+        undetermined_operands: list[str],
+    ) -> None:
+        self._outcome = outcome
+        self._undetermined_operands = undetermined_operands
+
+    async def evaluate_async(self, *, context: EvalContext) -> EvalResult:
+        """Return a fixed result carrying the chosen operand reasons."""
+        return EvalResult(
+            outcome=self._outcome,
+            rationale="carrier",
+            undetermined_operands=self._undetermined_operands,
+        )
+
+
 def _ctx() -> EvalContext:
     """Build a minimal EvalContext for testing."""
     return EvalContext(
@@ -586,6 +607,22 @@ class TestUndeterminedOperands:
 
         assert result.outcome is EvalOutcome.DETECTED
         assert result.undetermined_operands == ["cannot look"]
+
+    async def test_carried_operands_are_stripped_before_dedup_async(self) -> None:
+        # A padded reason and its bare form name the same gap, so the merge
+        # must strip before deduping rather than keep both as distinct entries.
+        left = _OperandCarrier(
+            outcome=EvalOutcome.DETECTED,
+            undetermined_operands=["gap"],
+        )
+        right = _OperandCarrier(
+            outcome=EvalOutcome.DETECTED,
+            undetermined_operands=[" gap ", "gap", "other"],
+        )
+
+        result = await (left & right).evaluate_async(context=_ctx())
+
+        assert result.undetermined_operands == ["gap", "other"]
 
 
 class _HostileEvidenceEvaluator(BaseEvaluator):

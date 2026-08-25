@@ -336,9 +336,9 @@ def _merge_undetermined(
         if operand is None:
             continue
         carried = [
-            reason
+            stripped
             for reason in safe_str_list(value=operand.undetermined_operands)
-            if reason.strip()
+            if (stripped := reason.strip())
         ]
         if carried:
             reasons.extend(carried)

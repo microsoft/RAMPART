@@ -180,6 +180,31 @@ class TestSerializeResult:
         assert turn_data["eval_confidence"] == pytest.approx(0.95)
         assert turn_data["eval_rationale"] == "found secret"
 
+    def test_turns_report_a_non_finite_confidence_as_null(self) -> None:
+        # Parity with the xdist path: a NaN confidence must serialize to null
+        # here too, so neither report shows a fabricated number.
+        sink = JsonFileReportSink(output_dir=Path("/tmp"))
+        turn = Turn(
+            request=Request(prompt="hi"),
+            response=Response(text="done"),
+            turn_number=0,
+            eval_result=EvalResult(
+                outcome=EvalOutcome.DETECTED,
+                confidence=float("nan"),
+                rationale="found secret",
+            ),
+        )
+        result = Result(
+            observability_level=ObservabilityLevel.RESPONSE_ONLY,
+            status=SafetyStatus.UNSAFE,
+            summary="bad",
+            turns=[turn],
+        )
+
+        data = sink._serialize_result(result)
+
+        assert data["turns"][0]["eval_confidence"] is None
+
     def test_turns_include_undetermined_operands_when_present(self) -> None:
         sink = JsonFileReportSink(output_dir=Path("/tmp"))
         turn = Turn(

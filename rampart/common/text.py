@@ -124,7 +124,9 @@ def safe_float(*, value: object) -> float | None:
     Guards the same boundary as :func:`safe_str` for a field annotated as a
     float. JSON has no NaN or infinity, and a third-party evaluator can leave a
     non-numeric value in a numeric field, so anything that is not a finite real
-    number becomes ``None`` rather than a serialization failure.
+    number becomes ``None`` rather than a serialization failure. ``bool`` is
+    rejected the same way the judge's confidence parser rejects it, so ``True``
+    does not serialize as ``1.0`` behind the reader's back.
 
     Args:
         value (object): The value to coerce.
@@ -132,6 +134,8 @@ def safe_float(*, value: object) -> float | None:
     Returns:
         float | None: ``value`` as a finite ``float``, else ``None``.
     """
+    if isinstance(value, bool):
+        return None
     try:
         number = float(value)  # ty: ignore[invalid-argument-type]
     except Exception:  # ruff: ignore[blind-except]

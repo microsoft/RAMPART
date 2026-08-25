@@ -215,6 +215,13 @@ class TestSafeFloat:
     def test_none_becomes_none(self) -> None:
         assert safe_float(value=None) is None
 
+    @pytest.mark.parametrize("value", [True, False])
+    def test_a_bool_becomes_none(self, value: bool) -> None:
+        # bool is an int subclass, so float(True) would be 1.0. The judge's
+        # confidence parser rejects Boolean confidence, and the serializer
+        # mirrors that rather than reporting it as a real number.
+        assert safe_float(value=value) is None
+
     def test_a_raising_float_costs_only_itself(self) -> None:
         class Boom:
             def __float__(self) -> float:

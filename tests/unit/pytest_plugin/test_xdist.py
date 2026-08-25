@@ -42,6 +42,7 @@ from rampart.pytest_plugin._xdist import (
     WORKEROUTPUT_KEY,
     SchemaVersionError,
     WorkerOutputError,
+    _deserialize_eval_result,
     _sanitize,
     _serialize_eval_result,
     _strip_ansi,
@@ -401,6 +402,76 @@ class TestSerializationRoundTrip:
         assert recovered["n"][0].turns[0].eval_result.undetermined_operands == [
             "side effects not reported",
         ]
+
+    def test_operands_with_mixed_whitespace_collapse_once_on_round_trip(self) -> None:
+        # The direct report and the xdist round trip must agree on the same
+        # reason set; padding must not survive as a separate entry.
+        eval_result = _make_eval_result(
+            outcome=EvalOutcome.NOT_DETECTED,
+            undetermined_operands=[" gap ", "gap", "other"],
+        )
+        turn = _make_turn(eval_result=eval_result, turn_number=1)
+        result = _make_result(turns=[turn])
+        session = _make_session_with_results(
+            results_by_nodeid={"n": [result]},
+        )
+        payload = _serialize_session_results(session=session)
+        recovered = _deserialize_report_results(data=payload)
+        recovered_eval = recovered["n"][0].turns[0].eval_result
+        assert recovered_eval is not None
+        assert recovered_eval.undetermined_operands == ["gap", "other"]
+
+    def test_a_sanitized_confidence_does_not_inflate_on_round_trip(self) -> None:
+        # A non-finite confidence serializes to null. The reader must not read
+        # that back as 1.0, or the same result would report maximum confidence
+        # through xdist while the direct JSON report shows null.
+        data = _serialize_eval_result(
+            eval_result=EvalResult(
+                outcome=EvalOutcome.DETECTED,
+                confidence=float("nan"),
+                rationale="r",
+            ),
+        )
+        assert data["confidence"] is None
+        recovered = _deserialize_eval_result(data=data)
+        assert recovered is not None
+        assert math.isnan(recovered.confidence)
+
+    def test_a_missing_confidence_still_defaults_to_full(self) -> None:
+        recovered = _deserialize_eval_result(data={"outcome": "detected"})
+        assert recovered is not None
+        assert recovered.confidence == pytest.approx(1.0)
+
+    def test_a_present_null_confidence_is_not_read_as_full(self) -> None:
+        recovered = _deserialize_eval_result(
+            data={"outcome": "detected", "confidence": None},
+        )
+        assert recovered is not None
+        assert math.isnan(recovered.confidence)
+
+    def test_a_bool_confidence_does_not_survive_as_a_number(self) -> None:
+        # bool is an int subclass; the serializer nulls it and the reader
+        # refuses to read it as 1.0/0.0, matching the judge's confidence parser.
+        data = _serialize_eval_result(
+            eval_result=EvalResult(
+                outcome=EvalOutcome.DETECTED,
+                confidence=True,  # ty: ignore[invalid-argument-type]
+                rationale="r",
+            ),
+        )
+        assert data["confidence"] is None
+        recovered = _deserialize_eval_result(
+            data={"outcome": "detected", "confidence": True},
+        )
+        assert recovered is not None
+        assert math.isnan(recovered.confidence)
+
+    def test_a_non_numeric_confidence_is_not_read_as_full(self) -> None:
+        recovered = _deserialize_eval_result(
+            data={"outcome": "detected", "confidence": "high"},
+        )
+        assert recovered is not None
+        assert math.isnan(recovered.confidence)
 
     def test_datetime_round_trip(self) -> None:
         when = datetime(2026, 1, 1, 12, 0, 0, tzinfo=UTC)

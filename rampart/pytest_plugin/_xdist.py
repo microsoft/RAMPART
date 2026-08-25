@@ -877,6 +877,31 @@ def _deserialize_datetime(*, value: object) -> datetime | None:
         raise WorkerOutputError(msg) from exc
 
 
+def _deserialize_confidence(*, typed: dict[str, Any]) -> float:
+    """Reconstruct a serialized confidence without inflating a sanitized one.
+
+    An older worker omits the field, and that still means full confidence. A
+    field that is present but was sanitized to ``null`` on the way out, or that
+    carries a rejected type such as ``bool``, must not come back as ``1.0``: the
+    direct JSON report shows ``null`` for it, so the round trip returns ``NaN``,
+    which the serializer renders back to ``null`` and keeps both paths in step.
+
+    Args:
+        typed (dict[str, Any]): The deserialized EvalResult mapping.
+
+    Returns:
+        float: The reconstructed confidence, or ``NaN`` when it was present but
+            not a usable finite number.
+    """
+    if "confidence" not in typed:
+        return 1.0
+    raw_confidence = typed["confidence"]
+    if isinstance(raw_confidence, bool) or not isinstance(raw_confidence, int | float):
+        return math.nan
+    number = float(raw_confidence)
+    return number if math.isfinite(number) else math.nan
+
+
 def _deserialize_eval_result(*, data: object) -> EvalResult | None:
     """Deserialize an EvalResult, or None when input is None.
 
@@ -893,10 +918,7 @@ def _deserialize_eval_result(*, data: object) -> EvalResult | None:
         raise WorkerOutputError(msg)
     typed = cast("dict[str, Any]", data)
     outcome = _deserialize_eval_outcome(value=typed.get("outcome"))
-    raw_confidence = typed.get("confidence")
-    confidence = (
-        float(raw_confidence) if isinstance(raw_confidence, int | float) else 1.0
-    )
+    confidence = _deserialize_confidence(typed=typed)
     raw_evidence = typed.get("evidence", [])
     evidence_items = cast(
         "list[Any]",
