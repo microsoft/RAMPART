@@ -68,9 +68,6 @@ def pytest_rampart_sinks(config):
 
 The JSON file contains aggregate statistics and per-result data that CI dashboards can consume. The hook is resolved on the controller, so it behaves identically in single-process and [`pytest-xdist`](xdist.md) CI runs. See [Registering Sinks](pytest-integration.md#pytest_rampart_sinks-hook).
 
-!!! warning "Deprecated"
-    The older `rampart_sinks` fixture still works but is deprecated and will be removed in `0.3.0`. Prefer the `pytest_rampart_sinks` hook above.
-
 ---
 
 ## Pytest Options

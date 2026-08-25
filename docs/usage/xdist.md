@@ -131,57 +131,9 @@ def pytest_rampart_sinks(config):
 - Non-`ReportSink` items (or a non-list return) are dropped with a warning, so one
   malformed implementation cannot break emission.
 
-### Precedence vs the `rampart_sinks` fixture
-
-!!! warning "Deprecated"
-    The `rampart_sinks` fixture is deprecated and will be removed in `0.3.0`.
-    Prefer the `pytest_rampart_sinks` hook above. Resolving the fixture emits a
-    `DeprecationWarning` in both single-process and controller discovery.
-
-The legacy `rampart_sinks` fixture is still supported as a **single-process
-fallback**. The rule is:
-
-- If **any** `pytest_rampart_sinks` hook implementation exists, the hook is
-  authoritative and the fixture path is skipped entirely (so a project that
-  defines both does **not** double-register).
-- If **no** hook implementation exists, RAMPART falls back to the fixture. On the
-  xdist controller this fallback scans registered conftest modules for a
-  `rampart_sinks` attribute.
-
-### Fixture fallback constraints (no hook present)
-
-When you rely on the fixture fallback under xdist, pytest's fixture machinery
-does not run on the controller. RAMPART therefore unwraps a **parameterless**
-`rampart_sinks` fixture and calls its underlying function directly, so these
-shapes resolve:
-
-```python
-# Parameterless session fixture — resolves single-process AND on the
-# xdist controller.
-@pytest.fixture(scope="session")
-def rampart_sinks():
-    return [JsonFileReportSink(output_dir=Path(".report"))]
-
-# Plain list assigned at module level — resolved on the xdist controller
-# only. Single-process discovery looks up a *fixture* named rampart_sinks,
-# so a bare module-level list is silently ignored there; use the fixture
-# form above (or the hook) for single-process runs.
-rampart_sinks = [JsonFileReportSink(output_dir=Path(".report"))]
-```
-
-A **fixture with dependencies** cannot be resolved on the controller and is
-skipped with a warning:
-
-```python
-# Not resolvable on the controller — use the hook instead
-@pytest.fixture(scope="session")
-def rampart_sinks(my_sink_config, db_connection):
-    return [DatabaseSink(connection=db_connection)]
-```
-
-If your sinks need dependencies, **use the `pytest_rampart_sinks` hook** — it
-receives the `pytest.Config` and runs on the controller, so you can build sinks
-from `config` values or environment variables there.
+If your sinks need dependencies, build them inside the hook — it receives the
+`pytest.Config` and runs on the controller, so you can build sinks from `config`
+values or environment variables there.
 
 ---
 
@@ -259,9 +211,6 @@ does not discard normal Results from that worker.
 
 ## Limitations
 
-- Sinks discovered through the **fixture fallback** on the controller cannot depend
-  on other pytest fixtures — use the `pytest_rampart_sinks` hook instead (see
-  [Registering Sinks](#registering-sinks-the-pytest_rampart_sinks-hook)).
 - Results recorded only during fixture teardown are outside the report-streaming
   boundary and are not included.
 - A worker that dies can lose Results whose eligible reports had not reached

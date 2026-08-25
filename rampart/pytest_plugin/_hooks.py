@@ -27,8 +27,8 @@ def pytest_rampart_sinks(config: pytest.Config) -> list[ReportSink]:  # ruff: ig
 
     Implement this hook in your ``conftest.py`` to register sinks in a
     way that works identically in single-process and ``pytest-xdist``
-    runs. Unlike the ``rampart_sinks`` fixture, hook implementations are
-    resolved on the xdist controller, which never executes fixtures.
+    runs. Hook implementations are resolved on the xdist controller,
+    which never executes fixtures.
 
     Multiple implementations are supported; RAMPART emits to the union
     of every returned sink.

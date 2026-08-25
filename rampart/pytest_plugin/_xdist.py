@@ -23,7 +23,6 @@ import math
 from datetime import datetime
 from typing import TYPE_CHECKING, Any, cast
 
-from rampart.common.deprecation import emit_deprecation_warning
 from rampart.common.text import safe_float, safe_str, safe_str_list
 from rampart.common.text import strip_ansi as _strip_ansi_impl
 from rampart.core.result import (
@@ -45,11 +44,8 @@ from rampart.core.types import (
     Turn,
 )
 from rampart.pytest_plugin._session import TrialSpec
-from rampart.reporting.sink import ReportSink
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
-
     import pytest
     from _typeshed import ConvertibleToInt
 
@@ -1538,165 +1534,3 @@ def handle_testnodedown(
                 f"(expected {expected_result_count}, received {received_result_count})"
             ),
         )
-
-
-def discover_sinks_from_conftest(*, config: pytest.Config) -> list[ReportSink]:
-    """Discover ``rampart_sinks`` definitions from registered conftest modules.
-
-    Workers run the standard ``_rampart_sink_bootstrap`` fixture to
-    register sinks via pytest's fixture machinery. The controller has
-    no test execution, so fixtures do not run. This function scans
-    registered plugins for a module-level ``rampart_sinks`` attribute
-    and resolves it:
-
-    - If callable with zero arguments, invoke it and use the return.
-    - If a list, use it directly.
-    - Otherwise, log a warning and skip.
-
-    Sinks that depend on other fixtures cannot be discovered this way.
-    Such configurations should register sinks via the
-    ``pytest_rampart_sinks`` hook, which is resolved identically on the
-    controller and in every worker.
-
-    Args:
-        config (pytest.Config): The pytest configuration object.
-
-    Returns:
-        list[ReportSink]: Discovered sinks (may be empty).
-    """
-    discovered: list[ReportSink] = []
-    seen: set[int] = set()
-    for plugin in config.pluginmanager.get_plugins():
-        if plugin is None or id(plugin) in seen:
-            continue
-        seen.add(id(plugin))
-        candidate = getattr(plugin, "rampart_sinks", None)
-        if candidate is None:
-            continue
-        resolved = _resolve_sink_candidate(candidate=candidate, plugin=plugin)
-        if resolved is None:
-            continue
-        for sink in resolved:
-            if isinstance(sink, ReportSink):
-                discovered.append(sink)
-            else:
-                logger.warning(
-                    "rampart_sinks in %s yielded a non-ReportSink: %r",
-                    getattr(plugin, "__name__", repr(plugin)),
-                    sink,
-                )
-    return discovered
-
-
-def _unwrap_fixture_function(candidate: object) -> Callable[..., object] | None:
-    """Return the underlying function of a ``@pytest.fixture``-wrapped object.
-
-    pytest >= 8.4 wraps fixtures in a ``FixtureFunctionDefinition`` whose
-    ``inspect.isfunction`` is False; the real function is reachable via
-    ``_get_wrapped_function()`` (with ``_fixture_function`` / ``__wrapped__``
-    as fallbacks). Returns the recovered function, or None when
-    ``candidate`` is not a fixture wrapper we can unwrap.
-    """
-    import inspect  # ruff: ignore[import-outside-top-level]
-
-    getter = getattr(candidate, "_get_wrapped_function", None)
-    if callable(getter):
-        try:
-            wrapped = getter()
-        except Exception:  # ruff: ignore[blind-except] — defensive across pytest versions
-            wrapped = None
-        if inspect.isfunction(wrapped):
-            return wrapped
-    for attr in ("_fixture_function", "__wrapped__"):
-        wrapped = getattr(candidate, attr, None)
-        if inspect.isfunction(wrapped):
-            return wrapped
-    return None
-
-
-def _resolve_sink_candidate(
-    *,
-    candidate: object,
-    plugin: object,
-) -> list[object] | None:
-    """Resolve a module-level ``rampart_sinks`` attribute into a list of sinks.
-
-    Handles three shapes:
-
-    - A list — used directly.
-    - A zero-argument plain function — called, and its list return used.
-    - A ``@pytest.fixture``-wrapped *parameterless* function — unwrapped to
-      its underlying function and called directly (no pytest fixture
-      machinery), so the documented session-fixture fallback keeps working
-      on the xdist controller.
-
-    Any other shape — a fixture that depends on other fixtures, a callable
-    requiring arguments, or a non-list return — is skipped with a warning
-    pointing at the ``pytest_rampart_sinks`` hook, which works identically
-    on the controller and in every worker.
-
-    Returns:
-        None on failure (logged) so the caller can continue scanning other plugins.
-
-    Raises:
-        KeyboardInterrupt: If the function is interrupted by the user.
-        SystemExit: If the function attempts to exit the program.
-    """
-    import inspect  # ruff: ignore[import-outside-top-level]
-
-    plugin_name = getattr(plugin, "__name__", repr(plugin))
-    if isinstance(candidate, list):
-        return cast("list[object]", candidate)
-
-    func: Callable[..., object] | None
-    if inspect.isfunction(candidate):
-        func = candidate
-    else:
-        func = _unwrap_fixture_function(candidate)
-        if func is not None:
-            emit_deprecation_warning(
-                old_item="The rampart_sinks fixture",
-                new_item="the pytest_rampart_sinks hook",
-                removed_in="0.3.0",
-            )
-    if func is None:
-        logger.warning(
-            "rampart_sinks in %s is %s, which controller-side discovery "
-            "cannot resolve. Register sinks via the pytest_rampart_sinks "
-            "hook instead.",
-            plugin_name,
-            type(candidate).__name__,
-        )
-        return None
-
-    sig = inspect.signature(func)
-    if len(sig.parameters) > 0:
-        logger.warning(
-            "rampart_sinks in %s requires arguments (%s); controller-side "
-            "discovery cannot satisfy those. Use the pytest_rampart_sinks "
-            "hook, or provide a parameterless function or a list.",
-            plugin_name,
-            list(sig.parameters),
-        )
-        return None
-
-    try:
-        value = func()
-    except (KeyboardInterrupt, SystemExit):
-        raise
-    except Exception as exc:  # ruff: ignore[blind-except] — broad on purpose: user code
-        logger.warning(
-            "rampart_sinks in %s raised during controller-side discovery: %s",
-            plugin_name,
-            exc,
-        )
-        return None
-
-    if isinstance(value, list):
-        return cast("list[object]", value)
-    logger.warning(
-        "rampart_sinks in %s returned %s instead of list[ReportSink].",
-        plugin_name,
-        type(value).__name__,
-    )
-    return None

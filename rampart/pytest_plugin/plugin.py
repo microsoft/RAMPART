@@ -27,7 +27,6 @@ from typing import TYPE_CHECKING, Any, cast
 
 import pytest
 
-from rampart.common.deprecation import emit_deprecation_warning
 from rampart.common.text import strip_ansi
 from rampart.core.execution import (
     ExecutionEventHandler,
@@ -49,7 +48,6 @@ from rampart.pytest_plugin._xdist import (
     SIZE_LIMIT_OPTION,
     WorkerOutputError,
     attach_report_results,
-    discover_sinks_from_conftest,
     finalize_worker,
     get_dist_mode,
     get_worker_count,
@@ -214,7 +212,7 @@ def pytest_configure(config: pytest.Config) -> None:
     """Register RAMPART markers and install default handler factory.
 
     Initializes session. Sinks are provided by teams via the
-    ``rampart_sinks`` fixture in their conftest.py, not through
+    ``pytest_rampart_sinks`` hook in their conftest.py, not through
     configuration.
 
     Args:
@@ -555,25 +553,6 @@ def pytest_runtest_logreport(report: pytest.TestReport) -> None:
     received_counts[worker_id] = received_counts.get(worker_id, 0) + result_count
 
 
-def _has_sink_hook_impl(*, config: pytest.Config) -> bool:
-    """Return True if any plugin implements ``pytest_rampart_sinks``.
-
-    Keyed on implementation existence, not on the sinks returned: a hook
-    implementation may legitimately contribute zero sinks, and that must
-    still suppress the legacy fixture fallback.
-
-    Args:
-        config (pytest.Config): The pytest configuration object.
-
-    Returns:
-        bool: True if at least one ``pytest_rampart_sinks`` impl exists.
-    """
-    hook = getattr(config.pluginmanager.hook, "pytest_rampart_sinks", None)
-    if hook is None:
-        return False
-    return bool(hook.get_hookimpls())
-
-
 def _resolve_hook_sinks(*, config: pytest.Config) -> list[ReportSink]:
     """Collect and validate sinks from the ``pytest_rampart_sinks`` hook.
 
@@ -609,83 +588,6 @@ def _resolve_hook_sinks(*, config: pytest.Config) -> list[ReportSink]:
                     sink,
                 )
     return sinks
-
-
-@pytest.fixture(scope="session", autouse=True)
-def _rampart_sink_bootstrap(  # pytest discovers this via autouse=True
-    request: pytest.FixtureRequest,
-) -> None:
-    """Merge team-provided sinks into the RAMPART session.
-
-    If the consuming project defines a ``rampart_sinks`` fixture
-    (session-scoped, returning ``list[ReportSink]``), this fixture
-    picks it up and registers those sinks for report emission at
-    session end.
-
-    Example in a team's conftest.py:
-
-    ```python
-    @pytest.fixture(scope="session")
-    def rampart_sinks():
-        return [JsonFileReportSink(output_dir=Path(".report"))]
-    ```
-
-    Precedence: when a ``pytest_rampart_sinks`` hook implementation
-    exists it is authoritative and this fixture-based path is skipped
-    entirely (hook sinks are registered at session finish), so a project
-    that defines both does not double-register.
-
-    Under pytest-xdist, this fixture is a no-op on worker processes
-    (workers skip sink emission entirely); sink discovery on the
-    controller is handled by the ``pytest_rampart_sinks`` hook or, as a
-    fallback, ``_xdist.discover_sinks_from_conftest``.
-
-    No test author ever imports or references this fixture.
-    """
-    if is_xdist_worker(config=request.config):
-        return
-
-    if _has_sink_hook_impl(config=request.config):
-        return
-
-    rampart_session = request.config.stash.get(_rampart_key, None)
-    if rampart_session is None:
-        return
-
-    try:
-        user_sinks = request.getfixturevalue("rampart_sinks")
-    except pytest.FixtureLookupError:
-        return
-
-    emit_deprecation_warning(
-        old_item="The rampart_sinks fixture",
-        new_item="the pytest_rampart_sinks hook",
-        removed_in="0.3.0",
-    )
-
-    if not isinstance(user_sinks, list):
-        logger.warning(
-            "rampart_sinks fixture must return list[ReportSink], got %s. Ignoring.",
-            type(user_sinks).__name__,
-        )
-        return
-
-    user_sinks = cast("list[object]", user_sinks)
-
-    if not all(isinstance(x, ReportSink) for x in user_sinks):
-        logger.warning(
-            "rampart_sinks fixture must return list[ReportSink], "
-            "got list with non-ReportSink items. Ignoring.",
-        )
-        return
-
-    user_sinks = cast("list[ReportSink]", user_sinks)
-
-    rampart_session.add_sinks(sinks=user_sinks)
-    logger.info(
-        "Loaded %d sink(s) from rampart_sinks fixture.",
-        len(user_sinks),
-    )
 
 
 def _aggregate_trial_results(
@@ -796,14 +698,15 @@ def pytest_sessionfinish(
       and skip sink emission (Results already streamed on test reports).
     - xdist controller: trials already aggregated against the merged
       ``_results_by_nodeid``; resolve sinks via the
-      ``pytest_rampart_sinks`` hook (falling back to conftest discovery),
-      evaluate gates, and emit.
+      ``pytest_rampart_sinks`` hook, evaluate gates, and emit.
     - non-xdist: original single-process pipeline (aggregate, gate,
-      emit); hook sinks are added here when the fixture path was
-      suppressed.
+      emit); hook sinks are added here.
 
     An incomplete run (a lost or crashed worker) is forced to a non-zero
     exit status so a dropped shard cannot pass silently.
+
+    A ``--collect-only`` run skips aggregation and sink emission entirely,
+    so collection never overwrites report files.
 
     Args:
         session (pytest.Session): The pytest session.
@@ -811,6 +714,9 @@ def pytest_sessionfinish(
     """
     rampart_session = session.config.stash.get(_rampart_key, None)
     if rampart_session is None:
+        return
+
+    if session.config.getoption("collectonly", default=False):
         return
 
     start_time = session.config.stash.get(_session_start_key, None)
@@ -835,17 +741,13 @@ def pytest_sessionfinish(
 
     if is_xdist_controller(config=session.config):
         _record_xdist_metadata(session=session, rampart_session=rampart_session)
-        if _has_sink_hook_impl(config=session.config):
-            controller_sinks = _resolve_hook_sinks(config=session.config)
-        else:
-            controller_sinks = discover_sinks_from_conftest(config=session.config)
+        controller_sinks = _resolve_hook_sinks(config=session.config)
         if controller_sinks:
             rampart_session.add_sinks(sinks=controller_sinks)
         _emit_sinks(rampart_session=rampart_session)
         return
 
-    if _has_sink_hook_impl(config=session.config):
-        rampart_session.add_sinks(sinks=_resolve_hook_sinks(config=session.config))
+    rampart_session.add_sinks(sinks=_resolve_hook_sinks(config=session.config))
     _emit_sinks(rampart_session=rampart_session)
 
 

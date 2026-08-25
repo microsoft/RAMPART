@@ -27,7 +27,6 @@ from rampart.pytest_plugin.plugin import (
     _emit_sinks,
     _enforce_incomplete_exit_status,
     _evaluate_gates,
-    _has_sink_hook_impl,
     _rampart_key,
     _received_result_counts_key,
     _resolve_hook_sinks,
@@ -952,6 +951,7 @@ class TestSessionFinishIntegration:
         config_stash[_rampart_key] = rs
         config_stash[_session_start_key] = time.monotonic() - 5.0
         session_mock.config.stash = config_stash
+        session_mock.config.getoption.return_value = False
         session_mock.items = []
 
         pytest_sessionfinish(session=cast("pytest.Session", session_mock), exitstatus=0)
@@ -962,18 +962,6 @@ class TestSessionFinishIntegration:
 
 class TestSinkHookResolution:
     """The pytest_rampart_sinks hook is resolved and validated."""
-
-    def test_has_sink_hook_impl_true_when_impls_present(self) -> None:
-        config = MagicMock()
-        hook = config.pluginmanager.hook.pytest_rampart_sinks
-        hook.get_hookimpls.return_value = [MagicMock()]
-        assert _has_sink_hook_impl(config=config) is True
-
-    def test_has_sink_hook_impl_false_when_no_impls(self) -> None:
-        config = MagicMock()
-        hook = config.pluginmanager.hook.pytest_rampart_sinks
-        hook.get_hookimpls.return_value = []
-        assert _has_sink_hook_impl(config=config) is False
 
     def test_resolve_hook_sinks_flattens_implementations(self) -> None:
         sink_a = MagicMock(spec=ReportSink)

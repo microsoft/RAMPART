@@ -111,7 +111,7 @@ class MyDatabaseSink:
 Register the `pytest_rampart_sinks` hook in your `conftest.py`. See [pytest Markers & Fixtures](pytest-integration.md#pytest_rampart_sinks-hook) for the setup and examples with multiple sinks.
 
 !!! note "Parallel execution"
-    Under [`pytest-xdist`](xdist.md), workers send their results to the controller, which emits sinks **once** with a unified [`TestRunReport`][rampart.reporting.sink.TestRunReport]. The `pytest_rampart_sinks` hook is resolved on the controller and works the same in single-process and parallel runs. The deprecated `rampart_sinks` fixture is still supported as a single-process fallback, but on the controller it cannot depend on other fixtures. See [Registering Sinks](xdist.md#registering-sinks-the-pytest_rampart_sinks-hook) for details.
+    Under [`pytest-xdist`](xdist.md), workers send their results to the controller, which emits sinks **once** with a unified [`TestRunReport`][rampart.reporting.sink.TestRunReport]. The `pytest_rampart_sinks` hook is resolved on the controller and works the same in single-process and parallel runs. See [Registering Sinks](xdist.md#registering-sinks-the-pytest_rampart_sinks-hook) for details.
 
 ---
 

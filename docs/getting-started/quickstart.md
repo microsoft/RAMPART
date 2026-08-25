@@ -135,7 +135,7 @@ See [pytest Markers & Fixtures](../usage/pytest-integration.md) for the full mar
 
 ## Step 4: Add Reporting
 
-Register report sinks with the `pytest_rampart_sinks` hook in your `conftest.py` so RAMPART writes structured JSON reports. See [pytest Markers & Fixtures](../usage/pytest-integration.md#pytest_rampart_sinks-hook) for the setup. (The older `rampart_sinks` fixture is still supported but deprecated.)
+Register report sinks with the `pytest_rampart_sinks` hook in your `conftest.py` so RAMPART writes structured JSON reports. See [pytest Markers & Fixtures](../usage/pytest-integration.md#pytest_rampart_sinks-hook) for the setup.
 
 ---
 

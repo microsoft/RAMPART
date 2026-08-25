@@ -49,7 +49,6 @@ from rampart.pytest_plugin._xdist import (
     attach_report_results,
     deserialize_report_data,
     deserialize_trial_specs,
-    discover_sinks_from_conftest,
     finalize_worker,
     get_dist_mode,
     get_worker_count,
@@ -60,7 +59,7 @@ from rampart.pytest_plugin._xdist import (
     serialize_report_data,
     serialize_worker_data,
 )
-from rampart.reporting.sink import ReportSink, TestRunReport
+from rampart.reporting.sink import TestRunReport
 
 
 def _make_result(
@@ -1348,145 +1347,6 @@ class TestReportEnvelope:
         )
         assert (
             len(json.dumps(marker["metadata"]["_pytest_nodeid"]).encode("utf-8")) <= 512
-        )
-
-
-class TestSinkDiscovery:
-    def test_finds_callable_rampart_sinks(self) -> None:
-        sink = MagicMock(spec=ReportSink)
-        plugin = MagicMock(
-            spec=["rampart_sinks", "__name__"],
-            rampart_sinks=lambda: [sink],
-            __name__="mod",
-        )
-        config = MagicMock()
-        config.pluginmanager.get_plugins.return_value = [plugin]
-        result = discover_sinks_from_conftest(config=config)
-        assert sink in result
-
-    def test_finds_list_rampart_sinks(self) -> None:
-        sink = MagicMock(spec=ReportSink)
-        plugin = MagicMock(
-            spec=["rampart_sinks", "__name__"],
-            rampart_sinks=[sink],
-            __name__="mod",
-        )
-        config = MagicMock()
-        config.pluginmanager.get_plugins.return_value = [plugin]
-        result = discover_sinks_from_conftest(config=config)
-        assert sink in result
-
-    def test_returns_empty_when_no_rampart_sinks(self) -> None:
-        plugin = MagicMock(spec=["__name__"], __name__="mod")
-        config = MagicMock()
-        config.pluginmanager.get_plugins.return_value = [plugin]
-        result = discover_sinks_from_conftest(config=config)
-        assert result == []
-
-    def test_warns_on_callable_with_required_args(
-        self,
-        caplog: pytest.LogCaptureFixture,
-    ) -> None:
-        def needs_arg(other: object) -> list[ReportSink]:
-            return []
-
-        plugin = MagicMock(
-            spec=["rampart_sinks", "__name__"],
-            rampart_sinks=needs_arg,
-            __name__="mod",
-        )
-        config = MagicMock()
-        config.pluginmanager.get_plugins.return_value = [plugin]
-        with caplog.at_level(logging.WARNING):
-            result = discover_sinks_from_conftest(config=config)
-        assert result == []
-        assert any("requires arguments" in r.getMessage() for r in caplog.records)
-
-    def test_resolves_parameterless_fixture_form(self) -> None:
-        sink = MagicMock(spec=ReportSink)
-
-        @pytest.fixture
-        def rampart_sinks() -> list[ReportSink]:
-            return [sink]
-
-        plugin = MagicMock(
-            spec=["rampart_sinks", "__name__"],
-            rampart_sinks=rampart_sinks,
-            __name__="mod",
-        )
-        config = MagicMock()
-        config.pluginmanager.get_plugins.return_value = [plugin]
-        result = discover_sinks_from_conftest(config=config)
-        assert sink in result
-
-    def test_warns_and_skips_fixture_with_dependencies(
-        self,
-        caplog: pytest.LogCaptureFixture,
-    ) -> None:
-        @pytest.fixture
-        def rampart_sinks(tmp_path: object) -> list[ReportSink]:
-            return []
-
-        plugin = MagicMock(
-            spec=["rampart_sinks", "__name__"],
-            rampart_sinks=rampart_sinks,
-            __name__="mod",
-        )
-        config = MagicMock()
-        config.pluginmanager.get_plugins.return_value = [plugin]
-        with caplog.at_level(logging.WARNING):
-            result = discover_sinks_from_conftest(config=config)
-        assert result == []
-        assert any("requires arguments" in r.getMessage() for r in caplog.records)
-        assert any("pytest_rampart_sinks" in r.getMessage() for r in caplog.records)
-
-
-class TestSinkDeprecationWarning:
-    """Deprecation-warning contract for controller-side ``rampart_sinks`` discovery.
-
-    The ``@pytest.fixture`` form warns when resolved; the module-level list form
-    is not a fixture and must stay silent. These fast, in-process checks replace
-    the equivalent ``pytester`` subprocess test in ``test_xdist_aggregation.py``.
-    """
-
-    def test_fixture_form_emits_deprecation_warning(self) -> None:
-        sink = MagicMock(spec=ReportSink)
-
-        @pytest.fixture
-        def rampart_sinks() -> list[ReportSink]:
-            return [sink]
-
-        plugin = MagicMock(
-            spec=["rampart_sinks", "__name__"],
-            rampart_sinks=rampart_sinks,
-            __name__="mod",
-        )
-        config = MagicMock()
-        config.pluginmanager.get_plugins.return_value = [plugin]
-        with pytest.warns(
-            DeprecationWarning, match="rampart_sinks fixture is deprecated"
-        ):
-            result = discover_sinks_from_conftest(config=config)
-        assert sink in result
-
-    def test_list_form_does_not_emit_deprecation_warning(
-        self,
-        recwarn: pytest.WarningsRecorder,
-    ) -> None:
-        sink = MagicMock(spec=ReportSink)
-        plugin = MagicMock(
-            spec=["rampart_sinks", "__name__"],
-            rampart_sinks=[sink],
-            __name__="mod",
-        )
-        config = MagicMock()
-        config.pluginmanager.get_plugins.return_value = [plugin]
-        result = discover_sinks_from_conftest(config=config)
-        assert sink in result
-        assert not any(
-            issubclass(w.category, DeprecationWarning)
-            and "rampart_sinks fixture is deprecated" in str(w.message)
-            for w in recwarn
         )
 
 

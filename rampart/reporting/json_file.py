@@ -8,19 +8,11 @@ configurable output directory. Ships with the framework as a
 built-in ``ReportSink`` for teams that want local file output
 without building a custom sink.
 
-Teams wire it up in their conftest, either via the
-``pytest_rampart_sinks`` hook (recommended; works under ``pytest-xdist``)
-or the legacy ``rampart_sinks`` fixture:
+Teams wire it up in their conftest via the ``pytest_rampart_sinks``
+hook (works under ``pytest-xdist``):
 
 ```python
-# Recommended: hook, resolved on the xdist controller
 def pytest_rampart_sinks(config):
-    return [JsonFileReportSink(output_dir=Path(".report"))]
-
-
-# Legacy fixture (single-process fallback)
-@pytest.fixture(scope="session")
-def rampart_sinks():
     return [JsonFileReportSink(output_dir=Path(".report"))]
 ```
 """

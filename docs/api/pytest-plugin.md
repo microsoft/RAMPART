@@ -46,4 +46,3 @@ hook to reconcile per-worker Result counts. See
         - deserialize_trial_specs
         - finalize_worker
         - handle_testnodedown
-        - discover_sinks_from_conftest

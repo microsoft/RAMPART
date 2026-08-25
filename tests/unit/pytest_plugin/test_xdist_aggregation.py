@@ -31,16 +31,13 @@ pytestmark = pytest.mark.slow
 _CONFTEST = """\
 from pathlib import Path
 
-import pytest
-
 from rampart.reporting import JsonFileReportSink
 
 
 _OUT_DIR = Path("rampart_reports").absolute()
 
 
-@pytest.fixture(scope="session")
-def rampart_sinks():
+def pytest_rampart_sinks(config):
     _OUT_DIR.mkdir(parents=True, exist_ok=True)
     Path("rampart_report_dir.txt").write_text(str(_OUT_DIR))
     return [JsonFileReportSink(output_dir=_OUT_DIR)]
@@ -712,32 +709,3 @@ class TestCloneIdDeterminism:
         # deterministic clone IDs so that workers can match them.
         if serial_ids and parallel_ids:
             assert serial_ids == parallel_ids
-
-
-class TestSinkFixtureDeprecation:
-    """End-to-end deprecation-warning contract for the ``rampart_sinks`` fixture.
-
-    The fixture warns wherever it is resolved: single-process and on the xdist
-    controller. The list form's silence is covered by the fast unit tests in
-    ``test_xdist.py::TestSinkDeprecationWarning``.
-    """
-
-    _DEPRECATION_LINE = "*rampart_sinks fixture is deprecated*"
-
-    def test_single_process_fixture_warns(
-        self,
-        configured_pytester: Pytester,
-    ) -> None:
-        _setup_simple_tests(configured_pytester)
-        result = configured_pytester.runpytest("-p", "no:cacheprovider")
-        result.assert_outcomes(passed=4)
-        result.stdout.fnmatch_lines([self._DEPRECATION_LINE])
-
-    def test_controller_fixture_warns_under_xdist(
-        self,
-        configured_pytester: Pytester,
-    ) -> None:
-        _setup_simple_tests(configured_pytester)
-        result = configured_pytester.runpytest("-p", "no:cacheprovider", "-n", "2")
-        result.assert_outcomes(passed=4)
-        result.stdout.fnmatch_lines([self._DEPRECATION_LINE])
