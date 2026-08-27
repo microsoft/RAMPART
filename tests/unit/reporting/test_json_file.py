@@ -6,8 +6,10 @@
 from __future__ import annotations
 
 import json
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+from unittest.mock import patch
 
 import pytest
 
@@ -365,6 +367,63 @@ class TestEmitAsync:
         assert category_results[0]["turns"][0]["response_metadata"] == {
             "page_url": "https://example.com/chat",
         }
+
+    async def test_same_timestamp_preserves_every_report_async(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        sink = JsonFileReportSink(output_dir=tmp_path)
+        fixed = datetime(2026, 8, 27, 12, 0, 0, tzinfo=UTC)
+
+        with patch("rampart.reporting.json_file.datetime") as clock:
+            clock.now.return_value = fixed
+            for run in range(3):
+                await sink.emit_async(report=TestRunReport(metadata={"run": run}))
+
+        files = {path.name: path for path in tmp_path.glob("run_report_*.json")}
+        assert set(files) == {
+            "run_report_2026-08-27T12-00-00.json",
+            "run_report_2026-08-27T12-00-00_1.json",
+            "run_report_2026-08-27T12-00-00_2.json",
+        }
+        for run, suffix in enumerate(("", "_1", "_2")):
+            path = files[f"run_report_2026-08-27T12-00-00{suffix}.json"]
+            assert json.loads(path.read_text(encoding="utf-8"))["metadata"] == {
+                "run": run,
+            }
+
+    async def test_existing_report_is_not_replaced_async(self, tmp_path: Path) -> None:
+        original = tmp_path / "run_report_2026-08-27T12-00-00.json"
+        original.write_text("keep me", encoding="utf-8")
+        sink = JsonFileReportSink(output_dir=tmp_path)
+        fixed = datetime(2026, 8, 27, 12, 0, 0, tzinfo=UTC)
+
+        with patch("rampart.reporting.json_file.datetime") as clock:
+            clock.now.return_value = fixed
+            await sink.emit_async(report=TestRunReport(metadata={"run": "new"}))
+
+        assert original.read_text(encoding="utf-8") == "keep me"
+        collision = tmp_path / "run_report_2026-08-27T12-00-00_1.json"
+        assert json.loads(collision.read_text(encoding="utf-8"))["metadata"] == {
+            "run": "new",
+        }
+
+    async def test_raises_after_all_suffixes_are_taken_async(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        stem = "run_report_2026-08-27T12-00-00"
+        (tmp_path / f"{stem}.json").write_text("first", encoding="utf-8")
+        (tmp_path / f"{stem}_1.json").write_text("second", encoding="utf-8")
+        monkeypatch.setattr(JsonFileReportSink, "_MAX_FILENAME_ATTEMPTS", 2)
+        sink = JsonFileReportSink(output_dir=tmp_path)
+        fixed = datetime(2026, 8, 27, 12, 0, 0, tzinfo=UTC)
+
+        with patch("rampart.reporting.json_file.datetime") as clock:
+            clock.now.return_value = fixed
+            with pytest.raises(FileExistsError, match="Unable to reserve"):
+                await sink.emit_async(report=TestRunReport())
 
 
 class TestReportMetadata:

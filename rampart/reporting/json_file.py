@@ -47,11 +47,14 @@ class JsonFileReportSink:
 
     Each run produces a timestamped file:
     ``<output_dir>/run_report_2026-03-19T21-30-00.json``
+    If that name already exists, the sink appends ``_1``, ``_2``, and so on.
 
     Args:
         output_dir (Path): Directory to write report files into.
             Created automatically if it does not exist.
     """
+
+    _MAX_FILENAME_ATTEMPTS: int = 1000
 
     def __init__(self, *, output_dir: Path) -> None:
         """Initialize with an output directory for report files."""
@@ -62,14 +65,41 @@ class JsonFileReportSink:
 
         Args:
             report (TestRunReport): The aggregated test run results.
+
+        Raises:
+            FileExistsError: If no collision-free filename can be reserved.
         """
         self._output_dir.mkdir(parents=True, exist_ok=True)
 
         timestamp = datetime.now(UTC).strftime("%Y-%m-%dT%H-%M-%S")
-        filepath = self._output_dir / f"run_report_{timestamp}.json"
-
         data = self._serialize_report(report)
-        filepath.write_text(json.dumps(data, indent=2, default=str))
+        self._write_report_file(
+            stem=f"run_report_{timestamp}",
+            content=json.dumps(data, indent=2, default=str),
+        )
+
+    def _write_report_file(self, *, stem: str, content: str) -> None:
+        """Write a report without replacing an existing file.
+
+        Args:
+            stem (str): Filename without a collision suffix or extension.
+            content (str): Serialized report content.
+
+        Raises:
+            FileExistsError: If every collision suffix is already in use.
+        """
+        for suffix in range(self._MAX_FILENAME_ATTEMPTS):
+            suffix_text = "" if suffix == 0 else f"_{suffix}"
+            filepath = self._output_dir / f"{stem}{suffix_text}.json"
+            try:
+                report_file = filepath.open("x", encoding="utf-8")
+            except FileExistsError:
+                continue
+            with report_file:
+                report_file.write(content)
+            return
+        msg = f"Unable to reserve a report filename for {stem!r}"
+        raise FileExistsError(msg)
 
     def _serialize_report(self, report: TestRunReport) -> dict[str, Any]:
         """Convert a TestRunReport to a JSON-serializable dict.
