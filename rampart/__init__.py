@@ -29,17 +29,21 @@ from rampart.core.result import (
     SafetyStatus,
     resolve_as_attack,
     resolve_as_probe,
+    resolve_attack_verdict,
+    resolve_probe_verdict,
 )
 from rampart.core.types import (
     EvalContext,
     EvalOutcome,
     EvalResult,
+    EvaluationRole,
     ObservabilityLevel,
     Payload,
     PayloadFormat,
     Request,
     Response,
     SideEffect,
+    TerminationReason,
     ToolCall,
     Turn,
 )
@@ -70,6 +74,7 @@ __all__ = [
     "EvalContext",
     "EvalOutcome",
     "EvalResult",
+    "EvaluationRole",
     "Evaluator",
     "EvaluatorError",
     "ExecutionEvent",
@@ -95,6 +100,7 @@ __all__ = [
     "Session",
     "SideEffect",
     "Surface",
+    "TerminationReason",
     "ToolCall",
     "ToolDeclaration",
     "TranscriptScope",
@@ -102,6 +108,8 @@ __all__ = [
     "record_result",
     "resolve_as_attack",
     "resolve_as_probe",
+    "resolve_attack_verdict",
+    "resolve_probe_verdict",
 ]
 
 

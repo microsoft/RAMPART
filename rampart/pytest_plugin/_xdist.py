@@ -8,11 +8,11 @@ logic for running RAMPART under pytest-xdist. Workers stream ``Result``
 objects on call-phase test reports; the controller merges each report
 incrementally and emits a single unified report at session end.
 
-Trust boundary: worker payloads may contain attacker-controlled
-content (agent responses, payload text). Serialization is strictly
-JSON-safe primitives; deserialization validates schema version,
-enum values, and metadata depth; ANSI escapes are stripped from free
-text as defense-in-depth.
+Trust boundary: worker payloads may contain attacker-controlled content
+(agent responses, payload text). Serialization is strictly JSON-safe
+primitives; deserialization validates schema version, core enum values, and
+metadata depth while treating additive display enums leniently. ANSI escapes
+are stripped from free text as defense-in-depth.
 """
 
 from __future__ import annotations
@@ -21,6 +21,7 @@ import json
 import logging
 import math
 from datetime import datetime
+from importlib.metadata import PackageNotFoundError, version
 from typing import TYPE_CHECKING, Any, cast
 
 from rampart.common.deprecation import emit_deprecation_warning
@@ -35,12 +36,14 @@ from rampart.core.result import (
 from rampart.core.types import (
     EvalOutcome,
     EvalResult,
+    EvaluationRole,
     ObservabilityLevel,
     Payload,
     PayloadFormat,
     Request,
     Response,
     SideEffect,
+    TerminationReason,
     ToolCall,
     Turn,
 )
@@ -69,6 +72,14 @@ _TRUNCATED_MARKER: str = "rampart_truncated"
 _TRUNCATED_ATTRIBUTION_MAX_BYTES: int = 512
 _TRUNCATED_FALLBACK_ATTRIBUTION_MAX_BYTES: int = 64
 _STREAMED_RESULT_COUNT: str = "streamed_result_count"
+
+
+def _rampart_version() -> str:
+    """Return the installed RAMPART version for transport diagnostics."""
+    try:
+        return version("RAMPART")
+    except PackageNotFoundError:
+        return "unknown"
 
 
 class WorkerOutputError(Exception):
@@ -453,6 +464,7 @@ def _serialize_turn(*, turn: Turn, nodeid: str) -> dict[str, Any]:
             if turn.eval_result is not None
             else None
         ),
+        "eval_role": turn.eval_role.value if turn.eval_role is not None else None,
         "turn_number": turn.turn_number,
         "timestamp": _isoformat(timestamp=turn.timestamp),
         "driver_reasoning": turn.driver_reasoning,
@@ -474,9 +486,10 @@ def _serialize_injection_record(*, injection: InjectionRecord) -> dict[str, Any]
 def _serialize_result(*, result: Result, nodeid: str) -> dict[str, Any]:
     """Serialize a Result to a JSON-safe dict for the xdist transport.
 
-    This is the full-fidelity transport projection: it round-trips back
-    to a ``Result`` via :func:`_deserialize_result`, and intentionally
-    differs from the flatter public report shape produced by
+    This is the full transport projection used to rebuild a ``Result`` via
+    :func:`_deserialize_result`, including final evaluation, termination
+    reason, and turn evaluation role. It intentionally differs from the
+    flatter public report shape produced by
     ``JsonFileReportSink._serialize_result``. The two projections are
     deliberately separate (different fields, sanitization, and size
     handling) and must not be naively merged into one serializer.
@@ -488,7 +501,17 @@ def _serialize_result(*, result: Result, nodeid: str) -> dict[str, Any]:
         "safe": result.safe,
         "status": result.status.value,
         "summary": result.summary,
+        "evaluation": (
+            _serialize_eval_result(eval_result=result.evaluation)
+            if result.evaluation is not None
+            else None
+        ),
         "turns": [_serialize_turn(turn=t, nodeid=nodeid) for t in result.turns],
+        "termination_reason": (
+            result.termination_reason.value
+            if result.termination_reason is not None
+            else None
+        ),
         "duration_seconds": safe_float(value=result.duration_seconds),
         "harm_category": (
             str(result.harm_category) if result.harm_category is not None else None
@@ -683,6 +706,7 @@ def serialize_report_data(
     limit_bytes = _size_limit(config=config)
     return {
         "schema": SCHEMA_VERSION,
+        "rampart_version": _rampart_version(),
         "nodeid": nodeid,
         "results": [
             _serialize_capped_result(
@@ -739,6 +763,7 @@ def serialize_worker_data(
     """
     return {
         "schema": SCHEMA_VERSION,
+        "rampart_version": _rampart_version(),
         _STREAMED_RESULT_COUNT: streamed_result_count,
         "trial_specs": [
             {
@@ -834,6 +859,36 @@ def _deserialize_eval_outcome(*, value: object) -> EvalOutcome:
     except ValueError as exc:
         msg = f"Unknown EvalOutcome value: {value!r}."
         raise WorkerOutputError(msg) from exc
+
+
+def _deserialize_evaluation_role(*, value: object) -> EvaluationRole | None:
+    """Deserialize an additive turn-evaluation role leniently.
+
+    Returns:
+        EvaluationRole | None: The role, or None when absent or unknown.
+    """
+    if value is None:
+        return None
+    try:
+        return EvaluationRole(value)
+    except (TypeError, ValueError):
+        logger.warning("Unknown EvaluationRole value %r; ignoring it.", value)
+        return None
+
+
+def _deserialize_termination_reason(*, value: object) -> TerminationReason | None:
+    """Deserialize an additive trace-termination reason leniently.
+
+    Returns:
+        TerminationReason | None: The reason, or None when absent or unknown.
+    """
+    if value is None:
+        return None
+    try:
+        return TerminationReason(value)
+    except (TypeError, ValueError):
+        logger.warning("Unknown TerminationReason value %r; ignoring it.", value)
+        return None
 
 
 def _deserialize_harm_category(*, value: object) -> HarmCategory | str | None:
@@ -1124,6 +1179,7 @@ def _deserialize_turn(*, data: object) -> Turn:
         request=_deserialize_request(data=typed.get("request")),
         response=_deserialize_response(data=typed.get("response")),
         eval_result=_deserialize_eval_result(data=typed.get("eval_result")),
+        eval_role=_deserialize_evaluation_role(value=typed.get("eval_role")),
         turn_number=int(raw_turn_number) if isinstance(raw_turn_number, int) else 0,
         timestamp=_deserialize_datetime(value=typed.get("timestamp")),
         driver_reasoning=_strip_ansi(text=str(typed.get("driver_reasoning", ""))),
@@ -1179,11 +1235,15 @@ def _deserialize_result(*, data: object) -> Result:
     return Result(
         status=_deserialize_safety_status(value=typed.get("status")),
         summary=_strip_ansi(text=str(typed.get("summary", ""))),
+        evaluation=_deserialize_eval_result(data=typed.get("evaluation")),
         turns=[
             _deserialize_turn(data=t)
             for t in cast("list[Any]", raw_turns if isinstance(raw_turns, list) else [])
         ],
         duration_seconds=duration,
+        termination_reason=_deserialize_termination_reason(
+            value=typed.get("termination_reason"),
+        ),
         harm_category=_deserialize_harm_category(value=typed.get("harm_category")),
         strategy=str(typed.get("strategy", "")),
         observability_level=_deserialize_observability_level(
@@ -1207,9 +1267,10 @@ def deserialize_report_data(
 ) -> tuple[dict[str, list[Result]], bool]:
     """Deserialize one call-phase report envelope.
 
-    Performs strict schema validation: missing ``schema`` key, unknown
-    versions, and malformed enum values all raise ``WorkerOutputError``
-    (or subclass). The report nodeid and envelope nodeid must agree.
+    Performs strict schema and core-enum validation. Additive display enums
+    such as evaluation role and termination reason warn and deserialize to
+    None when unknown, allowing mixed-version remote workers to retain core
+    verdict data. The report nodeid and envelope nodeid must agree.
 
     Each result's ``metadata["_pytest_nodeid"]`` and
     ``metadata["_rampart_result_index"]`` are set authoritatively from the
@@ -1229,6 +1290,19 @@ def deserialize_report_data(
         WorkerOutputError: Malformed payload (type errors, bad enums).
     """
     typed = _validate_schema(data=data)
+    worker_version = typed.get("rampart_version")
+    local_version = _rampart_version()
+    if (
+        isinstance(worker_version, str)
+        and worker_version != local_version
+        and "unknown" not in {worker_version, local_version}
+    ):
+        logger.warning(
+            "Worker RAMPART package version %s differs from controller "
+            "package version %s; additive fields may be unavailable.",
+            worker_version,
+            local_version,
+        )
     nodeid = typed.get("nodeid")
     if not isinstance(nodeid, str) or not nodeid:
         msg = "Streamed report envelope has an invalid 'nodeid'."

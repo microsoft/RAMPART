@@ -15,10 +15,12 @@ from rampart.core.result import HarmCategory, Result, SafetyStatus
 from rampart.core.types import (
     EvalOutcome,
     EvalResult,
+    EvaluationRole,
     ObservabilityLevel,
     Request,
     Response,
     SideEffect,
+    TerminationReason,
     ToolCall,
     Turn,
 )
@@ -165,6 +167,7 @@ class TestSerializeResult:
                 confidence=0.95,
                 rationale="found secret",
             ),
+            eval_role=EvaluationRole.STOP_CONDITION,
         )
         result = Result(
             observability_level=ObservabilityLevel.RESPONSE_ONLY,
@@ -179,6 +182,32 @@ class TestSerializeResult:
         assert turn_data["eval_outcome"] == "detected"
         assert turn_data["eval_confidence"] == pytest.approx(0.95)
         assert turn_data["eval_rationale"] == "found secret"
+        assert turn_data["eval_role"] == "stop_condition"
+
+    def test_result_includes_final_evaluation_and_termination_reason(self) -> None:
+        sink = JsonFileReportSink(output_dir=Path("/tmp"))
+        result = Result(
+            observability_level=ObservabilityLevel.RESPONSE_ONLY,
+            status=SafetyStatus.UNSAFE,
+            summary="bad",
+            evaluation=EvalResult(
+                outcome=EvalOutcome.DETECTED,
+                confidence=0.8,
+                evidence=["tool call"],
+                rationale="found it",
+            ),
+            termination_reason=TerminationReason.STOP_CONDITION,
+        )
+
+        data = sink._serialize_result(result)
+
+        assert data["evaluation"] == {
+            "outcome": "detected",
+            "confidence": pytest.approx(0.8),
+            "evidence": ["tool call"],
+            "rationale": "found it",
+        }
+        assert data["termination_reason"] == "stop_condition"
 
     def test_turns_report_a_non_finite_confidence_as_null(self) -> None:
         # Parity with the xdist path: a NaN confidence must serialize to null

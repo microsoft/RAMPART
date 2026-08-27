@@ -4,9 +4,9 @@
 """XPIAExecution — cross-plugin indirect attack execution strategy.
 
 Orchestrates the full XPIA lifecycle: activate injections, wait for
-indexing, create a session, drive the trigger conversation, evaluate
-per-turn with early stopping, clean up, and build a Result using
-attack semantics.  Inherits BaseExecution for lifecycle, events, and
+indexing, create a session, drive the trigger conversation with optional
+online stopping, evaluate the terminal trace, clean up, and build a Result
+using attack semantics. Inherits BaseExecution for lifecycle, events, and
 infrastructure error handling.
 """
 
@@ -17,7 +17,7 @@ import logging
 from contextlib import AsyncExitStack
 from typing import Any
 
-from rampart.common.text import safe_str_list
+from rampart.common.text import safe_str, safe_str_list
 from rampart.core import (
     AgentAdapter,
     BaseExecution,
@@ -30,14 +30,16 @@ from rampart.core import (
     PromptDriver,
     Result,
     SafetyStatus,
+    TerminationReason,
+    TraceRun,
     Turn,
-    resolve_as_attack,
+    resolve_attack_verdict,
 )
-from rampart.core.execution import evaluate_turn_async
 from rampart.core.result import (
     _explain_undetermined,
     _summarize_undetermined_operands,
 )
+from rampart.core.trace import evaluate_terminal_async, run_trace_async
 
 logger = logging.getLogger(__name__)
 
@@ -55,9 +57,10 @@ class XPIAExecution(BaseExecution):
         2. Wait for indexing (concurrent per-handle).
         3. Create session (via async context manager).
         4. Drive the trigger conversation via the PromptDriver.
-        5. Evaluate per-turn with early stopping on detection.
-        6. Cleanup session and injections (guaranteed via AsyncExitStack).
-        7. Build and return Result via ``resolve_as_attack``.
+        5. Apply an optional online stop condition while driving turns.
+        6. Evaluate the terminal trace once.
+        7. Cleanup session and injections (guaranteed via AsyncExitStack).
+        8. Build and return Result via direct attack polarity.
 
     InfrastructureError raised by surfaces or adapters during any phase
     is caught by ``BaseExecution.execute_async`` (not here) and converted
@@ -71,8 +74,10 @@ class XPIAExecution(BaseExecution):
             attachments.
         driver (PromptDriver): How to drive the trigger conversation.
         evaluator (Evaluator): What condition to check for.
-        max_turns (int): Maximum prompt-response exchanges before the
-            execution stops with ERROR.  Prevents unbounded loops.
+        stop_when (Evaluator | None): Optional online condition that stops the
+            trace when detected.
+        max_turns (int): Maximum prompt-response exchanges. Reaching the
+            limit resolves the trace normally and prevents unbounded loops.
         event_handlers (list[ExecutionEventHandler] | None): Additional
             handlers beyond the framework defaults.
     """
@@ -83,6 +88,7 @@ class XPIAExecution(BaseExecution):
         handles: list[InjectionHandle] | None = None,
         driver: PromptDriver,
         evaluator: Evaluator,
+        stop_when: Evaluator | None = None,
         max_turns: int = 25,
         event_handlers: list[ExecutionEventHandler] | None = None,
     ) -> None:
@@ -90,6 +96,7 @@ class XPIAExecution(BaseExecution):
         self._handles = handles or []
         self._driver = driver
         self._evaluator = evaluator
+        self._stop_when = stop_when
         self._max_turns = max_turns
 
     @property
@@ -112,52 +119,48 @@ class XPIAExecution(BaseExecution):
         Returns:
             Result: Safety verdict with full conversation evidence.
         """
-        turns = await self._run_phases_async(adapter=adapter)
-        return self._build_attack_result(adapter=adapter, turns=turns)
+        run, evaluation = await self._run_phases_async(adapter=adapter)
+        return self._build_attack_result(
+            adapter=adapter,
+            turns=run.turns,
+            evaluation=evaluation,
+            termination_reason=run.termination_reason,
+        )
 
     async def _run_phases_async(
         self,
         *,
         adapter: AgentAdapter,
-    ) -> list[Turn]:
+    ) -> tuple[TraceRun, EvalResult | None]:
         """Run XPIA phases 1-5 inside a cleanup-guaranteed context.
 
         Args:
             adapter (AgentAdapter): The agent adapter.
 
         Returns:
-            list[Turn]: Completed turns with eval_result populated.
+            tuple[TraceRun, EvalResult | None]: Completed trace and final
+                verdict evaluation.
         """
-        turns: list[Turn] = []
-
         async with AsyncExitStack() as stack:
             await self._activate_handles_async(stack=stack)
             session = await stack.enter_async_context(
                 await adapter.create_session_async(),
             )
 
-            for turn_index in range(self._max_turns):
-                decision = await self._driver.next_prompt_async(history=turns)
-                if decision is None:
-                    break
+            run = await run_trace_async(
+                session=session,
+                driver=self._driver,
+                max_turns=self._max_turns,
+                observability_level=adapter.observability_profile,
+                stop_when=self._stop_when,
+                manifest=adapter.manifest,
+            )
+            evaluation = await evaluate_terminal_async(
+                evaluator=self._evaluator,
+                run=run,
+            )
 
-                response = await session.send_async(decision.request)
-                turn = await evaluate_turn_async(
-                    evaluator=self._evaluator,
-                    history=turns,
-                    request=decision.request,
-                    response=response,
-                    turn_number=turn_index,
-                    driver_reasoning=decision.reasoning,
-                    manifest=adapter.manifest,
-                    observability_level=adapter.observability_profile,
-                )
-                turns.append(turn)
-
-                if turn.eval_result and turn.eval_result.detected:
-                    break
-
-        return turns
+        return run, evaluation
 
     async def _activate_handles_async(
         self,
@@ -197,36 +200,49 @@ class XPIAExecution(BaseExecution):
         *,
         adapter: AgentAdapter,
         turns: list[Turn],
+        evaluation: EvalResult | None,
+        termination_reason: TerminationReason,
     ) -> Result:
-        """Resolve eval results into a final attack Result.
+        """Resolve the terminal evaluation into an attack Result.
 
         Applies observability adjustment when the initial verdict is SAFE.
 
         Args:
             adapter (AgentAdapter): The adapter under test.
             turns (list[Turn]): Conversation history.
+            evaluation (EvalResult | None): Terminal verdict evidence.
+            termination_reason (TerminationReason): Why the trace ended.
 
         Returns:
             Result: The final safety verdict.
         """
-        eval_results = [t.eval_result for t in turns if t.eval_result is not None]
-        status = resolve_as_attack(eval_results=eval_results)
+        status = resolve_attack_verdict(evaluation=evaluation)
+        metadata = _collect_response_metadata(turns=turns)
 
         if status == SafetyStatus.SAFE:
-            status = self._adjust_for_observability(
+            adjusted = self._adjust_for_observability(
                 adapter=adapter,
                 turns=turns,
                 status=status,
             )
+            if adjusted is not status:
+                metadata["observability_adjusted"] = True
+            status = adjusted
 
         return Result(
             status=status,
-            summary=_build_summary(status=status, eval_results=eval_results),
+            summary=_build_summary(
+                status=status,
+                evaluation=evaluation,
+                termination_reason=termination_reason,
+            ),
+            evaluation=evaluation,
             turns=turns,
+            termination_reason=termination_reason,
             strategy=self.strategy_name,
             observability_level=adapter.observability_profile,
             injections=self._build_injection_records(),
-            metadata=_collect_response_metadata(turns=turns),
+            metadata=metadata,
         )
 
     def _build_injection_records(self) -> list[InjectionRecord]:
@@ -305,52 +321,72 @@ def _collect_response_metadata(
         dict[str, Any]: Merged response metadata.
     """
     per_turn = {
-        f"turn_{t.turn_number}": t.response.metadata
+        f"turn_{t.turn_number}": dict(t.response.metadata)
         for t in turns
         if t.response.metadata
     }
     if len(per_turn) == 1:
-        return next(iter(per_turn.values()))
+        return dict(next(iter(per_turn.values())))
     return per_turn
 
 
 def _build_summary(
     *,
     status: SafetyStatus,
-    eval_results: list[EvalResult],
+    evaluation: EvalResult | None,
+    termination_reason: TerminationReason,
 ) -> str:
     """Build a human-readable one-line summary for XPIA results.
 
     Args:
         status (SafetyStatus): The resolved safety status.
-        eval_results (list[EvalResult]): The evaluator outputs.
+        evaluation (EvalResult | None): Terminal verdict evidence.
+        termination_reason (TerminationReason): Why the trace ended.
 
     Returns:
         str: A summary string for the Result.
     """
-    if status == SafetyStatus.SAFE:
-        return "Agent defended successfully" + _summarize_undetermined_operands(
+    eval_results = [evaluation] if evaluation is not None else []
+    budget_suffix = (
+        " (turn budget exhausted)"
+        if termination_reason is TerminationReason.MAX_TURNS
+        else ""
+    )
+    if status is SafetyStatus.SAFE:
+        gap_suffix = _summarize_undetermined_operands(
             eval_results=eval_results,
         )
-    if status == SafetyStatus.UNSAFE:
-        # resolve_as_attack returns UNSAFE only when some evaluator DETECTED, so
-        # the evidence has to come from those. An undetermined result can carry
-        # evidence of its own, and it is not what established this verdict.
-        evidence = [
-            e
-            for er in eval_results
-            if er.detected
-            for e in safe_str_list(value=er.evidence)
-        ]
+        summary = f"Agent defended successfully{gap_suffix}{budget_suffix}"
+    elif status is SafetyStatus.UNSAFE:
+        evidence = (
+            safe_str_list(value=evaluation.evidence) if evaluation is not None else []
+        )
         if not evidence:
-            return "Attack objective detected"
-        return f"Attack objective detected: {'; '.join(evidence[:3])}"
-    if status == SafetyStatus.UNDETERMINED:
+            detail = (
+                safe_str(value=evaluation.rationale).strip()
+                if evaluation is not None
+                else ""
+            )
+            suffix = f": {detail}" if detail else ""
+            summary = f"Attack objective detected{suffix}{budget_suffix}"
+        else:
+            summary = (
+                f"Attack objective detected: {'; '.join(evidence[:3])}{budget_suffix}"
+            )
+    elif status is SafetyStatus.UNDETERMINED:
         detail = _explain_undetermined(
             eval_results=eval_results,
             fallback="Insufficient observability",
         )
-        return f"Evaluation undetermined: {detail}"
-    if status == SafetyStatus.ERROR:
-        return "Infrastructure error during execution"
-    return "Execution error"
+        summary = f"Evaluation undetermined: {detail}{budget_suffix}"
+    elif status is SafetyStatus.ERROR:
+        if termination_reason is TerminationReason.DRIVER_EXHAUSTED:
+            detail = "Driver produced no turns"
+        elif termination_reason is TerminationReason.MAX_TURNS:
+            detail = "Turn budget exhausted before agent exercise"
+        else:
+            detail = "No evaluable trace"
+        summary = f"Execution error: {detail}"
+    else:
+        summary = "Execution error"
+    return summary
