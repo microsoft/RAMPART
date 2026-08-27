@@ -7,6 +7,7 @@ Built-in evaluators. All extend `BaseEvaluator` and support composition via `|`,
       members:
         - ToolCalled
         - ResponseContains
+        - ResponseScope
         - SideEffectOccurred
         - LLMJudge
         - TranscriptScope

@@ -181,29 +181,37 @@ The process mirrors the [Attack](#attack) walkthrough. The differences are summa
 |---|---|---|
 | **Location** | `rampart/attacks/_name.py` | `rampart/probes/_name.py` |
 | **Factory class** | `Attacks` | `Probes` |
-| **Resolution function** | `resolve_as_attack` | `resolve_as_probe` |
+| **Resolution function** | `resolve_as_attack` (pending cadence migration) | `resolve_probe_verdict` |
 | **Detected means** | UNSAFE | SAFE |
 | **Injection phase** | Often yes | No |
 
 ### 1. Create the Execution Class
 
-The file structure mirrors the [Attack walkthrough](#1-create-the-execution-class) — same imports, `__init__`, and `_execute_async` loop. The diff from `MyAttackExecution` is:
+Probe strategies drive the full trace first, then evaluate it once while the
+session is still active:
 
-```diff
--from rampart.core import (..., resolve_as_attack)
-+from rampart.core import (..., resolve_as_probe)
+```python
+async with await adapter.create_session_async() as session:
+    run = await run_trace_async(
+        session=session,
+        driver=self._driver,
+        max_turns=self._max_turns,
+        observability_level=adapter.observability_profile,
+        stop_when=self._stop_when,
+        manifest=adapter.manifest,
+    )
+    evaluation = await evaluate_terminal_async(
+        evaluator=self._evaluator,
+        run=run,
+    )
 
--class MyAttackExecution(BaseExecution):
-+class MyProbeExecution(BaseExecution):
-
--    return "my_attack"
-+    return "my_probe"
-
--    status = resolve_as_attack(eval_results=eval_results)
-+    status = resolve_as_probe(eval_results=eval_results)
+status = resolve_probe_verdict(evaluation=evaluation)
 ```
 
-Place the file in `rampart/probes/` (e.g. `_my_probe.py`). Most probes skip the injection phase — just session creation, prompt driving, and evaluation. For a complete working reference, see [`rampart/probes/_single_turn.py`](https://github.com/microsoft/RAMPART/blob/main/rampart/probes/_single_turn.py).
+Store `evaluation`, `run.turns`, and `run.termination_reason` on the returned
+`Result`. Most probes skip the injection phase. For a complete working
+reference, see
+[`rampart/probes/_single_turn.py`](https://github.com/microsoft/RAMPART/blob/main/rampart/probes/_single_turn.py).
 
 ### 2. Add a Factory Method to `Probes`
 
@@ -214,7 +222,7 @@ Add a static method to the `Probes` class in `rampart/probes/__init__.py`, mirro
 Probe tests have the same surface as attack tests, with two differences:
 
 - **No injection phase** to test.
-- **Result resolution** uses `resolve_as_probe` semantics (detected → SAFE, not detected → UNSAFE).
+- **Result resolution** uses `resolve_probe_verdict` semantics (detected → SAFE, not detected → UNSAFE).
 
 
 ## Evaluator
@@ -248,7 +256,7 @@ class MyEvaluator(BaseEvaluator):
         self._target = target
 
     async def evaluate_async(self, *, context: EvalContext) -> EvalResult:
-        """Evaluate the latest turn for the target condition.
+        """Evaluate the full trace for the target condition.
 
         Args:
             context (EvalContext): The evaluation context with turn history.
@@ -256,8 +264,10 @@ class MyEvaluator(BaseEvaluator):
         Returns:
             EvalResult: Whether the condition was detected, with evidence.
         """
-        latest_turn = context.turns[-1]
-        detected = self._target in latest_turn.response.text
+        detected = any(
+            self._target in turn.response.text
+            for turn in context.turns
+        )
 
         return EvalResult(
             outcome=EvalOutcome.DETECTED if detected else EvalOutcome.NOT_DETECTED,
@@ -267,6 +277,13 @@ class MyEvaluator(BaseEvaluator):
 ```
 
 Evaluator tests should cover detection, non-detection, edge cases (empty response, missing data), and that `evidence` / `rationale` are populated correctly.
+
+!!! warning "Multi-turn evaluator migration"
+    A custom evaluator that reads only `context.turns[-1]` intentionally judges
+    only the latest response and cannot preserve earlier evidence. Rewrite
+    multi-turn predicates to inspect `context.turns` explicitly. The
+    [attack execution walkthrough](#attack) shows how execution decides which
+    turns are included in the evaluator context.
 
 
 ## Prompt Driver

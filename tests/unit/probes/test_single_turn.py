@@ -5,29 +5,41 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+from unittest.mock import AsyncMock
+
 import pytest
 
 from rampart.core.errors import InfrastructureError
 from rampart.core.evaluator import BaseEvaluator
 from rampart.core.manifest import AppManifest
+from rampart.core.prompt_driver import PromptDecision
 from rampart.core.result import SafetyStatus
 from rampart.core.types import (
     EvalContext,
     EvalOutcome,
     EvalResult,
     ObservabilityLevel,
+    Request,
     Response,
+    TerminationReason,
     ToolCall,
+    Turn,
 )
 from rampart.drivers.static import StaticDriver
 from rampart.evaluators import (
     ResponseContains,
+    ResponseScope,
     SideEffectOccurred,
     ToolCalled,
 )
 from rampart.probes import Probes
 from rampart.probes._single_turn import _build_summary
 from tests.fixtures import MockAdapter
+
+if TYPE_CHECKING:
+    import types
+    from typing import Self
 
 
 class _Unrenderable:
@@ -87,6 +99,54 @@ class _DetectsToolCall(BaseEvaluator):
         return EvalResult(
             outcome=EvalOutcome.NOT_DETECTED,
             rationale=f"{self._tool_name} not called",
+        )
+
+
+class _ToolSequence(BaseEvaluator):
+    """Detect a tool sequence across the complete trace."""
+
+    def __init__(self, *tool_names: str) -> None:
+        self._tool_names = tool_names
+
+    async def evaluate_async(self, *, context: EvalContext) -> EvalResult:
+        observed = [call.name for call in context.all_tool_calls]
+        next_index = 0
+        for name in observed:
+            if (
+                next_index < len(self._tool_names)
+                and name == self._tool_names[next_index]
+            ):
+                next_index += 1
+        return EvalResult(
+            outcome=(
+                EvalOutcome.DETECTED
+                if next_index == len(self._tool_names)
+                else EvalOutcome.NOT_DETECTED
+            ),
+            rationale=f"Observed tools: {observed}",
+        )
+
+
+class _RequiresPrior(BaseEvaluator):
+    """Detect when an action is always preceded by a required tool."""
+
+    def __init__(self, *, action: str, required: str) -> None:
+        self._action = action
+        self._required = required
+
+    async def evaluate_async(self, *, context: EvalContext) -> EvalResult:
+        seen_required = False
+        for call in context.all_tool_calls:
+            if call.name == self._required:
+                seen_required = True
+            if call.name == self._action and not seen_required:
+                return EvalResult(
+                    outcome=EvalOutcome.NOT_DETECTED,
+                    rationale=f"{self._action} occurred before {self._required}",
+                )
+        return EvalResult(
+            outcome=EvalOutcome.DETECTED,
+            rationale=f"{self._required} preceded {self._action}",
         )
 
 
@@ -289,6 +349,8 @@ class TestProbeInfrastructureError:
         assert result.safe is False
         assert result.status == SafetyStatus.ERROR
         assert "InfrastructureError" in result.summary
+        assert result.evaluation is None
+        assert result.termination_reason is None
 
 
 class TestProbeEndToEnd:
@@ -346,7 +408,7 @@ class TestProbeEndToEnd:
 
 
 class TestProbeMaxTurns:
-    """Max turns resolves normally via resolve_as_probe."""
+    """Max turns resolves normally from the terminal evaluation."""
 
     async def test_max_turns_resolves_normally_async(self) -> None:
         adapter = _adapter(responses=[Response(text="ok")])
@@ -360,170 +422,113 @@ class TestProbeMaxTurns:
         assert result.safe is False
         assert result.status == SafetyStatus.UNSAFE
         assert len(result.turns) == 2
+        assert result.termination_reason is TerminationReason.MAX_TURNS
+        assert "turn budget exhausted" in result.summary
 
 
-class TestProbeUnsafeSummary:
-    """An unsafe summary names the turn that settled it, not an undetermined one."""
+class TestProbeSummary:
+    """Terminal evaluation summaries preserve evidence and observability gaps."""
 
-    def test_summary_uses_only_not_detected_rationales(self) -> None:
+    def test_unsafe_summary_uses_terminal_rationale(self) -> None:
         summary = _build_summary(
             status=SafetyStatus.UNSAFE,
-            eval_results=[
-                EvalResult(
-                    outcome=EvalOutcome.NOT_DETECTED,
-                    rationale="Target pattern not found in response text",
-                ),
-                EvalResult(
-                    outcome=EvalOutcome.UNDETERMINED,
-                    rationale="Adapter observability is 'tool_only'",
-                ),
-            ],
+            evaluation=EvalResult(
+                outcome=EvalOutcome.NOT_DETECTED,
+                rationale="Target pattern not found in response text",
+            ),
+            termination_reason=TerminationReason.DRIVER_EXHAUSTED,
         )
 
-        assert "not found" in summary
-        assert "tool_only" not in summary
+        assert summary == "UNSAFE: Target pattern not found in response text"
 
-    def test_summary_falls_back_without_a_rationale(self) -> None:
+    @pytest.mark.parametrize("rationale", ["", "   "])
+    def test_unsafe_summary_falls_back_without_a_rationale(
+        self,
+        rationale: str,
+    ) -> None:
         summary = _build_summary(
             status=SafetyStatus.UNSAFE,
-            eval_results=[EvalResult(outcome=EvalOutcome.NOT_DETECTED)],
+            evaluation=EvalResult(
+                outcome=EvalOutcome.NOT_DETECTED,
+                rationale=rationale,
+            ),
+            termination_reason=TerminationReason.DRIVER_EXHAUSTED,
         )
 
         assert summary == "UNSAFE: Expected behavior not detected"
 
-    def test_summary_falls_back_past_a_whitespace_rationale(self) -> None:
-        summary = _build_summary(
-            status=SafetyStatus.UNSAFE,
-            eval_results=[
-                EvalResult(outcome=EvalOutcome.NOT_DETECTED, rationale="   "),
-            ],
-        )
-
-        assert summary == "UNSAFE: Expected behavior not detected"
-
-    def test_summary_names_the_last_undetected_turn(self) -> None:
-        summary = _build_summary(
-            status=SafetyStatus.UNSAFE,
-            eval_results=[
-                EvalResult(
-                    outcome=EvalOutcome.NOT_DETECTED,
-                    rationale="Disclaimer not found on the first prompt",
-                ),
-                EvalResult(
-                    outcome=EvalOutcome.NOT_DETECTED,
-                    rationale="Disclaimer not found on the retry",
-                ),
-            ],
-        )
-
-        assert summary == "UNSAFE: Disclaimer not found on the retry"
-
-
-class TestProbeUndeterminedSummary:
-    """An undetermined summary should name every gap that was carried up."""
-
-    def test_summary_names_every_operand_gap(self) -> None:
+    def test_undetermined_summary_names_every_operand_gap(self) -> None:
         summary = _build_summary(
             status=SafetyStatus.UNDETERMINED,
-            eval_results=[
-                EvalResult(
-                    outcome=EvalOutcome.UNDETERMINED,
-                    rationale="Left operand undetermined: tool calls unobservable",
-                    undetermined_operands=[
-                        "tool calls unobservable",
-                        "side effects unobservable",
-                    ],
-                ),
-            ],
+            evaluation=EvalResult(
+                outcome=EvalOutcome.UNDETERMINED,
+                undetermined_operands=[
+                    "tool calls unobservable",
+                    "side effects unobservable",
+                ],
+            ),
+            termination_reason=TerminationReason.DRIVER_EXHAUSTED,
         )
 
-        assert "tool calls unobservable" in summary
-        assert "side effects unobservable" in summary
+        assert summary == (
+            "UNDETERMINED: tool calls unobservable; side effects unobservable"
+        )
 
-    def test_summary_deduplicates_operand_reasons(self) -> None:
+    def test_undetermined_summary_deduplicates_operand_reasons(self) -> None:
         summary = _build_summary(
             status=SafetyStatus.UNDETERMINED,
-            eval_results=[
-                EvalResult(
-                    outcome=EvalOutcome.UNDETERMINED,
-                    undetermined_operands=["same gap"],
-                ),
-                EvalResult(
-                    outcome=EvalOutcome.UNDETERMINED,
-                    undetermined_operands=["same gap"],
-                ),
-            ],
+            evaluation=EvalResult(
+                outcome=EvalOutcome.UNDETERMINED,
+                undetermined_operands=["same gap", "same gap"],
+            ),
+            termination_reason=TerminationReason.DRIVER_EXHAUSTED,
         )
 
         assert summary == "UNDETERMINED: same gap"
 
-    def test_summary_counts_the_gaps_it_does_not_name(self) -> None:
+    def test_undetermined_summary_counts_extra_gaps(self) -> None:
         summary = _build_summary(
             status=SafetyStatus.UNDETERMINED,
-            eval_results=[
-                EvalResult(
-                    outcome=EvalOutcome.UNDETERMINED,
-                    undetermined_operands=["gap a", "gap b", "gap c", "gap d"],
-                ),
-            ],
+            evaluation=EvalResult(
+                outcome=EvalOutcome.UNDETERMINED,
+                undetermined_operands=["gap a", "gap b", "gap c", "gap d"],
+            ),
+            termination_reason=TerminationReason.DRIVER_EXHAUSTED,
         )
 
         assert summary == "UNDETERMINED: gap a; gap b (and 2 more)"
 
-    def test_summary_ignores_operands_carried_by_a_settled_result(self) -> None:
+    def test_undetermined_summary_falls_back_to_the_rationale(self) -> None:
         summary = _build_summary(
             status=SafetyStatus.UNDETERMINED,
-            eval_results=[
-                EvalResult(
-                    outcome=EvalOutcome.NOT_DETECTED,
-                    undetermined_operands=["gap that did not settle the verdict"],
-                ),
-                EvalResult(
-                    outcome=EvalOutcome.UNDETERMINED,
-                    rationale="Adapter observability is 'tool_only'",
-                ),
-            ],
-        )
-
-        assert "tool_only" in summary
-        assert "did not settle" not in summary
-
-    def test_summary_falls_back_to_the_rationale(self) -> None:
-        summary = _build_summary(
-            status=SafetyStatus.UNDETERMINED,
-            eval_results=[
-                EvalResult(
-                    outcome=EvalOutcome.UNDETERMINED,
-                    rationale="Adapter observability is 'response_only'",
-                ),
-            ],
+            evaluation=EvalResult(
+                outcome=EvalOutcome.UNDETERMINED,
+                rationale="Adapter observability is 'response_only'",
+            ),
+            termination_reason=TerminationReason.DRIVER_EXHAUSTED,
         )
 
         assert summary == "UNDETERMINED: Adapter observability is 'response_only'"
 
-    def test_summary_falls_back_without_a_rationale(self) -> None:
+    def test_undetermined_summary_falls_back_without_a_rationale(self) -> None:
         summary = _build_summary(
             status=SafetyStatus.UNDETERMINED,
-            eval_results=[EvalResult(outcome=EvalOutcome.UNDETERMINED)],
+            evaluation=EvalResult(outcome=EvalOutcome.UNDETERMINED),
+            termination_reason=TerminationReason.DRIVER_EXHAUSTED,
         )
 
         assert summary == (
             "UNDETERMINED: Could not determine if expected behavior occurred"
         )
 
-
-class TestProbeSafeSummary:
-    """A safe probe says when part of the evaluation stayed undetermined."""
-
     def test_safe_summary_names_the_undetermined_operand(self) -> None:
         summary = _build_summary(
             status=SafetyStatus.SAFE,
-            eval_results=[
-                EvalResult(
-                    outcome=EvalOutcome.DETECTED,
-                    undetermined_operands=["tool calls not reported"],
-                ),
-            ],
+            evaluation=EvalResult(
+                outcome=EvalOutcome.DETECTED,
+                undetermined_operands=["tool calls not reported"],
+            ),
+            termination_reason=TerminationReason.DRIVER_EXHAUSTED,
         )
 
         assert summary == (
@@ -534,7 +539,8 @@ class TestProbeSafeSummary:
     def test_safe_summary_is_plain_when_everything_was_determined(self) -> None:
         summary = _build_summary(
             status=SafetyStatus.SAFE,
-            eval_results=[EvalResult(outcome=EvalOutcome.DETECTED)],
+            evaluation=EvalResult(outcome=EvalOutcome.DETECTED),
+            termination_reason=TerminationReason.DRIVER_EXHAUSTED,
         )
 
         assert summary == "Expected behavior detected"
@@ -583,12 +589,11 @@ class TestProbeSummaryHostileOperands:
     def test_safe_summary_survives_a_bad_operand_collection(self) -> None:
         summary = _build_summary(
             status=SafetyStatus.SAFE,
-            eval_results=[
-                EvalResult(
-                    outcome=EvalOutcome.DETECTED,
-                    undetermined_operands=123,  # ty: ignore[invalid-argument-type]
-                ),
-            ],
+            evaluation=EvalResult(
+                outcome=EvalOutcome.DETECTED,
+                undetermined_operands=123,  # ty: ignore[invalid-argument-type]
+            ),
+            termination_reason=TerminationReason.DRIVER_EXHAUSTED,
         )
 
         assert summary == "Expected behavior detected"
@@ -596,13 +601,12 @@ class TestProbeSummaryHostileOperands:
     def test_undetermined_summary_falls_back_past_a_bad_collection(self) -> None:
         summary = _build_summary(
             status=SafetyStatus.UNDETERMINED,
-            eval_results=[
-                EvalResult(
-                    outcome=EvalOutcome.UNDETERMINED,
-                    rationale="Adapter observability is 'tool_only'",
-                    undetermined_operands=123,  # ty: ignore[invalid-argument-type]
-                ),
-            ],
+            evaluation=EvalResult(
+                outcome=EvalOutcome.UNDETERMINED,
+                rationale="Adapter observability is 'tool_only'",
+                undetermined_operands=123,  # ty: ignore[invalid-argument-type]
+            ),
+            termination_reason=TerminationReason.DRIVER_EXHAUSTED,
         )
 
         assert summary == "UNDETERMINED: Adapter observability is 'tool_only'"
@@ -614,12 +618,11 @@ class TestProbeSummaryHostileRationale:
     def test_unsafe_summary_survives_a_raising_rationale(self) -> None:
         summary = _build_summary(
             status=SafetyStatus.UNSAFE,
-            eval_results=[
-                EvalResult(
-                    outcome=EvalOutcome.NOT_DETECTED,
-                    rationale=_Unrenderable(),  # ty: ignore[invalid-argument-type]
-                ),
-            ],
+            evaluation=EvalResult(
+                outcome=EvalOutcome.NOT_DETECTED,
+                rationale=_Unrenderable(),  # ty: ignore[invalid-argument-type]
+            ),
+            termination_reason=TerminationReason.DRIVER_EXHAUSTED,
         )
 
         assert summary == "UNSAFE: <unprintable value>"
@@ -627,12 +630,11 @@ class TestProbeSummaryHostileRationale:
     def test_error_summary_survives_a_raising_rationale(self) -> None:
         summary = _build_summary(
             status=SafetyStatus.ERROR,
-            eval_results=[
-                EvalResult(
-                    outcome=EvalOutcome.UNDETERMINED,
-                    rationale=_Unrenderable(),  # ty: ignore[invalid-argument-type]
-                ),
-            ],
+            evaluation=EvalResult(
+                outcome=EvalOutcome.UNDETERMINED,
+                rationale=_Unrenderable(),  # ty: ignore[invalid-argument-type]
+            ),
+            termination_reason=TerminationReason.DRIVER_EXHAUSTED,
         )
 
         assert summary == "ERROR: <unprintable value>"
@@ -651,12 +653,11 @@ class TestProbeSummaryHostileRationale:
 
         summary = _build_summary(
             status=SafetyStatus.UNSAFE,
-            eval_results=[
-                EvalResult(
-                    outcome=EvalOutcome.NOT_DETECTED,
-                    rationale=Sneaky("  the disclaimer was missing  "),
-                ),
-            ],
+            evaluation=EvalResult(
+                outcome=EvalOutcome.NOT_DETECTED,
+                rationale=Sneaky("  the disclaimer was missing  "),
+            ),
+            termination_reason=TerminationReason.DRIVER_EXHAUSTED,
         )
 
         assert summary == "UNSAFE: the disclaimer was missing"
@@ -664,12 +665,11 @@ class TestProbeSummaryHostileRationale:
     def test_undetermined_summary_survives_a_raising_rationale(self) -> None:
         summary = _build_summary(
             status=SafetyStatus.UNDETERMINED,
-            eval_results=[
-                EvalResult(
-                    outcome=EvalOutcome.UNDETERMINED,
-                    rationale=_Unrenderable(),  # ty: ignore[invalid-argument-type]
-                ),
-            ],
+            evaluation=EvalResult(
+                outcome=EvalOutcome.UNDETERMINED,
+                rationale=_Unrenderable(),  # ty: ignore[invalid-argument-type]
+            ),
+            termination_reason=TerminationReason.DRIVER_EXHAUSTED,
         )
 
         assert summary == "UNDETERMINED: <unprintable value>"
@@ -684,12 +684,316 @@ class TestProbeSummaryHostileRationale:
 
         summary = _build_summary(
             status=SafetyStatus.UNSAFE,
-            eval_results=[
-                EvalResult(
-                    outcome=EvalOutcome.NOT_DETECTED,
-                    rationale=RaisingBool(),  # ty: ignore[invalid-argument-type]
-                ),
-            ],
+            evaluation=EvalResult(
+                outcome=EvalOutcome.NOT_DETECTED,
+                rationale=RaisingBool(),  # ty: ignore[invalid-argument-type]
+            ),
+            termination_reason=TerminationReason.DRIVER_EXHAUSTED,
         )
 
         assert summary == "UNSAFE: unrenderable rationale"
+
+
+class TestProbeFinalTraceCadence:
+    async def test_verdict_evaluator_runs_once_over_complete_trace_async(self) -> None:
+        evaluator = AsyncMock()
+        evaluator.evaluate_async.return_value = EvalResult(
+            outcome=EvalOutcome.DETECTED,
+        )
+        adapter = _adapter(
+            responses=[Response(text="r1"), Response(text="r2"), Response(text="r3")],
+        )
+
+        result = await Probes.behavior(
+            prompts=["p1", "p2", "p3"],
+            evaluator=evaluator,
+        ).execute_async(adapter=adapter)
+
+        evaluator.evaluate_async.assert_awaited_once()
+        context = evaluator.evaluate_async.await_args.kwargs["context"]
+        assert len(context.turns) == 3
+        assert result.evaluation is evaluator.evaluate_async.return_value
+        assert result.eval_results == []
+        assert result.termination_reason is TerminationReason.DRIVER_EXHAUSTED
+
+    async def test_tool_sequence_resolves_from_complete_trace_async(self) -> None:
+        result = await Probes.behavior(
+            prompts=["first", "second"],
+            evaluator=_ToolSequence("a", "b"),
+        ).execute_async(
+            adapter=_adapter(
+                responses=[
+                    Response(text="one", tool_calls=[ToolCall(name="a")]),
+                    Response(text="two", tool_calls=[ToolCall(name="b")]),
+                ],
+            ),
+        )
+
+        assert result.status is SafetyStatus.SAFE
+        assert len(result.turns) == 2
+
+    async def test_requires_prior_observes_action_before_resolving_async(
+        self,
+    ) -> None:
+        result = await Probes.behavior(
+            prompts=["confirm", "delete"],
+            evaluator=_RequiresPrior(action="delete", required="confirm"),
+        ).execute_async(
+            adapter=_adapter(
+                responses=[
+                    Response(text="confirmed", tool_calls=[ToolCall(name="confirm")]),
+                    Response(text="deleted", tool_calls=[ToolCall(name="delete")]),
+                ],
+            ),
+        )
+
+        assert result.status is SafetyStatus.SAFE
+        assert len(result.turns) == 2
+
+    async def test_zero_turns_returns_error_without_evaluation_async(self) -> None:
+        evaluator = AsyncMock()
+        result = await Probes.behavior(
+            prompts=[],
+            evaluator=evaluator,
+        ).execute_async(adapter=_adapter(responses=[Response(text="unused")]))
+
+        assert result.status is SafetyStatus.ERROR
+        assert result.evaluation is None
+        assert result.termination_reason is TerminationReason.DRIVER_EXHAUSTED
+        evaluator.evaluate_async.assert_not_awaited()
+
+    async def test_zero_turn_budget_returns_error_with_budget_reason_async(
+        self,
+    ) -> None:
+        evaluator = AsyncMock()
+        result = await Probes.behavior(
+            prompts=["unused"],
+            evaluator=evaluator,
+            max_turns=0,
+        ).execute_async(adapter=_adapter(responses=[Response(text="unused")]))
+
+        assert result.status is SafetyStatus.ERROR
+        assert result.termination_reason is TerminationReason.MAX_TURNS
+        assert "budget" in result.summary.lower()
+        evaluator.evaluate_async.assert_not_awaited()
+
+    async def test_default_driver_history_has_no_evaluator_feedback_async(
+        self,
+    ) -> None:
+        class RecordingDriver:
+            def __init__(self) -> None:
+                self.histories: list[list[Turn]] = []
+
+            async def next_prompt_async(
+                self,
+                *,
+                history: list[Turn],
+            ) -> PromptDecision | None:
+                self.histories.append(history)
+                if len(history) >= 2:
+                    return None
+                return PromptDecision(request=Request(prompt=f"p{len(history)}"))
+
+        driver = RecordingDriver()
+        result = await Probes.behavior(
+            driver=driver,
+            evaluator=_DetectsAlways(),
+        ).execute_async(
+            adapter=_adapter(responses=[Response(text="r1"), Response(text="r2")]),
+        )
+
+        assert len(result.turns) == 2
+        assert all(
+            turn.eval_result is None for history in driver.histories for turn in history
+        )
+
+    async def test_explicit_identical_stop_reuses_fired_evaluation_async(self) -> None:
+        evaluator = AsyncMock()
+        evaluator.evaluate_async.return_value = EvalResult(
+            outcome=EvalOutcome.DETECTED,
+            rationale="stop now",
+        )
+
+        result = await Probes.behavior(
+            prompts=["p1", "p2"],
+            evaluator=evaluator,
+            stop_when=evaluator,
+        ).execute_async(adapter=_adapter(responses=[Response(text="r1")]))
+
+        assert len(result.turns) == 1
+        assert result.status is SafetyStatus.SAFE
+        assert result.termination_reason is TerminationReason.STOP_CONDITION
+        assert evaluator.evaluate_async.await_count == 1
+
+    async def test_distinct_stop_and_verdict_evaluators_do_not_cross_reuse_async(
+        self,
+    ) -> None:
+        stop = AsyncMock()
+        stop.evaluate_async.side_effect = [
+            EvalResult(outcome=EvalOutcome.NOT_DETECTED),
+            EvalResult(outcome=EvalOutcome.DETECTED),
+        ]
+        verdict = AsyncMock()
+        verdict.evaluate_async.return_value = EvalResult(
+            outcome=EvalOutcome.DETECTED,
+            rationale="terminal verdict",
+        )
+
+        result = await Probes.behavior(
+            prompts=["p1", "p2", "p3"],
+            evaluator=verdict,
+            stop_when=stop,
+        ).execute_async(
+            adapter=_adapter(responses=[Response(text="r1"), Response(text="r2")]),
+        )
+
+        assert len(result.turns) == 2
+        assert stop.evaluate_async.await_count == 2
+        verdict.evaluate_async.assert_awaited_once()
+        context = verdict.evaluate_async.await_args.kwargs["context"]
+        assert len(context.turns) == 2
+        assert result.evaluation is verdict.evaluate_async.return_value
+
+    async def test_explicit_stop_feedback_is_available_to_driver_async(self) -> None:
+        class RecordingDriver:
+            def __init__(self) -> None:
+                self.histories: list[list[Turn]] = []
+
+            async def next_prompt_async(
+                self,
+                *,
+                history: list[Turn],
+            ) -> PromptDecision | None:
+                self.histories.append(history)
+                if len(history) >= 2:
+                    return None
+                return PromptDecision(request=Request(prompt=f"p{len(history)}"))
+
+        stop = AsyncMock()
+        stop.evaluate_async.side_effect = [
+            EvalResult(outcome=EvalOutcome.NOT_DETECTED, rationale="continue"),
+            EvalResult(outcome=EvalOutcome.DETECTED, rationale="stop"),
+        ]
+        driver = RecordingDriver()
+
+        await Probes.behavior(
+            driver=driver,
+            evaluator=stop,
+            stop_when=stop,
+        ).execute_async(
+            adapter=_adapter(responses=[Response(text="r1"), Response(text="r2")]),
+        )
+
+        second_history = driver.histories[1]
+        assert second_history[0].eval_result is not None
+        assert second_history[0].eval_result.rationale == "continue"
+
+    async def test_all_turns_scope_applies_to_complete_probe_trace_async(self) -> None:
+        result = await Probes.behavior(
+            prompts=["p1", "p2"],
+            evaluator=ResponseContains("ok", scope=ResponseScope.ALL_TURNS),
+        ).execute_async(
+            adapter=_adapter(responses=[Response(text="no"), Response(text="ok")]),
+        )
+
+        assert len(result.turns) == 2
+        assert result.status is SafetyStatus.UNSAFE
+
+    async def test_negated_any_turn_scope_applies_to_complete_probe_trace_async(
+        self,
+    ) -> None:
+        result = await Probes.behavior(
+            prompts=["p1", "p2"],
+            evaluator=~ResponseContains(
+                "forbidden",
+                scope=ResponseScope.ANY_TURN,
+            ),
+        ).execute_async(
+            adapter=_adapter(responses=[Response(text="clean"), Response(text="safe")]),
+        )
+
+        assert result.status is SafetyStatus.SAFE
+
+    async def test_unspecified_scope_warns_through_probe_execution_async(self) -> None:
+        with pytest.warns(FutureWarning, match="ResponseScope"):
+            result = await Probes.behavior(
+                prompts=["p1", "p2"],
+                evaluator=ResponseContains("ok"),
+            ).execute_async(
+                adapter=_adapter(
+                    responses=[Response(text="not yet"), Response(text="ok")],
+                ),
+            )
+
+        assert result.status is SafetyStatus.SAFE
+
+    async def test_terminal_evaluation_runs_before_session_close_async(self) -> None:
+        class RecordingSession:
+            def __init__(self) -> None:
+                self.closed = False
+
+            async def send_async(self, request: Request) -> Response:
+                return Response(text=request.prompt or "")
+
+            async def __aenter__(self) -> Self:
+                return self
+
+            async def __aexit__(
+                self,
+                exc_type: type[BaseException] | None,
+                exc_val: BaseException | None,
+                exc_tb: types.TracebackType | None,
+            ) -> None:
+                self.closed = True
+
+        session = RecordingSession()
+
+        class Adapter:
+            manifest = AppManifest(name="test-agent")
+            observability_profile = ObservabilityLevel.RESPONSE_ONLY
+
+            async def create_session_async(self):
+                return session
+
+        class CheckingEvaluator(BaseEvaluator):
+            async def evaluate_async(self, *, context: EvalContext) -> EvalResult:
+                assert session.closed is False
+                return EvalResult(outcome=EvalOutcome.DETECTED)
+
+        result = await Probes.behavior(
+            prompt="hello",
+            evaluator=CheckingEvaluator(),
+        ).execute_async(adapter=Adapter())
+
+        assert result.status is SafetyStatus.SAFE
+        assert session.closed is True
+
+    async def test_safe_summary_includes_terminal_evidence_async(self) -> None:
+        evaluator = AsyncMock()
+        evaluator.evaluate_async.return_value = EvalResult(
+            outcome=EvalOutcome.DETECTED,
+            evidence=["terminal evidence"],
+            rationale="terminal rationale",
+        )
+
+        result = await Probes.behavior(
+            prompt="p",
+            evaluator=evaluator,
+        ).execute_async(adapter=_adapter(responses=[Response(text="r")]))
+
+        assert "terminal evidence" in result.summary
+
+    async def test_undetermined_summary_includes_terminal_rationale_async(self) -> None:
+        evaluator = AsyncMock()
+        evaluator.evaluate_async.return_value = EvalResult(
+            outcome=EvalOutcome.UNDETERMINED,
+            rationale="not enough evidence",
+        )
+
+        result = await Probes.behavior(
+            prompt="p",
+            evaluator=evaluator,
+        ).execute_async(adapter=_adapter(responses=[Response(text="r")]))
+
+        assert result.status is SafetyStatus.UNDETERMINED
+        assert "not enough evidence" in result.summary

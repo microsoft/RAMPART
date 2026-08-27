@@ -121,6 +121,63 @@ ResponseContains(re.compile(r"ssh-rsa\s+[A-Za-z0-9+/]+"))
 ResponseContains(lambda text: "secret" in text.lower())
 ```
 
+#### Temporal Scope
+
+By default, `ResponseContains` inspects only the current response. For a
+multi-turn transcript, pass an explicit
+[`ResponseScope`][rampart.evaluators.response_contains.ResponseScope]:
+
+```python
+from rampart.evaluators import ResponseContains, ResponseScope
+
+# Detect if the pattern appeared at any point in the conversation
+ResponseContains("id_rsa", scope=ResponseScope.ANY_TURN)
+
+# Detect only if every response contained the pattern
+ResponseContains("Paris", scope=ResponseScope.ALL_TURNS)
+
+# Inspect only the latest response and ignore earlier turns
+ResponseContains("id_rsa", scope=ResponseScope.CURRENT_TURN)
+```
+
+| Existing use | Intended meaning | Explicit form |
+|---|---|---|
+| attack, `ResponseContains(p)` | some turn contains `p` | `ResponseContains(p, scope=ResponseScope.ANY_TURN)` |
+| attack, `~ResponseContains(p)` | some turn does not contain `p` | `~ResponseContains(p, scope=ResponseScope.ALL_TURNS)` |
+| probe, `ResponseContains(p)` | every turn contains `p` | `ResponseContains(p, scope=ResponseScope.ALL_TURNS)` |
+| probe, `~ResponseContains(p)` | no turn contains `p` | `~ResponseContains(p, scope=ResponseScope.ANY_TURN)` |
+
+!!! warning "Migration"
+    Evaluating an unspecified scope over more than one turn emits a
+    `FutureWarning`. Single-turn evaluation is unchanged. Pass
+    `ResponseScope.CURRENT_TURN` explicitly when latest-response behavior is
+    intentional.
+
+    Scope quantifies only the turns present in the evaluator's `EvalContext`.
+    It does not control how many turns an execution produces or whether an
+    execution stops early.
+
+    Probes evaluate their verdict once over the completed trace unless an
+    explicit `stop_when` ends the scenario. Attack cadence is documented in
+    the attack guide.
+
+#### How Each Evaluator Sees the Transcript
+
+Built-in evaluators reach their temporal behavior in two ways. Quantifying
+evaluators compute deterministic matches across turns. Windowing evaluators
+choose how much transcript to give a judge that returns one holistic verdict.
+
+| Evaluator | Mechanism | Default | Configurable via |
+|---|---|---|---|
+| `ToolCalled` | quantifies (`ANY_TURN`) | any turn | — |
+| `SideEffectOccurred` | quantifies (`ANY_TURN`) | any turn | — |
+| `ResponseContains` | quantifies | current turn | `ResponseScope` |
+| `LLMJudge` | windows | full transcript | `TranscriptScope` |
+
+`ResponseScope.CURRENT_TURN` and `TranscriptScope.CURRENT_TURN` both select
+the last turn, but they belong to different enums and are not interchangeable.
+Pass the scope type declared by the evaluator you are configuring.
+
 ### [`SideEffectOccurred`][rampart.evaluators.side_effect.SideEffectOccurred] — Detect Side Effects
 
 ```python
@@ -178,6 +235,10 @@ judge = LLMJudge(
     scope=TranscriptScope.CURRENT_TURN,
 )
 ```
+
+Use `TranscriptScope.FULL` when evidence from any earlier turn must affect the
+verdict. `CURRENT_TURN` intentionally gives the judge only the latest response.
+Like `ResponseScope`, it does not control how many turns an execution produces.
 
 **Custom persona.** The default judge identity is [`NEUTRAL_EVALUATOR`][rampart.evaluators.personas.NEUTRAL_EVALUATOR] — an impartial, literal evaluator. Override it when a different lens is useful:
 

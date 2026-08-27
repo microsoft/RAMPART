@@ -195,6 +195,20 @@ Worker payloads cross a process boundary via `execnet` and may contain attacker-
 - **Terminal/log injection** — ANSI escape sequences are stripped from free-form text at the deserialization boundary.
 - **Path traversal** — worker-local artifact paths are stored as opaque strings in metadata; the controller never accesses worker files.
 
+### Schema Evolution
+
+The streamed xdist transport uses the `rampart.xdist.v2` schema.
+Workers include their installed RAMPART package version for diagnostics. A
+different controller version emits a warning because optional evidence may not
+be available across remote `--tx` gateways.
+
+Core semantic fields remain fail-closed: unknown schema versions, safety
+statuses, observability levels, and evaluator outcomes reject the worker
+payload. Additive display fields such as turn evaluation role and termination
+reason are lenient; an unknown value warns and becomes `None` while preserving
+the core verdict. Version 2 envelopes that predate package-version diagnostics
+or omit the new optional fields remain valid; version 1 payloads are rejected.
+
 ### Size cap
 
 The default 16 MiB cap can be overridden via the pytest CLI option or an ini setting:
