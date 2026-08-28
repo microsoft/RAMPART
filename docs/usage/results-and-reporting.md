@@ -87,7 +87,9 @@ from rampart.reporting import JsonFileReportSink
 sink = JsonFileReportSink(output_dir=Path(".report"))
 ```
 
-Output: `.report/run_report_2026-04-25T14-30-00.json`
+Output: `.report/run_report_2026-04-25T14-30-00-123_a3f18c92654d4b75ad15687d383d951b.json`
+
+The filename contains a UTC timestamp (millisecond precision) and a random UUID. Reports created in the same millisecond receive different filenames. An exact filename collision raises `FileExistsError` instead of overwriting an existing report. Reports written within the same millisecond have no defined filename order relative to each other.
 
 ### Custom Sinks
 

@@ -31,6 +31,7 @@ import dataclasses
 import json
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
+from uuid import uuid4
 
 from rampart.common.text import safe_float, safe_str, safe_str_list
 
@@ -45,16 +46,14 @@ if TYPE_CHECKING:
 class JsonFileReportSink:
     """Writes the test run report to a JSON file.
 
-    Each run produces a timestamped file:
-    ``<output_dir>/run_report_2026-03-19T21-30-00.json``
-    If that name already exists, the sink appends ``_1``, ``_2``, and so on.
+    Each run produces a file named ``run_report_<timestamp>_<uuid>.json``.
+    The UTC timestamp includes milliseconds; the UUID distinguishes runs
+    created in the same millisecond. Existing files are never overwritten.
 
     Args:
         output_dir (Path): Directory to write report files into.
             Created automatically if it does not exist.
     """
-
-    _MAX_FILENAME_ATTEMPTS: int = 1000
 
     def __init__(self, *, output_dir: Path) -> None:
         """Initialize with an output directory for report files."""
@@ -67,39 +66,17 @@ class JsonFileReportSink:
             report (TestRunReport): The aggregated test run results.
 
         Raises:
-            FileExistsError: If no collision-free filename can be reserved.
+            FileExistsError: If the generated filename already exists, or
+                ``output_dir`` exists and is not a directory.
         """
         self._output_dir.mkdir(parents=True, exist_ok=True)
 
-        timestamp = datetime.now(UTC).strftime("%Y-%m-%dT%H-%M-%S")
+        timestamp = datetime.now(UTC).strftime("%Y-%m-%dT%H-%M-%S-%f")[:-3]
+        filepath = self._output_dir / f"run_report_{timestamp}_{uuid4().hex}.json"
         data = self._serialize_report(report)
-        self._write_report_file(
-            stem=f"run_report_{timestamp}",
-            content=json.dumps(data, indent=2, default=str),
-        )
-
-    def _write_report_file(self, *, stem: str, content: str) -> None:
-        """Write a report without replacing an existing file.
-
-        Args:
-            stem (str): Filename without a collision suffix or extension.
-            content (str): Serialized report content.
-
-        Raises:
-            FileExistsError: If every collision suffix is already in use.
-        """
-        for suffix in range(self._MAX_FILENAME_ATTEMPTS):
-            suffix_text = "" if suffix == 0 else f"_{suffix}"
-            filepath = self._output_dir / f"{stem}{suffix_text}.json"
-            try:
-                report_file = filepath.open("x", encoding="utf-8")
-            except FileExistsError:
-                continue
-            with report_file:
-                report_file.write(content)
-            return
-        msg = f"Unable to reserve a report filename for {stem!r}"
-        raise FileExistsError(msg)
+        content = json.dumps(data, indent=2, default=str)
+        with filepath.open("x", encoding="utf-8") as report_file:
+            report_file.write(content)
 
     def _serialize_report(self, report: TestRunReport) -> dict[str, Any]:
         """Convert a TestRunReport to a JSON-serializable dict.
