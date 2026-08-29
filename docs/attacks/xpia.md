@@ -226,7 +226,7 @@ See [`Attacks.xpia()`][rampart.attacks.Attacks.xpia] for the full API reference.
 | `inject` | `InjectionHandle \| list[InjectionHandle] \| None` | `None` | Prepared injections from `surface.inject()`. `None` for inline XPIA. |
 | `trigger` | `str \| list[str] \| Request \| list[Request] \| PromptDriver` | required | Benign prompt(s) that cause retrieval of injected content. |
 | `evaluator` | [`Evaluator`][rampart.core.evaluator.Evaluator] | required | What attack condition to detect. |
-| `max_turns` | `int` | `5` | Maximum prompt-response exchanges before `ERROR`. |
+| `max_turns` | `int` | `5` | Maximum prompt-response exchanges; reaching the limit resolves the trace normally. |
 | `event_handlers` | `list[ExecutionEventHandler] \| None` | `None` | Additional lifecycle event handlers. |
 
 ---

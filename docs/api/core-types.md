@@ -14,6 +14,8 @@ Data types shared across the entire framework. All importable from `rampart` dir
         - ToolCall
         - SideEffect
         - Turn
+        - EvaluationRole
+        - TerminationReason
         - EvalOutcome
         - EvalResult
         - EvalContext
@@ -28,6 +30,8 @@ Data types shared across the entire framework. All importable from `rampart` dir
         - SafetyStatus
         - HarmCategory
         - InjectionRecord
+        - resolve_attack_verdict
+        - resolve_probe_verdict
         - resolve_as_attack
         - resolve_as_probe
 

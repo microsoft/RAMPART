@@ -92,7 +92,7 @@ See [`Probes.behavior()`][rampart.probes.Probes.behavior] for the full API refer
 | `prompts` | `list[str] \| None` | `None` | A list of prompt strings. |
 | `driver` | [`PromptDriver`][rampart.core.prompt_driver.PromptDriver] `\| None` | `None` | A pre-built prompt driver. |
 | `evaluator` | [`Evaluator`][rampart.core.evaluator.Evaluator] | required | What behavior to detect. |
-| `max_turns` | `int` | `25` | Maximum exchanges before `ERROR`. |
+| `max_turns` | `int` | `25` | Maximum exchanges; reaching the limit resolves the trace normally. |
 
 !!! warning
     Provide exactly one of `prompt`, `prompts`, or `driver`. Providing more than one or none raises `ValueError`.
