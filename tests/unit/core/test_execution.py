@@ -377,6 +377,7 @@ class TestEvaluateTurnAsync:
 
         assert turn.eval_result is not None
         assert turn.eval_result.outcome is EvalOutcome.DETECTED
+        assert turn.eval_role is None
         assert turn.request.prompt == "hello"
         assert turn.response.text == "world"
         assert turn.turn_number == 0

@@ -23,11 +23,13 @@ from rampart.core.result import (
 from rampart.core.types import (
     EvalOutcome,
     EvalResult,
+    EvaluationRole,
     ObservabilityLevel,
     PayloadFormat,
     Request,
     Response,
     SideEffect,
+    TerminationReason,
     ToolCall,
     Turn,
 )
@@ -92,6 +94,7 @@ def _make_turn(
     prompt: str = "hi",
     text: str = "ok",
     eval_result: EvalResult | None = None,
+    eval_role: EvaluationRole | None = None,
     turn_number: int = 0,
     timestamp: datetime | None = None,
     driver_reasoning: str = "",
@@ -100,6 +103,7 @@ def _make_turn(
         request=Request(prompt=prompt),
         response=Response(text=text),
         eval_result=eval_result,
+        eval_role=eval_role,
         turn_number=turn_number,
         timestamp=timestamp,
         driver_reasoning=driver_reasoning,
@@ -352,6 +356,8 @@ class TestSerializationRoundTrip:
         assert outcome is EvalOutcome.NOT_DETECTED
         assert recovered["n"][0].turns[0].eval_result.evidence == ["e1", "e2"]
 
+
+class TestSerializationDetails:
     def test_a_hostile_evidence_value_does_not_lose_the_payload(self) -> None:
         class Boom:
             def __iter__(self) -> object:
@@ -489,6 +495,100 @@ class TestSerializationRoundTrip:
         assert recovered is not None
         assert math.isnan(recovered.confidence)
 
+    def test_final_evaluation_and_execution_metadata_round_trip(self) -> None:
+        final = _make_eval_result(
+            evidence=["\x1b[31mterminal evidence\x1b[0m"],
+            rationale="\x1b[31mterminal rationale\x1b[0m",
+        )
+        turn = _make_turn(
+            eval_result=_make_eval_result(),
+            eval_role=EvaluationRole.STOP_CONDITION,
+        )
+        result = _make_result(
+            turns=[turn],
+        )
+        result.evaluation = final
+        result.termination_reason = TerminationReason.STOP_CONDITION
+        payload = _serialize_session_results(
+            session=_make_session_with_results(results_by_nodeid={"n": [result]}),
+        )
+
+        assert payload["rampart_version"]
+        recovered = _deserialize_report_results(data=payload)["n"][0]
+        assert recovered.evaluation is not None
+        assert recovered.evaluation.evidence == ["terminal evidence"]
+        assert recovered.evaluation.rationale == "terminal rationale"
+        assert recovered.termination_reason is TerminationReason.STOP_CONDITION
+        assert recovered.turns[0].eval_role is EvaluationRole.STOP_CONDITION
+
+    def test_payload_without_additive_fields_defaults_to_none(self) -> None:
+        payload: dict[str, Any] = {
+            "schema": SCHEMA_VERSION,
+            "nodeid": "n",
+            "results": [
+                {
+                    "status": "safe",
+                    "summary": "legacy",
+                    "observability_level": "response_only",
+                },
+            ],
+        }
+
+        recovered = _deserialize_report_results(data=payload)["n"][0]
+        assert recovered.evaluation is None
+        assert recovered.termination_reason is None
+
+    def test_unknown_additive_keys_are_ignored(self) -> None:
+        payload: dict[str, Any] = {
+            "schema": SCHEMA_VERSION,
+            "nodeid": "n",
+            "future_top_level": True,
+            "results": [
+                {
+                    "status": "safe",
+                    "summary": "future compatible",
+                    "observability_level": "response_only",
+                    "future_result_field": {"value": 1},
+                    "turns": [
+                        {
+                            "request": {"prompt": "p"},
+                            "response": {"text": "r"},
+                            "future_turn_field": [1, 2, 3],
+                        },
+                    ],
+                },
+            ],
+        }
+
+        recovered = _deserialize_report_results(data=payload)["n"][0]
+        assert recovered.status is SafetyStatus.SAFE
+        assert recovered.turns[0].response.text == "r"
+
+    @pytest.mark.parametrize("confidence", [None, float("nan"), float("inf")])
+    def test_invalid_final_confidence_stays_non_finite(
+        self,
+        confidence: object,
+    ) -> None:
+        payload: dict[str, Any] = {
+            "schema": SCHEMA_VERSION,
+            "nodeid": "n",
+            "results": [
+                {
+                    "status": "unsafe",
+                    "summary": "x",
+                    "observability_level": "response_only",
+                    "evaluation": {
+                        "outcome": "detected",
+                        "confidence": confidence,
+                    },
+                },
+            ],
+        }
+
+        evaluation = _deserialize_report_results(data=payload)["n"][0].evaluation
+        assert evaluation is not None
+        assert math.isnan(evaluation.confidence)
+
     def test_datetime_round_trip(self) -> None:
         when = datetime(2026, 1, 1, 12, 0, 0, tzinfo=UTC)
         turn = _make_turn(timestamp=when)
@@ -615,6 +715,78 @@ class TestDeserializationValidation:
         }
         with pytest.raises(WorkerOutputError, match="Unknown ObservabilityLevel"):
             deserialize_report_data(data=payload, report_nodeid="n")
+
+    @pytest.mark.parametrize(
+        ("field", "value"),
+        [
+            ("termination_reason", "future_reason"),
+            ("eval_role", "future_role"),
+            ("termination_reason", {"future": True}),
+            ("eval_role", ["future_role"]),
+        ],
+    )
+    def test_unknown_display_enum_warns_and_deserializes_to_none(
+        self,
+        field: str,
+        value: str,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        turn: dict[str, Any] = {
+            "request": {"prompt": "p"},
+            "response": {"text": "r"},
+        }
+        result_data: dict[str, Any] = {
+            "status": "safe",
+            "summary": "x",
+            "observability_level": "response_only",
+            "turns": [turn],
+        }
+        (turn if field == "eval_role" else result_data)[field] = value
+        payload = {
+            "schema": SCHEMA_VERSION,
+            "nodeid": "n",
+            "results": [result_data],
+        }
+
+        with caplog.at_level(logging.WARNING):
+            recovered = _deserialize_report_results(data=payload)["n"][0]
+
+        assert recovered.termination_reason is None
+        assert recovered.turns[0].eval_role is None
+        assert any(repr(value) in record.getMessage() for record in caplog.records)
+
+    def test_package_version_mismatch_warns(
+        self,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        payload: dict[str, Any] = {
+            "schema": SCHEMA_VERSION,
+            "rampart_version": "0.0.0-other",
+            "nodeid": "n",
+            "results": [],
+        }
+
+        with caplog.at_level(logging.WARNING):
+            deserialize_report_data(data=payload, report_nodeid="n")
+
+        assert any("0.0.0-other" in record.getMessage() for record in caplog.records)
+
+    def test_missing_package_version_does_not_warn(
+        self,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        payload: dict[str, Any] = {
+            "schema": SCHEMA_VERSION,
+            "nodeid": "n",
+            "results": [],
+        }
+
+        with caplog.at_level(logging.WARNING):
+            deserialize_report_data(data=payload, report_nodeid="n")
+
+        assert not any(
+            "package version" in record.getMessage() for record in caplog.records
+        )
 
 
 class TestDeserializationSecurity:
