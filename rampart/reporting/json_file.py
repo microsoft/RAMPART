@@ -46,9 +46,10 @@ if TYPE_CHECKING:
 class JsonFileReportSink:
     """Writes the test run report to a JSON file.
 
-    Each run produces a file named ``run_report_<timestamp>_<uuid>.json``.
-    The UTC timestamp includes milliseconds; the UUID distinguishes runs
-    created in the same millisecond. Existing files are never overwritten.
+    Each run normally produces a file named ``run_report_<timestamp>.json``.
+    The UTC timestamp includes milliseconds. If that filename already exists,
+    a UUID suffix distinguishes the colliding run. Existing files are never
+    overwritten.
 
     Args:
         output_dir (Path): Directory to write report files into.
@@ -66,16 +67,29 @@ class JsonFileReportSink:
             report (TestRunReport): The aggregated test run results.
 
         Raises:
-            FileExistsError: If the generated filename already exists, or
+            FileExistsError: If the random fallback filename also exists, or
                 ``output_dir`` exists and is not a directory.
         """
         self._output_dir.mkdir(parents=True, exist_ok=True)
 
         timestamp = datetime.now(UTC).strftime("%Y-%m-%dT%H-%M-%S-%f")[:-3]
-        filepath = self._output_dir / f"run_report_{timestamp}_{uuid4().hex}.json"
         data = self._serialize_report(report)
         content = json.dumps(data, indent=2, default=str)
-        with filepath.open("x", encoding="utf-8") as report_file:
+
+        filepath = self._output_dir / f"run_report_{timestamp}.json"
+        try:
+            report_file = filepath.open("x", encoding="utf-8")
+        except FileExistsError:
+            filepath = self._output_dir / f"run_report_{timestamp}_{uuid4().hex}.json"
+
+            # Leave the exception handler before opening the fallback so a
+            # second collision reports only the path that actually collided.
+            report_file = None
+
+        if report_file is None:
+            report_file = filepath.open("x", encoding="utf-8")
+
+        with report_file:
             report_file.write(content)
 
     def _serialize_report(self, report: TestRunReport) -> dict[str, Any]:

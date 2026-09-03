@@ -388,14 +388,21 @@ class TestEmitAsync:
             json.loads(path.read_text(encoding="utf-8"))["metadata"]["run"]
             for path in files
         } == {0, 1, 2}
-        for path in files:
+
+        concise = tmp_path / "run_report_2026-08-27T12-00-00-123.json"
+        assert json.loads(concise.read_text(encoding="utf-8"))["metadata"] == {
+            "run": 0,
+        }
+        colliding_files = [path for path in files if path != concise]
+        assert len(colliding_files) == 2
+        for path in colliding_files:
             assert path.name.startswith("run_report_2026-08-27T12-00-00-123_")
             identifier = path.stem.rsplit("_", 1)[1]
             assert len(identifier) == 32
             assert UUID(hex=identifier).version == 4
 
     async def test_existing_report_is_not_replaced_async(self, tmp_path: Path) -> None:
-        original = tmp_path / "run_report_2026-08-27T12-00-00.json"
+        original = tmp_path / "run_report_2026-08-27T12-00-00-000.json"
         original.write_text("keep me", encoding="utf-8")
         sink = JsonFileReportSink(output_dir=tmp_path)
         fixed = datetime(2026, 8, 27, 12, 0, 0, tzinfo=UTC)
@@ -416,10 +423,12 @@ class TestEmitAsync:
         tmp_path: Path,
     ) -> None:
         identifier = UUID("a3f18c92-654d-4b75-ad15-687d383d951b")
-        original = (
+        timestamp_file = tmp_path / "run_report_2026-08-27T12-00-00-000.json"
+        timestamp_file.write_text("keep timestamp", encoding="utf-8")
+        uuid_file = (
             tmp_path / f"run_report_2026-08-27T12-00-00-000_{identifier.hex}.json"
         )
-        original.write_text("keep me", encoding="utf-8")
+        uuid_file.write_text("keep uuid", encoding="utf-8")
         sink = JsonFileReportSink(output_dir=tmp_path)
         fixed = datetime(2026, 8, 27, 12, 0, 0, tzinfo=UTC)
 
@@ -431,8 +440,9 @@ class TestEmitAsync:
             with pytest.raises(FileExistsError, match=identifier.hex):
                 await sink.emit_async(report=TestRunReport())
 
-        assert original.read_text(encoding="utf-8") == "keep me"
-        assert list(tmp_path.glob("run_report_*.json")) == [original]
+        assert timestamp_file.read_text(encoding="utf-8") == "keep timestamp"
+        assert uuid_file.read_text(encoding="utf-8") == "keep uuid"
+        assert set(tmp_path.glob("run_report_*.json")) == {timestamp_file, uuid_file}
 
     async def test_serialization_failure_does_not_create_a_file_async(
         self,
