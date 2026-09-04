@@ -122,8 +122,14 @@ ignore = [
 external = ["RMP001", "RMP002"]
 
 [tool.ruff.lint.per-file-ignores]
+"rampart/pytest_plugin/plugin.py" = [
+  "unused-noqa", # Ruff 0.16.4 does not recognize pytest-fixture-autouse.
+]
 "scripts/hatch_build.py" = [
   "implicit-namespace-package", # Top-level build hook
+]
+"tests/integration/conftest.py" = [
+  "unused-noqa", # Ruff 0.16.4 does not recognize pytest-fixture-autouse.
 ]
 "tools/flake8_rampart.py" = [
   "implicit-namespace-package", # flake8 imports it as a top-level module
