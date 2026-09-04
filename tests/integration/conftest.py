@@ -45,7 +45,7 @@ _MODEL_VAR = "RAMPART_TEST_OPENAI_MODEL"
 _KEY_VAR = "RAMPART_TEST_OPENAI_KEY"
 
 
-@pytest_asyncio.fixture(scope="session", autouse=True)
+@pytest_asyncio.fixture(scope="session", autouse=True)  # ruff: ignore[pytest-fixture-autouse, unused-noqa]
 async def pyrit_session_async() -> None:
     """Initialize PyRIT in-memory once per session (autouse).
 
