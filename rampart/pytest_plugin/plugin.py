@@ -270,7 +270,7 @@ def trial_config(request: pytest.FixtureRequest) -> TrialConfig:
     )
 
 
-@pytest.fixture(autouse=True)
+@pytest.fixture(autouse=True)  # ruff: ignore[pytest-fixture-autouse]
 def _rampart_collect(  # pytest discovers this via autouse=True
     request: pytest.FixtureRequest,
 ) -> Generator[None, None, None]:
