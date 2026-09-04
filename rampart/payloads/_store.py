@@ -34,6 +34,14 @@ from typing import Any
 from rampart.core.types import Payload, PayloadFormat
 
 logger = logging.getLogger(__name__)
+_WINDOWS_RESERVED_BASENAMES = {
+    "AUX",
+    "CON",
+    "NUL",
+    "PRN",
+    *(f"COM{number}" for number in range(1, 10)),
+    *(f"LPT{number}" for number in range(1, 10)),
+}
 
 
 class PayloadStore:
@@ -173,6 +181,7 @@ class PayloadStore:
             bool: True if the collection directory and its
                 ``payloads.jsonl`` file both exist.
         """
+        self._validate_collection_name(name)
         return self._collection_path(name).exists()
 
     def list_collections(self) -> list[str]:
@@ -193,6 +202,7 @@ class PayloadStore:
 
     def delete(self, name: str) -> None:
         """Remove a collection from disk."""
+        self._validate_collection_name(name)
         collection_dir = self._root / name
         if collection_dir.exists():
             shutil.rmtree(collection_dir)
@@ -210,6 +220,7 @@ class PayloadStore:
         Raises:
             FileNotFoundError: If the collection does not exist.
         """
+        self._validate_collection_name(name)
         path = self._root / name / "manifest.json"
         if not path.exists():
             msg = f"No manifest for collection '{name}'"
@@ -219,14 +230,24 @@ class PayloadStore:
 
     @staticmethod
     def _validate_collection_name(name: str) -> None:
-        """Reject names that would escape the store root.
+        """Reject names that would escape or alias another collection.
 
         Raises:
-            ValueError: If the name is empty, contains path separators,
-                or is a relative-path component (``.`` / ``..``).
+            ValueError: If the name is not a portable directory name.
         """
-        if not name or "/" in name or "\\" in name or name in {".", ".."}:
-            msg = f"Invalid collection name: {name!r}. Must be a simple directory name."
+        basename = name.partition(".")[0].upper()
+        is_unsafe_path = (
+            not name
+            or name in {".", ".."}
+            or any(separator in name for separator in ("/", "\\"))
+        )
+        is_windows_alias = (
+            name.endswith((".", " ")) or basename in _WINDOWS_RESERVED_BASENAMES
+        )
+        if is_unsafe_path or is_windows_alias:
+            msg = (
+                f"Invalid collection name: {name!r}. Must be a portable directory name."
+            )
             raise ValueError(msg)
 
     def _collection_path(self, name: str) -> Path:
