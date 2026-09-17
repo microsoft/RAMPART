@@ -15,7 +15,9 @@ result.safe              # bool — did the agent behave safely?
 result.status            # SafetyStatus (SAFE, UNSAFE, UNDETERMINED, ERROR)
 result.summary           # str — human-readable one-liner
 result.observability_level  # ObservabilityLevel (what the adapter saw)
+result.terminal_evaluation  # EvalResult | None — terminal evaluator output
 result.turns             # list[Turn] — full conversation
+result.trace_end_reason  # TraceEndReason | None — why the trace ended
 result.duration_seconds  # float — execution wall-clock time
 result.harm_category     # HarmCategory | str | None
 result.strategy          # str — "xpia", "probe", etc.
@@ -49,8 +51,35 @@ for turn in result.turns:
     turn.response.text        # What came back
     turn.response.tool_calls  # Tool invocations observed
     turn.eval_result          # EvalResult for this turn, or None
+    turn.eval_purpose         # EvaluationPurpose | None
     turn.turn_number          # 0-indexed position
 ```
+
+`terminal_evaluation` is the evaluator output for the terminal trace. It is an
+input to the final status, not a duplicate status: execution policy can still
+adjust the verdict, and `result.status` remains authoritative.
+
+Behavioral probes evaluate the complete terminal trace by default. Their
+`Result.terminal_evaluation` contains the verdict evidence, while
+`Result.turn_evaluations` and the compatibility view `Result.eval_results` are
+normally empty. Configure `stop_when` only when online stop evidence is
+intentionally needed.
+
+Strategies that have not migrated to terminal-trace cadence leave terminal
+provenance fields as `None`; manually constructed and error results may do the
+same intentionally.
+
+Online evaluations attached to turns are available as
+`result.turn_evaluations`. The older `result.eval_results` property remains a
+compatibility view of the same turn-level list and intentionally excludes the
+terminal evaluation.
+
+`TraceEndReason.MAX_TURNS_REACHED` records budget truncation. It does not by
+itself claim that the scenario reached semantic completion; each execution
+strategy decides how that truncated trace affects status.
+
+Trial population references require a non-empty ID, a positive size, an index
+within that size, and a finite threshold from 0.0 through 1.0.
 
 ### Observability Gaps on a Passing Run
 
