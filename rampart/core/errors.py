@@ -47,3 +47,11 @@ class EvaluatorError(InfrastructureError):
     ``InfrastructureError`` base class) and produces a Result with
     SafetyStatus.ERROR.
     """
+
+
+class SchemaError(Exception):
+    """A value cannot be represented by the canonical trace schema."""
+
+
+class UnsupportedSchemaVersionError(SchemaError):
+    """A record's version has no registered decoder."""

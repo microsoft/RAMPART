@@ -151,6 +151,7 @@ nav:
       - Attacks: concepts/attacks.md
       - Probes: concepts/probes.md
       - PyRIT Integration: concepts/pyrit.md
+      - Trace Schema & Migration: concepts/trace-schema.md
   - Attacks:
       - attacks/index.md
       - XPIA: attacks/xpia.md

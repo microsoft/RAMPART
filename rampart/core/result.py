@@ -11,20 +11,47 @@ word the undetermined parts of a summary, which execution strategies share.
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass, field
+from datetime import datetime
 from enum import Enum, StrEnum
-from typing import TYPE_CHECKING, Any
+from functools import cache
+from pathlib import Path
+from typing import (
+    TYPE_CHECKING,
+    Annotated,
+    Any,
+)
+
+from pydantic import (
+    GetPydanticSchema,
+    TypeAdapter,
+    ValidationError,
+)
+from pydantic.json_schema import GenerateJsonSchema, JsonSchemaValue
 
 from rampart.common.text import safe_str, safe_str_list
+from rampart.core._schema import (
+    json_value,
+    trace_schema,
+    validation_message,
+)
+from rampart.core.errors import SchemaError
 from rampart.core.types import (
     EvalOutcome,
     EvalResult,
     ObservabilityLevel,
+    Payload,
+    PayloadFormat,
+    Request,
     Turn,
 )
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
+
+    from pydantic.json_schema import JsonSchemaMode
+    from pydantic_core import core_schema
 
 
 class SafetyStatus(Enum):
@@ -193,6 +220,137 @@ class Result:
             f"status={self.status.value}, "
             f"summary={self.summary!r})"
         )
+
+    def to_dict(self) -> dict[str, Any]:
+        """Serialize the unversioned body, not a standalone durable record.
+
+        Returns:
+            dict[str, Any]: A JSON-safe body for a ResultRecord envelope.
+
+        Raises:
+            SchemaError: If the result is outside the trace value domain.
+        """
+        adapter = _result_adapter()
+        try:
+            validated = adapter.validate_python(self, strict=True)
+            # JSON-mode dumping has a lower nesting limit than the reader.
+            body = adapter.dump_python(validated, mode="python", warnings="error")
+            Result.from_dict(body)
+        except ValidationError as exc:
+            raise SchemaError(validation_message(error=exc, path="result")) from exc
+        except (ValueError, RecursionError) as exc:
+            msg = f"result: cannot serialize canonical body ({type(exc).__name__})"
+            raise SchemaError(msg) from exc
+        return body
+
+    @classmethod
+    def from_dict(cls, data: object) -> Result:
+        """Validate and reconstruct an unversioned canonical body.
+
+        Args:
+            data (object): A JSON-compatible body from a versioned record.
+
+        Returns:
+            Result: The reconstructed result.
+
+        Raises:
+            SchemaError: If the body is malformed or outside the trace domain.
+        """
+        try:
+            # JSON-mode strict validation accepts wire enums/dates, not coercions.
+            encoded = json.dumps(json_value(data), allow_nan=False)
+            return _result_adapter().validate_json(encoded, strict=True)
+        except ValidationError as exc:
+            raise SchemaError(validation_message(error=exc, path="result")) from exc
+        except (ValueError, RecursionError) as exc:
+            msg = f"result: {exc}"
+            raise SchemaError(msg) from exc
+
+    @classmethod
+    def json_schema(cls) -> JsonSchemaValue:
+        """Generate the body contract from the configured dataclass adapter.
+
+        Returns:
+            JsonSchemaValue: The JSON Schema for the unversioned body.
+        """
+        return _result_adapter().json_schema(schema_generator=_ResultJsonSchema)
+
+
+@cache
+def _result_adapter() -> TypeAdapter[Result]:
+    """Build the recursive adapter once, on first serialization use.
+
+    Returns:
+        TypeAdapter[Result]: The cached adapter.
+    """
+    adapter = TypeAdapter[Result](Annotated[Result, GetPydanticSchema(trace_schema)])
+    # Nested dataclasses keep these imports under TYPE_CHECKING.
+    adapter.rebuild(_types_namespace={"datetime": datetime, "Path": Path})
+    return adapter
+
+
+class _ResultJsonSchema(GenerateJsonSchema):
+    """Describe trace-only restrictions alongside the dataclass field schemas."""
+
+    def generate(
+        self, schema: core_schema.CoreSchema, mode: JsonSchemaMode = "validation"
+    ) -> JsonSchemaValue:
+        """Omit runtime class documentation from the published wire contract.
+
+        Returns:
+            JsonSchemaValue: A schema with only trace-specific descriptions.
+        """
+        result = super().generate(schema, mode=mode)
+        result.pop("description", None)
+        definitions = result.get("$defs", {})
+        for definition in definitions.values():
+            definition.pop("description", None)
+        if "Payload" in definitions:
+            definitions["Payload"]["description"] = (
+                "Recorded text payload. Binary formats and file artifacts "
+                "are not supported by this trace schema."
+            )
+        return result
+
+    def dataclass_schema(self, schema: core_schema.DataclassSchema) -> JsonSchemaValue:
+        """Add trace policies that do not restrict live dataclass construction.
+
+        Returns:
+            JsonSchemaValue: An open object schema matching the trace validators.
+        """
+        result = super().dataclass_schema(schema)
+        result["additionalProperties"] = True
+        if schema["cls"] is Payload:
+            result["properties"]["format"] = {
+                "type": "string",
+                "enum": [value.value for value in PayloadFormat if value.is_text],
+                "default": PayloadFormat.TEXT.value,
+            }
+            result["properties"]["artifact"] = {"type": "null", "default": None}
+            result["required"] = [*result["required"], "id"]
+        elif schema["cls"] is Request:
+            result["anyOf"] = [
+                {"required": ["prompt"], "properties": {"prompt": {"type": "string"}}},
+                {
+                    "required": ["attachments"],
+                    "properties": {"attachments": {"type": "array", "minItems": 1}},
+                },
+            ]
+        return result
+
+    def datetime_schema(self, schema: core_schema.DatetimeSchema) -> JsonSchemaValue:
+        """Describe Python datetimes without claiming RFC 3339 validation.
+
+        Returns:
+            JsonSchemaValue: A string with decoder-enforced datetime semantics.
+        """
+        result = super().datetime_schema(schema)
+        result.pop("format", None)
+        result["description"] = (
+            "Python ISO 8601 datetime; UTC offset is optional. "
+            "Parseability is enforced by the record decoder, not this schema."
+        )
+        return result
 
 
 @dataclass(kw_only=True)

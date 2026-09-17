@@ -50,6 +50,9 @@ jobs:
       - name: ty
         run: uv run ty check
 
+      - name: Trace schema drift
+        run: uv run python scripts/generate_trace_schema.py --check
+
   test:
     name: Test (Python ${{ matrix.python-version }})
     needs: lint
