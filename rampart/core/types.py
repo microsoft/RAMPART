@@ -264,6 +264,31 @@ class Request:
             raise ValueError(msg)
 
 
+class EvaluationPurpose(Enum):
+    """Why an evaluation was attached to a turn.
+
+    Attributes:
+        STOP_CHECK: The evaluation was produced by an online stop
+            condition. It is execution evidence, not the final verdict input.
+    """
+
+    STOP_CHECK = "stop_check"
+
+
+class TraceEndReason(Enum):
+    """Why a trace stopped producing turns.
+
+    Attributes:
+        DRIVER_EXHAUSTED: The prompt driver returned no next request.
+        MAX_TURNS_REACHED: The configured turn budget truncated the trace.
+        STOP_CONDITION_MET: An online stop condition fired.
+    """
+
+    DRIVER_EXHAUSTED = "driver_exhausted"
+    MAX_TURNS_REACHED = "max_turns_reached"
+    STOP_CONDITION_MET = "stop_condition_met"
+
+
 @dataclass(frozen=True, kw_only=True)
 class Turn:
     """One prompt-response exchange.
@@ -276,6 +301,8 @@ class Turn:
         request: What was sent to the agent.
         response: What the agent returned.
         eval_result: Evaluator outcome for this turn.
+        eval_purpose: Why ``eval_result`` was produced. None when the purpose was
+            not recorded, including executions that predate the trace runner.
         turn_number: Position in the conversation (0-indexed).
         timestamp: When this exchange occurred.
         driver_reasoning: Why the driver chose this request.
@@ -284,9 +311,20 @@ class Turn:
     request: Request
     response: Response
     eval_result: EvalResult | None = None
+    eval_purpose: EvaluationPurpose | None = None
     turn_number: int = 0
     timestamp: datetime | None = None
     driver_reasoning: str = ""
+
+    def __post_init__(self) -> None:
+        """Validate evaluation annotation consistency.
+
+        Raises:
+            ValueError: If an evaluation purpose is present without a result.
+        """
+        if self.eval_purpose is not None and self.eval_result is None:
+            msg = "eval_purpose requires eval_result"
+            raise ValueError(msg)
 
 
 class EvalOutcome(Enum):

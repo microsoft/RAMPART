@@ -73,8 +73,8 @@ class Attacks:
                 Benign user request(s) that cause the agent to process
                 poisoned content.
             evaluator (Evaluator): What condition to check for.
-            max_turns (int): Maximum prompt-response exchanges before
-                ERROR.  Defaults to 5.
+            max_turns (int): Maximum prompt-response exchanges. Reaching the
+                limit resolves the trace normally. Defaults to 5.
             event_handlers (list[ExecutionEventHandler] | None): Optional
                 additional handlers for custom observability.
 
