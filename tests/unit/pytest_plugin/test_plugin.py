@@ -21,7 +21,11 @@ from rampart.pytest_plugin._collection import (
     deactivate_collector,
 )
 from rampart.pytest_plugin._session import RampartSession
-from rampart.pytest_plugin._xdist import REPORT_RESULTS_ATTR, serialize_report_data
+from rampart.pytest_plugin._xdist import (
+    REPORT_RESULTS_ATTR,
+    SCHEMA_VERSION,
+    serialize_report_data,
+)
 from rampart.pytest_plugin.plugin import (
     _call_results_key,
     _emit_sinks,
@@ -863,3 +867,28 @@ class TestPytestRuntestLogreport:
         )
         pytest_runtest_logreport(cast("pytest.TestReport", report))
         assert rampart_session.is_incomplete is True
+
+    def test_overflowing_terminal_confidence_marks_run_incomplete(self) -> None:
+        nodeid = "test_plugin.py::test_stream"
+        report, rampart_session = _make_controller_report(
+            payload={
+                "schema": SCHEMA_VERSION,
+                "nodeid": nodeid,
+                "results": [
+                    {
+                        "status": "unsafe",
+                        "summary": "unsafe terminal trace",
+                        "observability_level": "response_only",
+                        "terminal_evaluation": {
+                            "outcome": "detected",
+                            "confidence": 10**400,
+                        },
+                    },
+                ],
+            },
+        )
+
+        pytest_runtest_logreport(cast("pytest.TestReport", report))
+
+        assert rampart_session.is_incomplete is True
+        assert rampart_session._results == []

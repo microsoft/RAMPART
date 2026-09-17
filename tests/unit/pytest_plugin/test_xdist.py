@@ -14,6 +14,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from rampart.core.execution import BaseExecution, execute_trials_async
+from rampart.core.manifest import AppManifest
 from rampart.core.result import (
     HarmCategory,
     InjectionRecord,
@@ -24,12 +26,14 @@ from rampart.core.result import (
 from rampart.core.types import (
     EvalOutcome,
     EvalResult,
+    EvaluationPurpose,
     ObservabilityLevel,
     PayloadFormat,
     Request,
     Response,
     SideEffect,
     ToolCall,
+    TraceEndReason,
     Turn,
 )
 from rampart.pytest_plugin._session import RampartSession
@@ -60,6 +64,7 @@ from rampart.pytest_plugin._xdist import (
     serialize_worker_data,
 )
 from rampart.reporting.sink import TestRunReport
+from tests.fixtures import MockAdapter
 
 
 def _make_result(
@@ -94,6 +99,7 @@ def _make_turn(
     prompt: str = "hi",
     text: str = "ok",
     eval_result: EvalResult | None = None,
+    eval_purpose: EvaluationPurpose | None = None,
     turn_number: int = 0,
     timestamp: datetime | None = None,
     driver_reasoning: str = "",
@@ -102,6 +108,7 @@ def _make_turn(
         request=Request(prompt=prompt),
         response=Response(text=text),
         eval_result=eval_result,
+        eval_purpose=eval_purpose,
         turn_number=turn_number,
         timestamp=timestamp,
         driver_reasoning=driver_reasoning,
@@ -493,6 +500,86 @@ class TestSerializationRoundTrip:
 
 
 class TestResultFieldSerializationRoundTrip:
+    def test_terminal_contract_and_population_round_trip_together(self) -> None:
+        population = PopulationRef(
+            id="p" * 513,
+            index=2,
+            size=2**31,
+            threshold=0.8,
+        )
+        terminal = _make_eval_result(
+            outcome=EvalOutcome.DETECTED,
+            evidence=["terminal evidence"],
+        )
+        turn = _make_turn(
+            eval_result=_make_eval_result(),
+            eval_purpose=EvaluationPurpose.STOP_CHECK,
+        )
+        result = _make_result(turns=[turn], population=population)
+        result.terminal_evaluation = terminal
+        result.trace_end_reason = TraceEndReason.STOP_CONDITION_MET
+        payload = _serialize_session_results(
+            session=_make_session_with_results(results_by_nodeid={"n": [result]}),
+        )
+
+        recovered = _deserialize_report_results(data=payload)["n"][0]
+
+        assert recovered.population == population
+        assert recovered.terminal_evaluation is not None
+        assert recovered.terminal_evaluation.evidence == ["terminal evidence"]
+        assert recovered.trace_end_reason is TraceEndReason.STOP_CONDITION_MET
+        assert recovered.turns[0].eval_purpose is EvaluationPurpose.STOP_CHECK
+
+    async def test_execute_trials_terminal_provenance_round_trip_async(self) -> None:
+        terminal_evaluation = _make_eval_result(
+            outcome=EvalOutcome.NOT_DETECTED,
+            evidence=["terminal evidence"],
+        )
+
+        class TerminalExecution(BaseExecution):
+            @property
+            def strategy_name(self) -> str:
+                return "terminal-test"
+
+            async def _execute_async(self, *, adapter) -> Result:
+                del adapter
+                return Result(
+                    status=SafetyStatus.SAFE,
+                    summary="safe terminal trace",
+                    observability_level=ObservabilityLevel.RESPONSE_ONLY,
+                    terminal_evaluation=terminal_evaluation,
+                    trace_end_reason=TraceEndReason.DRIVER_EXHAUSTED,
+                )
+
+        adapter = MockAdapter(
+            responses=[Response(text="unused")],
+            manifest=AppManifest(name="agent"),
+        )
+        population = await execute_trials_async(
+            execution_factory=TerminalExecution,
+            adapter=adapter,
+            n=2,
+            threshold=0.5,
+        )
+        payload = serialize_report_data(
+            config=_make_config(is_worker=True),
+            nodeid="n",
+            results=population.results,
+        )
+
+        recovered = _deserialize_report_results(data=payload)["n"]
+
+        assert len(recovered) == 2
+        population_ids = {
+            result.population.id for result in recovered if result.population
+        }
+        assert len(population_ids) == 1
+        assert all(result.terminal_evaluation is not None for result in recovered)
+        assert all(
+            result.trace_end_reason is TraceEndReason.DRIVER_EXHAUSTED
+            for result in recovered
+        )
+
     def test_datetime_round_trip(self) -> None:
         when = datetime(2026, 1, 1, 12, 0, 0, tzinfo=UTC)
         turn = _make_turn(timestamp=when)
@@ -586,14 +673,88 @@ class TestDeserializationValidation:
         with pytest.raises(SchemaVersionError, match="does not match"):
             deserialize_report_data(data=payload, report_nodeid="n")
 
-    def test_rejects_legacy_schema_version(self) -> None:
+    def test_rejects_previous_schema_version(self) -> None:
         payload: dict[str, Any] = {
-            "schema": "rampart.xdist.v1",
+            "schema": "rampart.xdist.v2",
             "nodeid": "n",
             "results": [],
         }
         with pytest.raises(SchemaVersionError, match="does not match"):
             deserialize_report_data(data=payload, report_nodeid="n")
+
+    @pytest.mark.parametrize(
+        ("field", "value"),
+        [
+            ("trace_end_reason", "future_reason"),
+            ("eval_purpose", "future_purpose"),
+            ("trace_end_reason", ["driver_exhausted"]),
+            ("eval_purpose", {"purpose": "stop_check"}),
+        ],
+    )
+    def test_rejects_unknown_terminal_contract_enum(
+        self,
+        field: str,
+        value: object,
+    ) -> None:
+        turn: dict[str, Any] = {
+            "request": {"prompt": "p"},
+            "response": {"text": "r"},
+        }
+        result_data: dict[str, Any] = {
+            "status": "safe",
+            "summary": "x",
+            "observability_level": "response_only",
+            "turns": [turn],
+        }
+        (turn if field == "eval_purpose" else result_data)[field] = value
+        payload = {
+            "schema": SCHEMA_VERSION,
+            "nodeid": "n",
+            "results": [result_data],
+        }
+
+        with pytest.raises(WorkerOutputError, match=r"Unknown|Expected string"):
+            deserialize_report_data(data=payload, report_nodeid="n")
+
+    def test_rejects_eval_purpose_without_eval_result(self) -> None:
+        payload = {
+            "schema": SCHEMA_VERSION,
+            "nodeid": "n",
+            "results": [
+                {
+                    "status": "safe",
+                    "summary": "x",
+                    "observability_level": "response_only",
+                    "turns": [
+                        {
+                            "request": {"prompt": "p"},
+                            "response": {"text": "r"},
+                            "eval_purpose": "stop_check",
+                        },
+                    ],
+                },
+            ],
+        }
+
+        with pytest.raises(WorkerOutputError, match="eval_purpose requires"):
+            deserialize_report_data(data=payload, report_nodeid="n")
+
+    def test_huge_duration_is_sanitized_to_zero(self) -> None:
+        payload = {
+            "schema": SCHEMA_VERSION,
+            "nodeid": "n",
+            "results": [
+                {
+                    "status": "safe",
+                    "summary": "x",
+                    "observability_level": "response_only",
+                    "duration_seconds": 10**10_000,
+                },
+            ],
+        }
+
+        recovered = _deserialize_report_results(data=payload)["n"][0]
+        assert recovered.duration_seconds == pytest.approx(0.0)
 
     def test_rejects_nodeid_mismatch(self) -> None:
         payload = {"schema": SCHEMA_VERSION, "nodeid": "other", "results": []}
@@ -979,8 +1140,8 @@ class TestHandleTestnodedown:
         node = MagicMock()
         node.gateway.id = "gw1"
         node.workeroutput = {
-            "rampart_xdist_v1": {
-                "schema": "rampart.xdist.v1",
+            "rampart_xdist_v2": {
+                "schema": "rampart.xdist.v2",
                 "streamed_result_count": 0,
             },
         }
@@ -1240,6 +1401,86 @@ class TestReportEnvelope:
             == 1
         )
 
+    def test_oversized_result_preserves_population_provenance(self) -> None:
+        population = PopulationRef(
+            id="population-1",
+            index=3,
+            size=5,
+            threshold=0.8,
+        )
+        payload = serialize_report_data(
+            config=_make_config(is_worker=True, max_bytes=1024),
+            nodeid="n",
+            results=[
+                _make_result(
+                    summary="x" * 10_000,
+                    population=population,
+                ),
+            ],
+        )
+        recovered, truncated = deserialize_report_data(
+            data=payload,
+            report_nodeid="n",
+        )
+
+        assert truncated is True
+        assert recovered["n"][0].population == population
+        marker = payload["results"][0]
+        assert len(json.dumps(marker).encode("utf-8")) <= MIN_RESULT_SIZE_LIMIT_BYTES
+
+    def test_oversized_population_provenance_is_omitted_from_marker(self) -> None:
+        population = PopulationRef(
+            id="\U0001f600" * 10_000,
+            index=0,
+            size=1,
+            threshold=1.0,
+        )
+        payload = serialize_report_data(
+            config=_make_config(is_worker=True, max_bytes=1024),
+            nodeid="n",
+            results=[
+                _make_result(
+                    summary="x" * 10_000,
+                    population=population,
+                ),
+            ],
+        )
+
+        recovered, truncated = deserialize_report_data(
+            data=payload,
+            report_nodeid="n",
+        )
+        marker = payload["results"][0]
+
+        assert truncated is True
+        assert recovered["n"][0].population is None
+        assert marker["metadata"]["_rampart_population_ref_omitted"] is True
+        assert len(json.dumps(marker).encode("utf-8")) <= MIN_RESULT_SIZE_LIMIT_BYTES
+
+    def test_unserializable_integer_provenance_becomes_bounded_marker(self) -> None:
+        population = PopulationRef(
+            id="population-1",
+            index=0,
+            size=1 << 20_000,
+            threshold=1.0,
+        )
+        payload = serialize_report_data(
+            config=_make_config(is_worker=True, max_bytes=1024),
+            nodeid="n",
+            results=[_make_result(population=population)],
+        )
+
+        recovered, truncated = deserialize_report_data(
+            data=payload,
+            report_nodeid="n",
+        )
+        marker = payload["results"][0]
+
+        assert truncated is True
+        assert recovered["n"][0].population is None
+        assert marker["metadata"]["_rampart_population_ref_omitted"] is True
+        assert len(json.dumps(marker).encode("utf-8")) <= MIN_RESULT_SIZE_LIMIT_BYTES
+
     @pytest.mark.parametrize(
         "escaped",
         ["\x00" * 10_000, "\U0001f600" * 10_000],
@@ -1300,11 +1541,11 @@ class TestConstants:
     def test_default_size_limit_is_16mb(self) -> None:
         assert DEFAULT_SIZE_LIMIT_BYTES == 16 * 1024 * 1024
 
-    def test_schema_version_is_v2(self) -> None:
-        assert SCHEMA_VERSION == "rampart.xdist.v2"
+    def test_schema_version_is_v3(self) -> None:
+        assert SCHEMA_VERSION == "rampart.xdist.v3"
 
     def test_workeroutput_key_namespaced(self) -> None:
-        assert WORKEROUTPUT_KEY == "rampart_xdist_v2"
+        assert WORKEROUTPUT_KEY == "rampart_xdist_v3"
 
 
 class TestTestRunReportTestable:

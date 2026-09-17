@@ -6,11 +6,14 @@
 Result, SafetyStatus, HarmCategory, resolve functions.
 """
 
+import warnings
+
 import pytest
 
 from rampart.core.result import (
     HarmCategory,
     InjectionRecord,
+    PopulationRef,
     PopulationResult,
     Result,
     SafetyStatus,
@@ -18,6 +21,8 @@ from rampart.core.result import (
     _summarize_undetermined_operands,
     resolve_as_attack,
     resolve_as_probe,
+    resolve_attack_verdict,
+    resolve_probe_verdict,
 )
 from rampart.core.types import (
     EvalOutcome,
@@ -25,6 +30,7 @@ from rampart.core.types import (
     ObservabilityLevel,
     Request,
     Response,
+    TraceEndReason,
     Turn,
 )
 
@@ -160,6 +166,20 @@ class TestResult:
         assert r.observability_level is ObservabilityLevel.RESPONSE_ONLY
         assert r.injections == []
         assert r.metadata == {}
+        assert r.terminal_evaluation is None
+        assert r.trace_end_reason is None
+
+    def test_terminal_evaluation_and_trace_end_reason_round_trip(self) -> None:
+        evaluation = _er(EvalOutcome.DETECTED)
+        r = Result(
+            observability_level=ObservabilityLevel.RESPONSE_ONLY,
+            status=SafetyStatus.UNSAFE,
+            summary="bad",
+            terminal_evaluation=evaluation,
+            trace_end_reason=TraceEndReason.STOP_CONDITION_MET,
+        )
+        assert r.terminal_evaluation is evaluation
+        assert r.trace_end_reason is TraceEndReason.STOP_CONDITION_MET
 
     def test_harm_category_accepts_enum(self) -> None:
         r = Result(
@@ -260,6 +280,14 @@ class TestPopulationResult:
         with pytest.raises(ValueError, match="threshold must be between"):
             PopulationResult(results=[], threshold=threshold)
 
+    @pytest.mark.parametrize("threshold", [True, float("nan"), float("inf")])
+    def test_rejects_invalid_threshold(self, threshold: object) -> None:
+        with pytest.raises((TypeError, ValueError)):
+            PopulationResult(
+                results=[],
+                threshold=threshold,  # ty: ignore[invalid-argument-type]
+            )
+
     def test_summary_contains_population_verdict(self) -> None:
         population = PopulationResult(
             results=[_result(SafetyStatus.SAFE), _result(SafetyStatus.UNSAFE)],
@@ -282,8 +310,50 @@ class TestPopulationResult:
         )
 
 
-class TestResultEvalResultsProperty:
-    """eval_results is a property derived from turns."""
+class TestPopulationRef:
+    def test_accepts_generated_shape(self) -> None:
+        ref = PopulationRef(id="a" * 32, index=2, size=5, threshold=0.8)
+        assert ref.index == 2
+
+    @pytest.mark.parametrize(
+        ("overrides", "message"),
+        [
+            ({"id": ""}, "id must be non-empty"),
+            ({"index": -1}, "index must be"),
+            ({"index": 5}, "index must be"),
+            ({"size": 0}, "size must be"),
+            ({"threshold": float("nan")}, "threshold must be finite"),
+            ({"threshold": 1.1}, "threshold must be between"),
+        ],
+    )
+    def test_rejects_invalid_provenance(
+        self,
+        overrides: dict[str, object],
+        message: str,
+    ) -> None:
+        values: dict[str, object] = {
+            "id": "population-1",
+            "index": 0,
+            "size": 5,
+            "threshold": 0.8,
+        }
+        values.update(overrides)
+        with pytest.raises((TypeError, ValueError), match=message):
+            PopulationRef(**values)
+
+    def test_accepts_large_but_semantically_valid_provenance(self) -> None:
+        ref = PopulationRef(
+            id="x" * 513,
+            index=0,
+            size=2**31,
+            threshold=0.5,
+        )
+        assert len(ref.id) == 513
+        assert ref.size == 2**31
+
+
+class TestResultTurnEvaluationsProperty:
+    """Turn evaluations remain separate from the terminal evaluation."""
 
     def test_empty_turns_gives_empty_eval_results(self) -> None:
         r = Result(
@@ -291,6 +361,7 @@ class TestResultEvalResultsProperty:
             status=SafetyStatus.SAFE,
             summary="ok",
         )
+        assert r.turn_evaluations == []
         assert r.eval_results == []
 
     def test_turns_with_eval_results_returned_in_order(self) -> None:
@@ -314,7 +385,8 @@ class TestResultEvalResultsProperty:
             summary="bad",
             turns=turns,
         )
-        assert r.eval_results == [er1, er2]
+        assert r.turn_evaluations == [er1, er2]
+        assert r.eval_results == r.turn_evaluations
 
     def test_turns_without_eval_result_filtered(self) -> None:
         er = _er(EvalOutcome.DETECTED)
@@ -335,7 +407,26 @@ class TestResultEvalResultsProperty:
             summary="bad",
             turns=turns,
         )
-        assert r.eval_results == [er]
+        assert r.turn_evaluations == [er]
+
+    def test_final_evaluation_is_not_in_turn_eval_results(self) -> None:
+        final = _er(EvalOutcome.DETECTED)
+        turn_evaluation = _er(EvalOutcome.NOT_DETECTED)
+        r = Result(
+            observability_level=ObservabilityLevel.RESPONSE_ONLY,
+            status=SafetyStatus.UNSAFE,
+            summary="bad",
+            terminal_evaluation=final,
+            turns=[
+                Turn(
+                    request=Request(prompt="p"),
+                    response=Response(text="r"),
+                    eval_result=turn_evaluation,
+                ),
+            ],
+        )
+        assert r.turn_evaluations == [turn_evaluation]
+        assert r.eval_results == [turn_evaluation]
 
 
 class TestResolveAsAttack:
@@ -388,6 +479,13 @@ class TestResolveAsAttack:
         )
         assert status is SafetyStatus.SAFE
 
+    def test_rejects_malformed_runtime_outcome(self) -> None:
+        malformed = EvalResult(
+            outcome="detected",  # ty: ignore[invalid-argument-type]
+        )
+        with pytest.raises(ValueError, match="Unknown EvalOutcome"):
+            resolve_as_attack(eval_results=[malformed])
+
 
 class TestResolveAsProbe:
     def test_empty_returns_error(self) -> None:
@@ -438,6 +536,13 @@ class TestResolveAsProbe:
             ],
         )
         assert status is SafetyStatus.SAFE
+
+    def test_rejects_malformed_runtime_outcome(self) -> None:
+        malformed = EvalResult(
+            outcome="detected",  # ty: ignore[invalid-argument-type]
+        )
+        with pytest.raises(ValueError, match="Unknown EvalOutcome"):
+            resolve_as_probe(eval_results=[malformed])
 
 
 class TestSummarizeUndeterminedOperands:
@@ -710,3 +815,59 @@ class TestExplainUndetermined:
         )
 
         assert detail == "nothing to say"
+
+
+def test_legacy_resolvers_remain_warning_free() -> None:
+    """The additive API does not start the legacy deprecation clock."""
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        assert resolve_as_attack(eval_results=[]) is SafetyStatus.ERROR
+        assert resolve_as_probe(eval_results=[]) is SafetyStatus.ERROR
+
+
+class TestResolveAttackVerdict:
+    @pytest.mark.parametrize(
+        ("evaluation", "expected"),
+        [
+            (_er(EvalOutcome.DETECTED), SafetyStatus.UNSAFE),
+            (_er(EvalOutcome.NOT_DETECTED), SafetyStatus.SAFE),
+            (_er(EvalOutcome.UNDETERMINED), SafetyStatus.UNDETERMINED),
+        ],
+    )
+    def test_maps_single_evaluation(
+        self,
+        evaluation: EvalResult,
+        expected: SafetyStatus,
+    ) -> None:
+        assert resolve_attack_verdict(evaluation=evaluation) is expected
+
+    def test_rejects_malformed_runtime_outcome(self) -> None:
+        evaluation = EvalResult(
+            outcome="detected",  # ty: ignore[invalid-argument-type]
+        )
+        with pytest.raises(ValueError, match="Unknown EvalOutcome"):
+            resolve_attack_verdict(evaluation=evaluation)
+
+
+class TestResolveProbeVerdict:
+    @pytest.mark.parametrize(
+        ("evaluation", "expected"),
+        [
+            (_er(EvalOutcome.DETECTED), SafetyStatus.SAFE),
+            (_er(EvalOutcome.NOT_DETECTED), SafetyStatus.UNSAFE),
+            (_er(EvalOutcome.UNDETERMINED), SafetyStatus.UNDETERMINED),
+        ],
+    )
+    def test_maps_single_evaluation(
+        self,
+        evaluation: EvalResult,
+        expected: SafetyStatus,
+    ) -> None:
+        assert resolve_probe_verdict(evaluation=evaluation) is expected
+
+    def test_rejects_malformed_runtime_outcome(self) -> None:
+        evaluation = EvalResult(
+            outcome="detected",  # ty: ignore[invalid-argument-type]
+        )
+        with pytest.raises(ValueError, match="Unknown EvalOutcome"):
+            resolve_probe_verdict(evaluation=evaluation)
