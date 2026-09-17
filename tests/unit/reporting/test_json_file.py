@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import json
 from datetime import UTC, datetime
 from pathlib import Path
@@ -18,11 +19,13 @@ from rampart.core.result import HarmCategory, PopulationRef, Result, SafetyStatu
 from rampart.core.types import (
     EvalOutcome,
     EvalResult,
+    EvaluationPurpose,
     ObservabilityLevel,
     Request,
     Response,
     SideEffect,
     ToolCall,
+    TraceEndReason,
     Turn,
 )
 from rampart.reporting.json_file import JsonFileReportSink
@@ -92,6 +95,34 @@ class TestSerializeResult:
         data = sink._serialize_result(_result_with_turns())
 
         assert data["population"] is None
+
+    def test_terminal_contract_appears_with_population(self) -> None:
+        sink = JsonFileReportSink(output_dir=Path("/tmp"))
+        result = _result_with_turns()
+        result.population = PopulationRef(
+            id="population-1",
+            index=2,
+            size=5,
+            threshold=0.8,
+        )
+        result.terminal_evaluation = EvalResult(
+            outcome=EvalOutcome.DETECTED,
+            evidence=["terminal evidence"],
+            rationale="terminal rationale",
+        )
+        result.trace_end_reason = TraceEndReason.STOP_CONDITION_MET
+        result.turns[0] = dataclasses.replace(
+            result.turns[0],
+            eval_result=EvalResult(outcome=EvalOutcome.NOT_DETECTED),
+            eval_purpose=EvaluationPurpose.STOP_CHECK,
+        )
+
+        data = sink._serialize_result(result)
+
+        assert data["population"]["id"] == "population-1"
+        assert data["terminal_evaluation"]["outcome"] == "detected"
+        assert data["trace_end_reason"] == "stop_condition_met"
+        assert data["turns"][0]["eval_purpose"] == "stop_check"
 
     def test_result_reports_the_observability_level(self) -> None:
         # Not the value _result_with_turns defaults to, so a hardcoded

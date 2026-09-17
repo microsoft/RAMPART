@@ -35,6 +35,7 @@ from rampart.core.result import (
 from rampart.core.types import (
     EvalOutcome,
     EvalResult,
+    EvaluationPurpose,
     ObservabilityLevel,
     Payload,
     PayloadFormat,
@@ -42,6 +43,7 @@ from rampart.core.types import (
     Response,
     SideEffect,
     ToolCall,
+    TraceEndReason,
     Turn,
 )
 
@@ -449,6 +451,9 @@ def _serialize_turn(*, turn: Turn, nodeid: str) -> dict[str, Any]:
             if turn.eval_result is not None
             else None
         ),
+        "eval_purpose": (
+            turn.eval_purpose.value if turn.eval_purpose is not None else None
+        ),
         "turn_number": turn.turn_number,
         "timestamp": _isoformat(timestamp=turn.timestamp),
         "driver_reasoning": turn.driver_reasoning,
@@ -467,12 +472,31 @@ def _serialize_injection_record(*, injection: InjectionRecord) -> dict[str, Any]
     }
 
 
+def _serialize_population_ref(
+    *,
+    population: PopulationRef | None,
+) -> dict[str, Any] | None:
+    """Serialize optional trial-population provenance.
+
+    Returns:
+        dict[str, Any] | None: JSON-safe provenance, or None when absent.
+    """
+    if population is None:
+        return None
+    return {
+        "id": population.id,
+        "index": population.index,
+        "size": population.size,
+        "threshold": population.threshold,
+    }
+
+
 def _serialize_result(*, result: Result, nodeid: str) -> dict[str, Any]:
     """Serialize a Result to a JSON-safe dict for the xdist transport.
 
-    This is the full-fidelity transport projection: it round-trips back
-    to a ``Result`` via :func:`_deserialize_result`, and intentionally
-    differs from the flatter public report shape produced by
+    This full-fidelity transport projection round-trips terminal and online
+    evaluation provenance together with trial-population attribution. It
+    intentionally differs from the flatter public report shape produced by
     ``JsonFileReportSink._serialize_result``. The two projections are
     deliberately separate (different fields, sanitization, and size
     handling) and must not be naively merged into one serializer.
@@ -484,7 +508,17 @@ def _serialize_result(*, result: Result, nodeid: str) -> dict[str, Any]:
         "safe": result.safe,
         "status": result.status.value,
         "summary": result.summary,
+        "terminal_evaluation": (
+            _serialize_eval_result(eval_result=result.terminal_evaluation)
+            if result.terminal_evaluation is not None
+            else None
+        ),
         "turns": [_serialize_turn(turn=t, nodeid=nodeid) for t in result.turns],
+        "trace_end_reason": (
+            result.trace_end_reason.value
+            if result.trace_end_reason is not None
+            else None
+        ),
         "duration_seconds": safe_float(value=result.duration_seconds),
         "harm_category": (
             str(result.harm_category) if result.harm_category is not None else None
@@ -494,16 +528,7 @@ def _serialize_result(*, result: Result, nodeid: str) -> dict[str, Any]:
         "injections": [
             _serialize_injection_record(injection=i) for i in result.injections
         ],
-        "population": (
-            {
-                "id": result.population.id,
-                "index": result.population.index,
-                "size": result.population.size,
-                "threshold": result.population.threshold,
-            }
-            if result.population is not None
-            else None
-        ),
+        "population": _serialize_population_ref(population=result.population),
         "metadata": _sanitize_metadata(
             metadata=result.metadata,
             nodeid=nodeid,
@@ -548,7 +573,7 @@ def _truncated_result_data(
     *,
     result: Result,
     nodeid: str,
-    size_bytes: int,
+    size_bytes: int | None,
     limit_bytes: int,
 ) -> dict[str, Any]:
     """Build a bounded ERROR Result marker for oversized transport data.
@@ -573,7 +598,9 @@ def _truncated_result_data(
             "RAMPART Result exceeded the xdist transport size cap; "
             "full content was truncated."
         ),
+        "terminal_evaluation": None,
         "turns": [],
+        "trace_end_reason": None,
         "duration_seconds": 0.0,
         "harm_category": _bounded_attribution(
             value=harm_category,
@@ -585,6 +612,7 @@ def _truncated_result_data(
         # part that overflowed.
         "observability_level": result.observability_level.value,
         "injections": [],
+        "population": None,
         "metadata": {
             "_pytest_test_name": _bounded_attribution(
                 value=test_name,
@@ -599,29 +627,43 @@ def _truncated_result_data(
             "_rampart_limit_bytes": limit_bytes,
         },
     }
-    if _serialized_size(data=marker) <= limit_bytes:
-        return marker
-    logger.warning(
-        "Compacting truncation marker for %s to fit the %d-byte transport cap.",
-        _bounded_attribution(
+    marker_metadata = cast("dict[str, Any]", marker["metadata"])
+    if _serialized_size(data=marker) > limit_bytes:
+        logger.warning(
+            "Compacting truncation marker for %s to fit the %d-byte transport cap.",
+            _bounded_attribution(
+                value=nodeid,
+                max_bytes=_TRUNCATED_FALLBACK_ATTRIBUTION_MAX_BYTES,
+            ),
+            limit_bytes,
+        )
+        marker["harm_category"] = _bounded_attribution(
+            value=harm_category,
+            max_bytes=_TRUNCATED_FALLBACK_ATTRIBUTION_MAX_BYTES,
+        )
+        marker_metadata["_pytest_test_name"] = _bounded_attribution(
+            value=test_name,
+            max_bytes=_TRUNCATED_FALLBACK_ATTRIBUTION_MAX_BYTES,
+        )
+        marker_metadata["_pytest_nodeid"] = _bounded_attribution(
             value=nodeid,
             max_bytes=_TRUNCATED_FALLBACK_ATTRIBUTION_MAX_BYTES,
-        ),
-        limit_bytes,
-    )
-    marker["harm_category"] = _bounded_attribution(
-        value=harm_category,
-        max_bytes=_TRUNCATED_FALLBACK_ATTRIBUTION_MAX_BYTES,
-    )
-    marker_metadata = cast("dict[str, Any]", marker["metadata"])
-    marker_metadata["_pytest_test_name"] = _bounded_attribution(
-        value=test_name,
-        max_bytes=_TRUNCATED_FALLBACK_ATTRIBUTION_MAX_BYTES,
-    )
-    marker_metadata["_pytest_nodeid"] = _bounded_attribution(
-        value=nodeid,
-        max_bytes=_TRUNCATED_FALLBACK_ATTRIBUTION_MAX_BYTES,
-    )
+        )
+
+    population = _serialize_population_ref(population=result.population)
+    if population is not None:
+        marker["population"] = population
+        try:
+            population_fits = _serialized_size(data=marker) <= limit_bytes
+        except (OverflowError, TypeError, ValueError):
+            population_fits = False
+        if not population_fits:
+            marker["population"] = None
+            marker_metadata["_rampart_population_ref_omitted"] = True
+
+    if _serialized_size(data=marker) > limit_bytes:
+        marker["population"] = None
+        marker_metadata["_rampart_population_ref_omitted"] = True
     return marker
 
 
@@ -657,22 +699,33 @@ def _serialize_capped_result(
         dict[str, Any]: Full Result data or a bounded truncation marker.
     """
     data = _serialize_result(result=result, nodeid=nodeid)
-    size_bytes = _serialized_size(data=data)
     try:
+        size_bytes = _serialized_size(data=data)
         _enforce_result_size(
             size_bytes=size_bytes,
             limit_bytes=limit_bytes,
             nodeid=nodeid,
         )
+    except (OverflowError, TypeError, ValueError) as exc:
+        logger.warning(
+            "Result for %r could not be serialized safely and was truncated: %s",
+            _bounded_attribution(
+                value=nodeid,
+                max_bytes=_TRUNCATED_FALLBACK_ATTRIBUTION_MAX_BYTES,
+            ),
+            safe_str(value=exc),
+        )
+        size_bytes = None
     except SizeLimitError as exc:
         logger.warning("%s", exc)
-        return _truncated_result_data(
-            result=result,
-            nodeid=nodeid,
-            size_bytes=size_bytes,
-            limit_bytes=limit_bytes,
-        )
-    return data
+    else:
+        return data
+    return _truncated_result_data(
+        result=result,
+        nodeid=nodeid,
+        size_bytes=size_bytes,
+        limit_bytes=limit_bytes,
+    )
 
 
 def serialize_report_data(
@@ -832,6 +885,48 @@ def _deserialize_eval_outcome(*, value: object) -> EvalOutcome:
         raise WorkerOutputError(msg) from exc
 
 
+def _deserialize_evaluation_purpose(*, value: object) -> EvaluationPurpose | None:
+    """Deserialize an optional turn evaluation purpose.
+
+    Returns:
+        EvaluationPurpose | None: The purpose, or None when absent.
+
+    Raises:
+        WorkerOutputError: If ``value`` is not a known EvaluationPurpose.
+    """
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        msg = f"Expected string for EvaluationPurpose, got {type(value).__name__}."
+        raise WorkerOutputError(msg)
+    try:
+        return EvaluationPurpose(value)
+    except ValueError as exc:
+        msg = f"Unknown EvaluationPurpose value: {value!r}."
+        raise WorkerOutputError(msg) from exc
+
+
+def _deserialize_trace_end_reason(*, value: object) -> TraceEndReason | None:
+    """Deserialize an optional trace end reason.
+
+    Returns:
+        TraceEndReason | None: The reason, or None when absent.
+
+    Raises:
+        WorkerOutputError: If ``value`` is not a known TraceEndReason.
+    """
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        msg = f"Expected string for TraceEndReason, got {type(value).__name__}."
+        raise WorkerOutputError(msg)
+    try:
+        return TraceEndReason(value)
+    except ValueError as exc:
+        msg = f"Unknown TraceEndReason value: {value!r}."
+        raise WorkerOutputError(msg) from exc
+
+
 def _deserialize_harm_category(*, value: object) -> HarmCategory | str | None:
     """Deserialize a HarmCategory enum value, plain string, or None.
 
@@ -888,13 +983,20 @@ def _deserialize_confidence(*, typed: dict[str, Any]) -> float:
     Returns:
         float: The reconstructed confidence, or ``NaN`` when it was present but
             not a usable finite number.
+
+    Raises:
+        WorkerOutputError: If a numeric value cannot be converted to float.
     """
     if "confidence" not in typed:
         return 1.0
     raw_confidence = typed["confidence"]
     if isinstance(raw_confidence, bool) or not isinstance(raw_confidence, int | float):
         return math.nan
-    number = float(raw_confidence)
+    try:
+        number = float(raw_confidence)
+    except (OverflowError, ValueError) as exc:
+        msg = f"Confidence could not be converted to float: {raw_confidence!r}."
+        raise WorkerOutputError(msg) from exc
     return number if math.isfinite(number) else math.nan
 
 
@@ -1116,10 +1218,18 @@ def _deserialize_turn(*, data: object) -> Turn:
         raise WorkerOutputError(msg)
     typed = cast("dict[str, Any]", data)
     raw_turn_number = typed.get("turn_number", 0)
+    eval_result = _deserialize_eval_result(data=typed.get("eval_result"))
+    eval_purpose = _deserialize_evaluation_purpose(
+        value=typed.get("eval_purpose"),
+    )
+    if eval_purpose is not None and eval_result is None:
+        msg = "eval_purpose requires eval_result"
+        raise WorkerOutputError(msg)
     return Turn(
         request=_deserialize_request(data=typed.get("request")),
         response=_deserialize_response(data=typed.get("response")),
-        eval_result=_deserialize_eval_result(data=typed.get("eval_result")),
+        eval_result=eval_result,
+        eval_purpose=eval_purpose,
         turn_number=int(raw_turn_number) if isinstance(raw_turn_number, int) else 0,
         timestamp=_deserialize_datetime(value=typed.get("timestamp")),
         driver_reasoning=_strip_ansi(text=str(typed.get("driver_reasoning", ""))),
@@ -1182,15 +1292,24 @@ def _deserialize_population_ref(*, data: object) -> PopulationRef | None:
             f"Expected number for population threshold, got {type(threshold).__name__}."
         )
         raise WorkerOutputError(msg)
-    if not math.isfinite(threshold):
+    try:
+        normalized_threshold = float(threshold)
+    except (OverflowError, ValueError) as exc:
+        msg = f"Expected finite number for population threshold, got {threshold!r}."
+        raise WorkerOutputError(msg) from exc
+    if not math.isfinite(normalized_threshold):
         msg = f"Expected finite number for population threshold, got {threshold!r}."
         raise WorkerOutputError(msg)
-    return PopulationRef(
-        id=population_id,
-        index=index,
-        size=size,
-        threshold=float(threshold),
-    )
+    try:
+        return PopulationRef(
+            id=population_id,
+            index=index,
+            size=size,
+            threshold=normalized_threshold,
+        )
+    except (TypeError, ValueError) as exc:
+        msg = f"Invalid population provenance: {exc}"
+        raise WorkerOutputError(msg) from exc
 
 
 def _deserialize_result(*, data: object) -> Result:
@@ -1215,19 +1334,31 @@ def _deserialize_result(*, data: object) -> Result:
         strip_ansi=True,
     )
     raw_duration = typed.get("duration_seconds", 0.0)
-    duration = (
-        float(raw_duration)
-        if isinstance(raw_duration, int | float) and math.isfinite(float(raw_duration))
-        else 0.0
-    )
+    try:
+        duration = (
+            float(raw_duration)
+            if isinstance(raw_duration, int | float)
+            and not isinstance(raw_duration, bool)
+            else 0.0
+        )
+    except (OverflowError, ValueError):
+        duration = 0.0
+    if not math.isfinite(duration):
+        duration = 0.0
     return Result(
         status=_deserialize_safety_status(value=typed.get("status")),
         summary=_strip_ansi(text=str(typed.get("summary", ""))),
+        terminal_evaluation=_deserialize_eval_result(
+            data=typed.get("terminal_evaluation"),
+        ),
         turns=[
             _deserialize_turn(data=t)
             for t in cast("list[Any]", raw_turns if isinstance(raw_turns, list) else [])
         ],
         duration_seconds=duration,
+        trace_end_reason=_deserialize_trace_end_reason(
+            value=typed.get("trace_end_reason"),
+        ),
         harm_category=_deserialize_harm_category(value=typed.get("harm_category")),
         strategy=str(typed.get("strategy", "")),
         observability_level=_deserialize_observability_level(
