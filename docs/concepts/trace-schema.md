@@ -1,8 +1,8 @@
 # Trace/Result Schema & Migration Policy
 
 `rampart.core.serialization` defines RAMPART's canonical, versioned
-`Result`-record format. `ResultRecord.to_dict()` / `ResultRecord.from_dict()` own
-the versioned envelope and optional `pytest_nodeid` / `result_index` attribution.
+`Result`-record format. `ResultRecord` references a result and optional
+`pytest_nodeid` / `result_index` attribution.
 `serialize_record(record=...)` converts a `ResultRecord` to JSON text (`str`);
 `deserialize_record(data=...)` reconstructs a `ResultRecord` from JSON text.
 Existing xdist and reporting consumers are not yet wired to this module.
@@ -11,34 +11,45 @@ This page defines how the schema may evolve as consumers adopt it.
 
 ## Serialization and schema generation
 
-`Result.to_dict()` / `Result.from_dict()` own the **unversioned body**, using one
-cached Pydantic `TypeAdapter` over the existing standard dataclasses. Body dicts
-are fragments, not standalone durable records: persist a `ResultRecord` to
-include the version. `ResultRecord` references the live result; serialization
-does not mutate it.
-
-The dictionary methods remain available for projections and structured
-inspection. The serialization functions use those same methods at the JSON-text
-boundary, without a separate codec:
+`serialize_record()` and `deserialize_record()` are the only public conversion
+API. The serialization module owns both the versioned envelope and its body,
+using one cached Pydantic `TypeAdapter` over the existing standard dataclasses.
+Neither `Result` nor `ResultRecord` exposes dictionary-conversion methods.
+`ResultRecord` references the live result; serialization does not mutate it.
 
 ```python
+import json
+
+from rampart.core.serialization import (
+    ResultRecord,
+    deserialize_record,
+    serialize_record,
+)
+
 record = ResultRecord(result=result, pytest_nodeid="tests/test_safety.py::test_case")
 text = serialize_record(record=record)
 restored = deserialize_record(data=text)
+canonical = json.loads(text)
 ```
+
+Projections and structured transports obtain dictionaries by parsing the
+canonical JSON, not by maintaining another result serializer or importing private
+helpers. Transports that already hold a record dictionary can use
+`deserialize_record(data=json.dumps(canonical, allow_nan=False))`.
+The nested `result` body is unversioned and must not be persisted on its own.
 
 Malformed JSON and invalid record values raise `SchemaError`; unsupported
 versions raise its `UnsupportedSchemaVersionError` subclass.
 
 The adapter validates nested fields without string, boolean, or integer
-coercion. Dictionary input is checked for JSON-only values before strict
+coercion. The parsed body is checked for JSON-only values before strict
 JSON-mode validation reconstructs the dataclasses. Missing fields use their
 declared defaults; explicit `null` is accepted only on nullable fields. Payload
 IDs must be recorded, not generated during deserialization. These boundary
 rules do not replace the normal dataclass constructors used during execution.
 
 Body encoding uses adapter-local enum and datetime serializers in Python mode,
-then validates the output through the canonical reader before returning it.
+then validates the body through the same reader logic before emitting record JSON.
 This extra validation pass aligns writer and reader nesting support without
 introducing a new depth cap or inheriting Pydantic's lower JSON-mode writer limit.
 Interpreter and parser recursion limits still apply; failures raise `SchemaError`.
@@ -64,8 +75,8 @@ a version bump is needed.
 ### Structural schema and decoder semantics
 
 The JSON Schema checks structure; passing it is necessary but **not sufficient**
-for successful record decoding. Use `deserialize_record()` (or
-`ResultRecord.from_dict()` for dictionaries) for the complete contract.
+for successful record decoding. Use `deserialize_record()` for the complete
+contract.
 
 The decoder additionally enforces these representation rules:
 
@@ -176,16 +187,16 @@ flowchart TD
   the canonical schema.
 - Strings and mapping keys must contain Unicode scalar values, including optional
   attribution. Encoding rejects surrogate-containing strings before returning
-  a body or record; decoding rejects them in dictionary input as well.
+  JSON text; decoding rejects unpaired surrogate escapes.
 - Timestamps retain Python's ISO 8601 representation, including naive datetimes
   and UTC offsets. The schema describes strings rather than RFC 3339
   `date-time`, which would exclude some supported Python datetimes.
 - `rampart.trace.v1` does not define a durable representation for binary or
   opaque payload artifacts. Encoding or decoding one fails closed rather than
   coercing it to text.
-- `ResultRecord.to_dict()` removes transport bookkeeping keys, including
+- `serialize_record()` removes transport bookkeeping keys, including
   `_rampart_source_worker`, from top-level `Result.metadata` in the encoded
-  output. Body-only serialization and record decoding do not filter these keys.
+  output. Record decoding does not filter these keys.
   Re-encoding a decoded record filters them from output without mutating the
   result. Nested user mappings are preserved.
 

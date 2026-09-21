@@ -8,7 +8,7 @@ from __future__ import annotations
 import json
 import math
 import re
-from dataclasses import fields, replace
+from dataclasses import FrozenInstanceError, fields, replace
 from datetime import (
     UTC,
     datetime,
@@ -34,13 +34,13 @@ from rampart.core.result import (
     PopulationRef,
     Result,
     SafetyStatus,
-    _result_adapter,
 )
 from rampart.core.serialization import (
     TRACE_SCHEMA_VERSION,
     ResultRecord,
     SchemaError,
     UnsupportedSchemaVersionError,
+    _result_adapter,
     deserialize_record,
     serialize_record,
 )
@@ -143,6 +143,10 @@ def _minimal_record_dict() -> dict:
     }
 
 
+def _record_data(record: ResultRecord) -> dict[str, Any]:
+    return json.loads(serialize_record(record=record))
+
+
 def _freeform_maps(result: Result) -> list[MutableMapping[str, Any]]:
     return [
         result.metadata,
@@ -168,11 +172,11 @@ class TestRoundTrip:
         decoded = deserialize_record(data=encoded)
 
         assert isinstance(encoded, str)
-        assert json.loads(encoded) == original.to_dict()
+        assert json.loads(encoded)["version"] == TRACE_SCHEMA_VERSION
         assert decoded == original
 
     def test_version_is_stamped_on_the_record(self) -> None:
-        encoded = ResultRecord(result=_make_full_result()).to_dict()
+        encoded = _record_data(ResultRecord(result=_make_full_result()))
 
         assert encoded["version"] == TRACE_SCHEMA_VERSION
         assert ResultRecord.VERSION == "rampart.trace.v1"
@@ -244,6 +248,29 @@ class TestRoundTrip:
         assert deserialize_record(data=encoded) == record
 
 
+class TestPublicApi:
+    @pytest.mark.parametrize("cls", [Result, ResultRecord])
+    @pytest.mark.parametrize("method", ["to_dict", "from_dict"])
+    def test_dictionary_conversion_methods_are_absent(
+        self, *, cls: type, method: str
+    ) -> None:
+        assert not hasattr(cls, method)
+
+    def test_live_result_does_not_expose_a_json_schema(self) -> None:
+        assert not hasattr(Result, "json_schema")
+
+    def test_record_is_frozen_but_references_the_live_result(self) -> None:
+        result = _make_full_result()
+        record = ResultRecord(result=result)
+
+        with pytest.raises(FrozenInstanceError, match="result"):
+            record.result = _make_full_result()  # ty: ignore[invalid-assignment]
+
+        result.summary = "updated"
+        assert record.result is result
+        assert _record_data(record)["result"]["summary"] == "updated"
+
+
 class TestJsonTextBoundary:
     @pytest.mark.parametrize(
         "data", ["", "{", '{"version":', "{} trailing", "{'key': 1}"]
@@ -297,28 +324,20 @@ class TestUnicodeDomain:
 
     @pytest.mark.parametrize("text", _INVALID_TEXT)
     @pytest.mark.parametrize("nested", [False, True])
-    def test_surrogates_in_typed_text_are_rejected(
+    def test_surrogates_in_typed_text_are_rejected_on_encode(
         self, *, text: str, nested: bool
     ) -> None:
         result = _make_full_result()
-        body = result.to_dict()
         field = "text" if nested else "summary"
         target = result.turns[0].response if nested else result
-        body_target = body["turns"][0]["response"] if nested else body
         setattr(target, field, text)
-        body_target[field] = text
-
-        with pytest.raises(SchemaError, match=rf"{field}.*surrogate"):
-            result.to_dict()
-        with pytest.raises(SchemaError, match=rf"{field}.*surrogate"):
-            Result.from_dict(body)
         with pytest.raises(SchemaError, match=rf"{field}.*surrogate"):
             serialize_record(record=ResultRecord(result=result))
 
     @pytest.mark.parametrize("text", _INVALID_TEXT)
     @pytest.mark.parametrize("map_index", range(5))
     @pytest.mark.parametrize("as_key", [False, True])
-    def test_surrogates_in_freeform_keys_and_values_are_rejected(
+    def test_surrogates_in_freeform_keys_and_values_are_rejected_on_encode(
         self, *, text: str, map_index: int, as_key: bool
     ) -> None:
         result = _make_full_result()
@@ -327,26 +346,54 @@ class TestUnicodeDomain:
         )
 
         with pytest.raises(SchemaError, match=r"nested.*surrogate") as error:
-            result.to_dict()
+            serialize_record(record=ResultRecord(result=result))
+
+        assert text not in str(error.value)
+
+    @pytest.mark.parametrize("text", _INVALID_TEXT[:2])
+    @pytest.mark.parametrize("map_index", range(5))
+    @pytest.mark.parametrize("as_key", [False, True])
+    def test_unpaired_json_surrogates_in_freeform_maps_are_rejected(
+        self, *, text: str, map_index: int, as_key: bool
+    ) -> None:
+        result = _make_full_result()
+        placeholder = "surrogate-placeholder"
+        _freeform_maps(result)[map_index]["nested"] = (
+            {placeholder: "value"} if as_key else {"text": placeholder}
+        )
+        encoded = serialize_record(record=ResultRecord(result=result)).replace(
+            json.dumps(placeholder), json.dumps(text)
+        )
+
+        with pytest.raises(SchemaError, match=r"nested.*surrogate") as error:
+            deserialize_record(data=encoded)
 
         assert text not in str(error.value)
 
     @pytest.mark.parametrize("text", _INVALID_TEXT)
     def test_surrogate_attribution_is_rejected(self, text: str) -> None:
+        with pytest.raises(SchemaError, match=r"record\.pytest_nodeid.*surrogate"):
+            ResultRecord(result=_make_full_result(), pytest_nodeid=text)
+
+    @pytest.mark.parametrize("text", _INVALID_TEXT[:2])
+    def test_unpaired_json_surrogate_attribution_is_rejected(self, text: str) -> None:
         data = _minimal_record_dict()
         data["pytest_nodeid"] = text
 
         with pytest.raises(SchemaError, match=r"record\.pytest_nodeid.*surrogate"):
-            ResultRecord(result=_make_full_result(), pytest_nodeid=text)
-        with pytest.raises(SchemaError, match=r"record\.pytest_nodeid.*surrogate"):
-            ResultRecord.from_dict(data)
+            deserialize_record(data=json.dumps(data))
 
     @pytest.mark.parametrize("text", _INVALID_TEXT[:2])
-    def test_unpaired_json_surrogate_escapes_are_rejected(self, text: str) -> None:
-        data = _minimal_record_dict()
-        data["result"]["summary"] = text
+    @pytest.mark.parametrize("nested", [False, True])
+    def test_unpaired_json_surrogate_escapes_are_rejected(
+        self, *, text: str, nested: bool
+    ) -> None:
+        data = _record_data(ResultRecord(result=_make_full_result()))
+        field = "text" if nested else "summary"
+        target = data["result"]["turns"][0]["response"] if nested else data["result"]
+        target[field] = text
 
-        with pytest.raises(SchemaError, match=r"summary.*surrogate"):
+        with pytest.raises(SchemaError, match=rf"{field}.*surrogate"):
             deserialize_record(data=json.dumps(data))
 
     def test_unicode_scalars_and_valid_json_surrogate_pairs_round_trip(self) -> None:
@@ -363,7 +410,7 @@ class TestUnicodeDomain:
 
 class TestFieldExhaustiveness:
     def test_every_field_of_every_type_is_serialized(self) -> None:
-        body = ResultRecord(result=_make_full_result()).to_dict()["result"]
+        body = _record_data(ResultRecord(result=_make_full_result()))["result"]
         turn = body["turns"][0]
 
         cases = [
@@ -403,7 +450,7 @@ class TestVersionDispatch:
 
 class TestMigrationTolerance:
     def test_unknown_extra_fields_decode(self) -> None:
-        encoded = ResultRecord(result=_make_full_result()).to_dict()
+        encoded = _record_data(ResultRecord(result=_make_full_result()))
         encoded["future_collar"] = {"anything": True}
         encoded["result"]["future_intrinsic"] = 42
 
@@ -427,14 +474,14 @@ class TestMigrationTolerance:
         data["result"]["turns"] = "not-a-list"
 
         with pytest.raises(SchemaError, match=r"result\.turns"):
-            ResultRecord.from_dict(data)
+            deserialize_record(data=json.dumps(data))
 
     def test_incomplete_population_reference_fails_closed(self) -> None:
         data = _minimal_record_dict()
         data["result"]["population"] = {}
 
         with pytest.raises(SchemaError, match=r"result\.population\.id"):
-            ResultRecord.from_dict(data)
+            deserialize_record(data=json.dumps(data))
 
 
 class TestValueDomain:
@@ -443,7 +490,7 @@ class TestValueDomain:
             metadata={"_pytest_nodeid": "x::y", "note": "keep me"},
         )
 
-        encoded = ResultRecord(result=result).to_dict()
+        encoded = _record_data(ResultRecord(result=result))
 
         assert encoded["result"]["metadata"] == {"note": "keep me"}
 
@@ -451,8 +498,8 @@ class TestValueDomain:
         result = _make_full_result()
         result.harm_category = "custom_product_risk"
 
-        encoded = ResultRecord(result=result).to_dict()
-        decoded = ResultRecord.from_dict(encoded).result
+        encoded = _record_data(ResultRecord(result=result))
+        decoded = deserialize_record(data=json.dumps(encoded)).result
 
         assert encoded["result"]["harm_category"] == "custom_product_risk"
         assert decoded.harm_category == "custom_product_risk"
@@ -462,34 +509,34 @@ class TestValueDomain:
         result.duration_seconds = math.inf
 
         with pytest.raises(SchemaError, match="duration_seconds"):
-            ResultRecord(result=result).to_dict()
+            serialize_record(record=ResultRecord(result=result))
 
     def test_non_json_metadata_fails_closed(self) -> None:
         result = _make_full_result(metadata={"blob": object()})
 
         with pytest.raises(SchemaError, match="metadata"):
-            ResultRecord(result=result).to_dict()
+            serialize_record(record=ResultRecord(result=result))
 
     def test_bad_enum_value_fails_closed_on_decode(self) -> None:
         data = _minimal_record_dict()
         data["result"]["status"] = "not_a_status"
 
         with pytest.raises(SchemaError, match="status"):
-            ResultRecord.from_dict(data)
+            deserialize_record(data=json.dumps(data))
 
     def test_non_string_harm_category_fails_closed_on_encode(self) -> None:
         result = _make_full_result()
         result.__dict__["harm_category"] = 42
 
         with pytest.raises(SchemaError, match="harm_category"):
-            ResultRecord(result=result).to_dict()
+            serialize_record(record=ResultRecord(result=result))
 
     def test_non_string_harm_category_fails_closed_on_decode(self) -> None:
         data = _minimal_record_dict()
         data["result"]["harm_category"] = {"category": "custom"}
 
         with pytest.raises(SchemaError, match="harm_category"):
-            ResultRecord.from_dict(data)
+            deserialize_record(data=json.dumps(data))
 
     def test_boolean_result_index_fails_before_encoding(self) -> None:
         with pytest.raises(SchemaError, match="result_index"):
@@ -517,7 +564,7 @@ class TestBinaryPayloadFailsClosed:
         ]
 
         with pytest.raises(SchemaError, match="binary payload"):
-            ResultRecord(result=result).to_dict()
+            serialize_record(record=ResultRecord(result=result))
 
     def test_decoding_a_binary_payload_fails_closed(self) -> None:
         data = _minimal_record_dict()
@@ -532,13 +579,13 @@ class TestBinaryPayloadFailsClosed:
         ]
 
         with pytest.raises(SchemaError, match="binary payload"):
-            ResultRecord.from_dict(data)
+            deserialize_record(data=json.dumps(data))
 
     @pytest.mark.parametrize("payload_format", ["pdf", "docx", "text"])
     def test_artifact_is_rejected_before_filesystem_access(
         self, payload_format: str
     ) -> None:
-        data = ResultRecord(result=_make_full_result()).to_dict()
+        data = _record_data(ResultRecord(result=_make_full_result()))
         payload = data["result"]["turns"][0]["request"]["attachments"][0]
         payload.update(format=payload_format, artifact="untrusted-artifact")
 
@@ -548,7 +595,7 @@ class TestBinaryPayloadFailsClosed:
             ),
             pytest.raises(SchemaError, match="artifact"),
         ):
-            ResultRecord.from_dict(data)
+            deserialize_record(data=json.dumps(data))
 
     def test_live_binary_payload_is_still_supported(self, tmp_path: Path) -> None:
         artifact = tmp_path / "doc.pdf"
@@ -560,15 +607,30 @@ class TestBinaryPayloadFailsClosed:
 
 
 class TestResultAdapter:
-    def test_body_methods_round_trip_through_json(self) -> None:
-        original = _make_full_result()
+    def test_record_preserves_nested_types_and_wire_values(self) -> None:
+        original = ResultRecord(result=_make_full_result())
 
-        body = original.to_dict()
-        restored = Result.from_dict(json.loads(json.dumps(body, allow_nan=False)))
+        encoded = serialize_record(record=original)
+        body = json.loads(encoded)["result"]
+        restored = deserialize_record(data=encoded)
 
         assert restored == original
-        assert isinstance(restored.turns[0], Turn)
+        assert isinstance(restored.result, Result)
+        turn = restored.result.turns[0]
+        assert isinstance(turn, Turn)
+        assert isinstance(turn.request, Request)
+        assert isinstance(turn.request.attachments[0], Payload)
+        assert isinstance(turn.response, Response)
+        assert isinstance(turn.response.tool_calls[0], ToolCall)
+        assert isinstance(turn.response.side_effects[0], SideEffect)
+        assert isinstance(turn.eval_result, EvalResult)
+        assert isinstance(restored.result.injections[0], InjectionRecord)
+        assert isinstance(restored.result.population, PopulationRef)
         assert "version" not in body
+        assert body["status"] == "unsafe"
+        assert body["observability_level"] == "tool_and_side_effects"
+        assert body["turns"][0]["request"]["attachments"][0]["format"] == "markdown"
+        assert body["turns"][0]["eval_result"]["outcome"] == "detected"
         assert body["turns"][0]["timestamp"] == _TIMESTAMP.isoformat()
         assert body["turns"][0]["response"]["tool_calls"][0]["timestamp"] == (
             _TIMESTAMP.isoformat()
@@ -590,10 +652,10 @@ class TestResultAdapter:
         result.turns[0].__dict__["timestamp"] = timestamp
         result.turns[0].response.tool_calls[0].timestamp = timestamp
 
-        encoded = ResultRecord(result=result).to_dict()
+        encoded = _record_data(ResultRecord(result=result))
 
         assert encoded["result"]["turns"][0]["timestamp"] == timestamp.isoformat()
-        assert ResultRecord.from_dict(encoded).result == result
+        assert deserialize_record(data=json.dumps(encoded)).result == result
         Draft202012Validator(
             ResultRecord.json_schema(),
             format_checker=Draft202012Validator.FORMAT_CHECKER,
@@ -611,7 +673,7 @@ class TestResultAdapter:
         record = ResultRecord(result=original)
         original.summary = "updated after wrapping"
 
-        body = record.to_dict()["result"]
+        body = _record_data(record)["result"]
         body["metadata"]["user"]["extra"] = True
 
         assert record.result is original
@@ -622,35 +684,46 @@ class TestResultAdapter:
         assert original.metadata["user"] == {"_rampart_source_worker": "keep"}
         assert "_rampart_worker_artifact_path" in original.metadata
 
-    def test_body_does_not_own_transport_filtering(self) -> None:
-        result = _make_full_result(metadata={"_rampart_source_worker": "gw0"})
+    def test_decoding_retains_transport_metadata_until_reencoding(self) -> None:
+        data = _minimal_record_dict()
+        data["result"]["metadata"] = {
+            "_rampart_source_worker": "gw0",
+            "nested": {"_rampart_source_worker": "keep"},
+        }
 
-        assert result.to_dict()["metadata"] == result.metadata
-        assert ResultRecord(result=result).to_dict()["result"]["metadata"] == {}
+        record = deserialize_record(data=json.dumps(data))
+
+        assert record.result.metadata == data["result"]["metadata"]
+        assert _record_data(record)["result"]["metadata"] == {
+            "nested": {"_rampart_source_worker": "keep"}
+        }
+        assert record.result.metadata == data["result"]["metadata"]
 
     @pytest.mark.parametrize("index", [None, 0, 2])
     def test_optional_attribution_is_not_inferred(self, index: int | None) -> None:
         record = ResultRecord(result=_make_full_result(), result_index=index)
 
-        encoded = record.to_dict()
+        encoded = _record_data(record)
 
-        assert ResultRecord.from_dict(encoded).result_index == index
+        assert deserialize_record(data=json.dumps(encoded)).result_index == index
         assert ("result_index" in encoded) is (index is not None)
 
     @pytest.mark.parametrize("nodeid", [False, 1, [], {}])
-    def test_invalid_nodeid_is_rejected(self, nodeid: object) -> None:
+    def test_invalid_nodeid_is_rejected(self, nodeid: Any) -> None:
         data = _minimal_record_dict()
         data["pytest_nodeid"] = nodeid
 
         with pytest.raises(SchemaError, match="pytest_nodeid"):
-            ResultRecord.from_dict(data)
+            deserialize_record(data=json.dumps(data))
+        with pytest.raises(SchemaError, match="pytest_nodeid"):
+            ResultRecord(result=_make_full_result(), pytest_nodeid=nodeid)
 
     def test_nested_mutations_are_revalidated(self) -> None:
         result = _make_full_result()
         result.turns[0].response.__dict__["text"] = 42
 
         with pytest.raises(SchemaError, match=r"result\.turns\[0\]\.response\.text"):
-            result.to_dict()
+            serialize_record(record=ResultRecord(result=result))
 
     @pytest.mark.parametrize("invalid", [True, 1.5, "1"])
     def test_integer_fields_are_not_coerced(self, invalid: object) -> None:
@@ -659,39 +732,39 @@ class TestResultAdapter:
         result.population.__dict__["index"] = invalid
 
         with pytest.raises(SchemaError, match=r"result\.population\.index"):
-            result.to_dict()
+            serialize_record(record=ResultRecord(result=result))
 
     def test_missing_payload_identity_is_not_generated(self) -> None:
-        body = _make_full_result().to_dict()
-        del body["turns"][0]["request"]["attachments"][0]["id"]
+        data = _record_data(ResultRecord(result=_make_full_result()))
+        del data["result"]["turns"][0]["request"]["attachments"][0]["id"]
 
         with pytest.raises(SchemaError, match="id"):
-            Result.from_dict(body)
+            deserialize_record(data=json.dumps(data))
 
     def test_invalid_timestamp_is_rejected(self) -> None:
-        body = _make_full_result().to_dict()
-        body["turns"][0]["timestamp"] = "not a date"
+        data = _record_data(ResultRecord(result=_make_full_result()))
+        data["result"]["turns"][0]["timestamp"] = "not a date"
 
         with pytest.raises(SchemaError, match=r"result\.turns\[0\]\.timestamp"):
-            Result.from_dict(body)
+            deserialize_record(data=json.dumps(data))
 
     @pytest.mark.parametrize(
         "field", ["turns", "injections", "metadata", "duration_seconds"]
     )
     def test_null_is_not_a_default_for_nonnullable_fields(self, field: str) -> None:
-        body = _make_full_result().to_dict()
-        body[field] = None
+        data = _record_data(ResultRecord(result=_make_full_result()))
+        data["result"][field] = None
 
         with pytest.raises(SchemaError, match=field):
-            Result.from_dict(body)
+            deserialize_record(data=json.dumps(data))
 
 
 class TestAdapterIsolation:
     def test_cold_adapter_resolves_types_without_changing_their_module(self) -> None:
         _result_adapter.cache_clear()
 
-        restored = ResultRecord.from_dict(_minimal_record_dict())
-        restored.to_dict()
+        restored = deserialize_record(data=json.dumps(_minimal_record_dict()))
+        serialize_record(record=restored)
         ResultRecord.json_schema()
 
         assert "datetime" not in vars(core_types)
@@ -725,8 +798,8 @@ class TestAdapterIsolation:
         result = _make_full_result(metadata={"tuple": (1, 2), "opaque": object()})
 
         with pytest.raises(SchemaError, match="metadata"):
-            result.to_dict()
-        Result.json_schema()
+            serialize_record(record=ResultRecord(result=result))
+        ResultRecord.json_schema()
 
         assert adapter.validate_python(result) is result
         assert _regular_adapter(Result).validate_python(result) is result
@@ -734,7 +807,7 @@ class TestAdapterIsolation:
         assert _regular_adapter(Result).json_schema() == original_schema
 
     def test_regular_adapter_can_still_generate_payload_ids(self) -> None:
-        _make_full_result().to_dict()
+        serialize_record(record=ResultRecord(result=_make_full_result()))
 
         payload = _regular_adapter(Payload).validate_python(
             {"content": "live", "metadata": {"tuple": (1, 2)}}
@@ -746,7 +819,7 @@ class TestAdapterIsolation:
     def test_regular_adapter_retains_pydantic_datetime_behavior(self) -> None:
         result = _make_full_result()
 
-        canonical = result.to_dict()
+        canonical = _record_data(ResultRecord(result=result))["result"]
         regular = _regular_adapter(Result).dump_python(result, mode="json")
 
         assert canonical["turns"][0]["timestamp"].endswith("+00:00")
@@ -757,7 +830,7 @@ class TestAdapterIsolation:
     ) -> None:
         artifact = tmp_path / "document.pdf"
         artifact.write_bytes(b"%PDF-1.4 fake")
-        _make_full_result().to_dict()
+        serialize_record(record=ResultRecord(result=_make_full_result()))
 
         payload = _regular_adapter(Payload).validate_python(
             {"content": "doc", "format": "pdf", "artifact": str(artifact)}
@@ -772,7 +845,7 @@ class TestAdapterIsolation:
         result.turns[1].request.attachments[0].metadata["bad"] = (1, 2)
 
         with pytest.raises(SchemaError, match=r"turns\[1\].*metadata"):
-            result.to_dict()
+            serialize_record(record=ResultRecord(result=result))
 
     def test_nested_numeric_fields_are_still_finite(self) -> None:
         result = _make_full_result()
@@ -780,7 +853,7 @@ class TestAdapterIsolation:
         result.turns[0].eval_result.confidence = math.inf
 
         with pytest.raises(SchemaError, match="confidence"):
-            result.to_dict()
+            serialize_record(record=ResultRecord(result=result))
 
 
 class TestTransportPreparationBoundary:
@@ -854,31 +927,26 @@ class TestJsonValueDomain:
         _freeform_maps(result)[map_index]["nested"] = {"bad": invalid}
 
         with pytest.raises(SchemaError, match="nested"):
-            result.to_dict()
+            serialize_record(record=ResultRecord(result=result))
 
-    @pytest.mark.parametrize(
-        "invalid",
-        [(1, 2), b"bytes", Path("file"), object(), math.inf, math.nan, {1: "x"}],
-    )
-    def test_dictionary_input_is_checked_before_json_encoding(
-        self, invalid: object
-    ) -> None:
-        body = _make_full_result().to_dict()
-        body["metadata"]["bad"] = invalid
+    @pytest.mark.parametrize("number", ["1e400", "-1e400"])
+    def test_overflowing_json_numbers_are_rejected(self, number: str) -> None:
+        data = (
+            '{"version": "rampart.trace.v1", "result": {'
+            '"status": "safe", "summary": "clean", '
+            '"observability_level": "response_only", '
+            f'"metadata": {{"bad": {number}}}}}}}'
+        )
 
         with pytest.raises(SchemaError, match="metadata"):
-            Result.from_dict(body)
+            deserialize_record(data=data)
 
     def test_cyclic_values_fail_with_a_field_path(self) -> None:
         result = _make_full_result()
         result.metadata["cycle"] = result.metadata
 
         with pytest.raises(SchemaError, match=r"metadata.*cycle"):
-            result.to_dict()
-        body = _minimal_record_dict()["result"]
-        body["metadata"] = result.metadata
-        with pytest.raises(SchemaError, match=r"metadata.*cycle"):
-            Result.from_dict(body)
+            serialize_record(record=ResultRecord(result=result))
 
     def test_supported_values_round_trip_without_mutation(self) -> None:
         metadata = {
@@ -887,7 +955,9 @@ class TestJsonValueDomain:
         }
         result = _make_full_result(metadata=metadata)
 
-        restored = Result.from_dict(result.to_dict())
+        restored = deserialize_record(
+            data=serialize_record(record=ResultRecord(result=result))
+        ).result
         restored.metadata["nested"]["list"][0]["text"] = "changed"
 
         assert result.metadata == metadata
@@ -908,11 +978,9 @@ class TestJsonNesting:
         )
         record = ResultRecord(result=result)
 
-        body = result.to_dict()
         encoded = serialize_record(record=record)
         restored = deserialize_record(data=encoded)
 
-        assert Result.from_dict(body) == result
         assert restored == record
         assert serialize_record(record=restored) == encoded
 
@@ -937,10 +1005,6 @@ class TestJsonNesting:
         data["result"]["metadata"] = result.metadata
 
         with pytest.raises(SchemaError, match=r"recursion|depth"):
-            result.to_dict()
-        with pytest.raises(SchemaError, match=r"recursion|depth"):
-            ResultRecord.from_dict(data)
-        with pytest.raises(SchemaError, match=r"recursion|depth"):
             serialize_record(record=ResultRecord(result=result))
         with pytest.raises(SchemaError, match=r"recursion|depth"):
             deserialize_record(data=json.dumps(data))
@@ -951,7 +1015,7 @@ class TestJsonNesting:
             patch.object(_result_adapter(), "dump_python", side_effect=original_error),
             pytest.raises(SchemaError, match=r"cannot serialize.*ValueError") as error,
         ):
-            _make_full_result().to_dict()
+            serialize_record(record=ResultRecord(result=_make_full_result()))
 
         assert error.value.__cause__ is original_error
 
@@ -983,7 +1047,7 @@ class TestGeneratedSchema:
     def test_structural_validation_does_not_replace_decoder_semantics(
         self, *, path: tuple[str | int, ...], value: object
     ) -> None:
-        data = ResultRecord(result=_make_full_result()).to_dict()
+        data = _record_data(ResultRecord(result=_make_full_result()))
         parent: Any = data
         for key in path[:-1]:
             parent = parent[key]
@@ -1001,7 +1065,7 @@ class TestGeneratedSchema:
     def test_schema_and_decoder_agree_on_payload_formats(
         self, payload_format: PayloadFormat
     ) -> None:
-        data = ResultRecord(result=_make_full_result()).to_dict()
+        data = _record_data(ResultRecord(result=_make_full_result()))
         data["result"]["turns"][0]["request"]["attachments"][0]["format"] = (
             payload_format.value
         )
@@ -1009,10 +1073,14 @@ class TestGeneratedSchema:
 
         assert validator.is_valid(data) is payload_format.is_text
         if payload_format.is_text:
-            assert ResultRecord.from_dict(data).result.turns[0].request.attachments
+            assert (
+                deserialize_record(data=json.dumps(data))
+                .result.turns[0]
+                .request.attachments
+            )
         else:
             with pytest.raises(SchemaError, match="binary payload"):
-                ResultRecord.from_dict(data)
+                deserialize_record(data=json.dumps(data))
 
     @pytest.mark.parametrize("full", [False, True])
     def test_full_and_minimal_records_conform(self, *, full: bool) -> None:
@@ -1031,10 +1099,10 @@ class TestGeneratedSchema:
         )
 
         validator.validate(data)
-        validator.validate(ResultRecord.from_dict(data).to_dict())
+        validator.validate(_record_data(deserialize_record(data=json.dumps(data))))
 
     def test_unknown_additive_fields_are_allowed_at_every_level(self) -> None:
-        data = ResultRecord(result=_make_full_result()).to_dict()
+        data = _record_data(ResultRecord(result=_make_full_result()))
         body = data["result"]
         turn = body["turns"][0]
         objects = [
@@ -1054,7 +1122,7 @@ class TestGeneratedSchema:
             item["future"] = {"recorded": True}
 
         Draft202012Validator(ResultRecord.json_schema()).validate(data)
-        assert ResultRecord.from_dict(data).result == _make_full_result()
+        assert deserialize_record(data=json.dumps(data)).result == _make_full_result()
 
     @pytest.mark.parametrize(
         ("path", "invalid"),
@@ -1077,7 +1145,7 @@ class TestGeneratedSchema:
     def test_schema_and_decoder_reject_malformed_fields(
         self, *, path: tuple[str | int, ...], invalid: object
     ) -> None:
-        data = ResultRecord(result=_make_full_result()).to_dict()
+        data = _record_data(ResultRecord(result=_make_full_result()))
         parent: Any = data
         for key in path[:-1]:
             parent = parent[key]
@@ -1085,7 +1153,7 @@ class TestGeneratedSchema:
 
         assert not Draft202012Validator(ResultRecord.json_schema()).is_valid(data)
         with pytest.raises(SchemaError, match=re.escape(str(path[-1]))):
-            ResultRecord.from_dict(data)
+            deserialize_record(data=json.dumps(data))
 
     @pytest.mark.parametrize(
         ("prompt", "attachments", "valid"),
@@ -1099,7 +1167,7 @@ class TestGeneratedSchema:
     def test_request_invariant_is_in_schema(
         self, *, prompt: str | None, attachments: bool, valid: bool
     ) -> None:
-        data = ResultRecord(result=_make_full_result()).to_dict()
+        data = _record_data(ResultRecord(result=_make_full_result()))
         request = data["result"]["turns"][0]["request"]
         request["prompt"] = prompt
         if not attachments:
@@ -1107,13 +1175,13 @@ class TestGeneratedSchema:
 
         assert Draft202012Validator(ResultRecord.json_schema()).is_valid(data) is valid
         if valid:
-            ResultRecord.from_dict(data)
+            deserialize_record(data=json.dumps(data))
         else:
             with pytest.raises(SchemaError, match="request"):
-                ResultRecord.from_dict(data)
+                deserialize_record(data=json.dumps(data))
 
     def test_schema_requires_recorded_payload_id(self) -> None:
-        data = ResultRecord(result=_make_full_result()).to_dict()
+        data = _record_data(ResultRecord(result=_make_full_result()))
         del data["result"]["turns"][0]["request"]["attachments"][0]["id"]
 
         assert not Draft202012Validator(ResultRecord.json_schema()).is_valid(data)

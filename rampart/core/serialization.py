@@ -1,28 +1,46 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT license.
 
-"""Versioned ResultRecord envelopes around the canonical Result body codec."""
+"""Canonical, versioned JSON serialization for ResultRecord envelopes."""
 
 from __future__ import annotations
 
 import json
 from collections.abc import Mapping
 from dataclasses import dataclass, replace
+from datetime import datetime
+from functools import cache
+from pathlib import Path
 from typing import (
     TYPE_CHECKING,
+    Annotated,
     Any,
     ClassVar,
 )
 
-from rampart.core._schema import json_string
+from pydantic import (
+    GetPydanticSchema,
+    TypeAdapter,
+    ValidationError,
+)
+from pydantic.json_schema import GenerateJsonSchema
+
+from rampart.core._schema import (
+    json_string,
+    json_value,
+    trace_schema,
+    validation_message,
+)
 from rampart.core.errors import SchemaError, UnsupportedSchemaVersionError
 from rampart.core.result import Result
+from rampart.core.types import Payload, PayloadFormat, Request
 
 if TYPE_CHECKING:
     from collections.abc import Callable
     from typing import Never
 
-    from pydantic.json_schema import JsonSchemaValue
+    from pydantic.json_schema import JsonSchemaMode, JsonSchemaValue
+    from pydantic_core import core_schema
 
 
 # Single root schema version stamped on every serialized record.
@@ -78,52 +96,6 @@ class ResultRecord:
             msg = "record.result_index: expected an integer or null"
             raise SchemaError(msg)
 
-    def to_dict(self) -> dict[str, Any]:
-        """Convert the envelope to a dict using the single Result body codec.
-
-        Returns:
-            dict[str, Any]: A versioned, JSON-safe record.
-
-        Raises:
-            SchemaError: If the referenced result is outside the trace domain.
-        """
-        if not isinstance(self.result.metadata, Mapping):
-            msg = "result.metadata: expected a mapping"
-            raise SchemaError(msg)
-        metadata = {
-            key: value
-            for key, value in self.result.metadata.items()
-            if key not in _RESERVED_METADATA_KEYS
-        }
-        body = replace(self.result, metadata=metadata).to_dict()
-        encoded: dict[str, Any] = {"version": self.VERSION, "result": body}
-        if self.pytest_nodeid is not None:
-            encoded["pytest_nodeid"] = self.pytest_nodeid
-        if self.result_index is not None:
-            encoded["result_index"] = self.result_index
-        return encoded
-
-    @classmethod
-    def from_dict(cls, data: object) -> ResultRecord:
-        """Dispatch a record to its version-specific decoder.
-
-        Returns:
-            ResultRecord: The reconstructed body and attribution.
-
-        Raises:
-            SchemaError: If the record is not a mapping.
-            UnsupportedSchemaVersionError: If the version is unsupported.
-        """
-        if not isinstance(data, Mapping):
-            msg = "record: expected a mapping"
-            raise SchemaError(msg)
-        version = data.get("version")
-        decoder = _DECODERS.get(version) if isinstance(version, str) else None
-        if decoder is None:
-            msg = f"No decoder registered for trace schema version {version!r}."
-            raise UnsupportedSchemaVersionError(msg)
-        return decoder(data)
-
     @classmethod
     def json_schema(cls) -> JsonSchemaValue:
         """Compose the versioned contract with the adapter-generated body schema.
@@ -131,7 +103,7 @@ class ResultRecord:
         Returns:
             JsonSchemaValue: An open Draft 2020-12 schema.
         """
-        body = Result.json_schema()
+        body = _result_adapter().json_schema(schema_generator=_ResultJsonSchema)
         definitions = body.pop("$defs", {})
         return {
             "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -168,7 +140,32 @@ def serialize_record(*, record: ResultRecord) -> str:
     Raises:
         SchemaError: If the record cannot be represented as canonical JSON.
     """
-    data = record.to_dict()
+    if not isinstance(record.result.metadata, Mapping):
+        msg = "result.metadata: expected a mapping"
+        raise SchemaError(msg)
+    metadata = {
+        key: value
+        for key, value in record.result.metadata.items()
+        if key not in _RESERVED_METADATA_KEYS
+    }
+    adapter = _result_adapter()
+    try:
+        validated = adapter.validate_python(
+            replace(record.result, metadata=metadata), strict=True
+        )
+        # JSON-mode dumping has a lower nesting limit than the reader.
+        body = adapter.dump_python(validated, mode="python", warnings="error")
+        _validate_body(body)
+    except ValidationError as exc:
+        raise SchemaError(validation_message(error=exc, path="result")) from exc
+    except (ValueError, RecursionError) as exc:
+        msg = f"result: cannot serialize canonical body ({type(exc).__name__})"
+        raise SchemaError(msg) from exc
+    data: dict[str, Any] = {"version": record.VERSION, "result": body}
+    if record.pytest_nodeid is not None:
+        data["pytest_nodeid"] = record.pytest_nodeid
+    if record.result_index is not None:
+        data["result_index"] = record.result_index
     try:
         return json.dumps(data, allow_nan=False)
     except (ValueError, RecursionError) as exc:
@@ -197,7 +194,35 @@ def deserialize_record(*, data: str) -> ResultRecord:
     except (ValueError, RecursionError) as exc:
         msg = f"record: invalid JSON ({exc})"
         raise SchemaError(msg) from exc
-    return ResultRecord.from_dict(decoded)
+    if not isinstance(decoded, Mapping):
+        msg = "record: expected a mapping"
+        raise SchemaError(msg)
+    version = decoded.get("version")
+    decoder = _DECODERS.get(version) if isinstance(version, str) else None
+    if decoder is None:
+        msg = f"No decoder registered for trace schema version {version!r}."
+        raise UnsupportedSchemaVersionError(msg)
+    return decoder(decoded)
+
+
+def _validate_body(data: object) -> Result:
+    """Validate a body for decoding or the writer's readability check.
+
+    Returns:
+        Result: The reconstructed result.
+
+    Raises:
+        SchemaError: If the body is malformed or outside the trace domain.
+    """
+    try:
+        # JSON-mode strict validation accepts wire enums/dates, not coercions.
+        encoded = json.dumps(json_value(data), allow_nan=False)
+        return _result_adapter().validate_json(encoded, strict=True)
+    except ValidationError as exc:
+        raise SchemaError(validation_message(error=exc, path="result")) from exc
+    except (ValueError, RecursionError) as exc:
+        msg = f"result: {exc}"
+        raise SchemaError(msg) from exc
 
 
 def _reject_json_constant(value: str) -> Never:
@@ -217,7 +242,7 @@ def _decode_v1(data: Mapping[str, Any]) -> ResultRecord:
         ResultRecord: The reconstructed record.
     """
     return ResultRecord(
-        result=Result.from_dict(data.get("result")),
+        result=_validate_body(data.get("result")),
         pytest_nodeid=data.get("pytest_nodeid"),
         result_index=data.get("result_index"),
     )
@@ -226,3 +251,80 @@ def _decode_v1(data: Mapping[str, Any]) -> ResultRecord:
 _DECODERS: dict[str, Callable[[Mapping[str, Any]], ResultRecord]] = {
     TRACE_SCHEMA_VERSION: _decode_v1,
 }
+
+
+@cache
+def _result_adapter() -> TypeAdapter[Result]:
+    """Build the recursive adapter once, on first serialization use.
+
+    Returns:
+        TypeAdapter[Result]: The cached adapter.
+    """
+    adapter = TypeAdapter[Result](Annotated[Result, GetPydanticSchema(trace_schema)])
+    # Nested dataclasses keep these imports under TYPE_CHECKING.
+    adapter.rebuild(_types_namespace={"datetime": datetime, "Path": Path})
+    return adapter
+
+
+class _ResultJsonSchema(GenerateJsonSchema):
+    """Describe trace-only restrictions alongside the dataclass field schemas."""
+
+    def generate(
+        self, schema: core_schema.CoreSchema, mode: JsonSchemaMode = "validation"
+    ) -> JsonSchemaValue:
+        """Omit runtime class documentation from the published wire contract.
+
+        Returns:
+            JsonSchemaValue: A schema with only trace-specific descriptions.
+        """
+        result = super().generate(schema, mode=mode)
+        result.pop("description", None)
+        definitions = result.get("$defs", {})
+        for definition in definitions.values():
+            definition.pop("description", None)
+        if "Payload" in definitions:
+            definitions["Payload"]["description"] = (
+                "Recorded text payload. Binary formats and file artifacts "
+                "are not supported by this trace schema."
+            )
+        return result
+
+    def dataclass_schema(self, schema: core_schema.DataclassSchema) -> JsonSchemaValue:
+        """Add trace policies that do not restrict live dataclass construction.
+
+        Returns:
+            JsonSchemaValue: An open object schema matching the trace validators.
+        """
+        result = super().dataclass_schema(schema)
+        result["additionalProperties"] = True
+        if schema["cls"] is Payload:
+            result["properties"]["format"] = {
+                "type": "string",
+                "enum": [value.value for value in PayloadFormat if value.is_text],
+                "default": PayloadFormat.TEXT.value,
+            }
+            result["properties"]["artifact"] = {"type": "null", "default": None}
+            result["required"] = [*result["required"], "id"]
+        elif schema["cls"] is Request:
+            result["anyOf"] = [
+                {"required": ["prompt"], "properties": {"prompt": {"type": "string"}}},
+                {
+                    "required": ["attachments"],
+                    "properties": {"attachments": {"type": "array", "minItems": 1}},
+                },
+            ]
+        return result
+
+    def datetime_schema(self, schema: core_schema.DatetimeSchema) -> JsonSchemaValue:
+        """Describe Python datetimes without claiming RFC 3339 validation.
+
+        Returns:
+            JsonSchemaValue: A string with decoder-enforced datetime semantics.
+        """
+        result = super().datetime_schema(schema)
+        result.pop("format", None)
+        result["description"] = (
+            "Python ISO 8601 datetime; UTC offset is optional. "
+            "Parseability is enforced by the record decoder, not this schema."
+        )
+        return result

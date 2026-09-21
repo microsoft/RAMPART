@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import json
+from copy import deepcopy
 from dataclasses import replace
 from datetime import timedelta, timezone
 from typing import TYPE_CHECKING, Any
@@ -160,16 +161,6 @@ def _results() -> SearchStrategy[Result]:
 
 
 class TestGeneratedRoundTrips:
-    @given(result=_results())
-    def test_body_preserves_supported_values(self, result: Result) -> None:
-        body = result.to_dict()
-
-        restored = Result.from_dict(json.loads(json.dumps(body, allow_nan=False)))
-
-        assert restored == result
-        assert restored.to_dict() == body
-        assert result.to_dict() == body
-
     @given(
         result=_results(),
         nodeid=st.none() | st.text(max_size=40),
@@ -178,17 +169,26 @@ class TestGeneratedRoundTrips:
     def test_record_round_trip_matches_the_structural_schema(
         self, *, result: Result, nodeid: str | None, index: int | None
     ) -> None:
+        expected = replace(result, metadata={"user": result.metadata})
+        result = replace(
+            expected,
+            metadata={
+                **expected.metadata,
+                "_rampart_source_worker": "gw0",
+                "_pytest_nodeid": "private",
+            },
+        )
         record = ResultRecord(result=result, pytest_nodeid=nodeid, result_index=index)
-        original_body = result.to_dict()
+        original = deepcopy(record)
         encoded = serialize_record(record=record)
         body = json.loads(encoded)
 
         restored = deserialize_record(data=encoded)
 
-        assert restored.result == replace(result, metadata=body["result"]["metadata"])
+        assert restored.result == expected
         assert restored.pytest_nodeid == nodeid
         assert restored.result_index == index
-        assert restored.to_dict() == body
-        assert record.to_dict() == body
-        assert result.to_dict() == original_body
+        assert serialize_record(record=restored) == encoded
+        assert serialize_record(record=record) == encoded
+        assert record == original
         Draft202012Validator(ResultRecord.json_schema()).validate(body)
