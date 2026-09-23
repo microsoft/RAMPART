@@ -128,9 +128,7 @@ def serialize_record(*, record: ResultRecord) -> str:
     adapter = _result_adapter()
     try:
         validated = adapter.validate_python(record.result, strict=True)
-        # JSON-mode dumping has a lower nesting limit than the reader.
-        body = adapter.dump_python(validated, mode="python", warnings="error")
-        _validate_body(body)
+        body = adapter.dump_python(validated, mode="json", warnings="error")
     except ValidationError as exc:
         raise SchemaError(validation_message(error=exc, path="result")) from exc
     except (ValueError, RecursionError) as exc:
@@ -181,7 +179,7 @@ def deserialize_record(*, data: str) -> ResultRecord:
 
 
 def _validate_body(data: object) -> Result:
-    """Validate a body for decoding or the writer's readability check.
+    """Validate a JSON body and reconstruct its Result.
 
     Returns:
         Result: The reconstructed result.

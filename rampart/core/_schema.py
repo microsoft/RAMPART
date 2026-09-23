@@ -8,7 +8,6 @@ from __future__ import annotations
 import math
 from collections.abc import Mapping
 from datetime import datetime
-from operator import attrgetter
 from typing import TYPE_CHECKING
 
 from pydantic_core import core_schema
@@ -95,16 +94,14 @@ def _trace_schema(
 
 
 def _trace_scalar(schema: core_schema.CoreSchema) -> core_schema.CoreSchema:
-    """Apply wire representations to copied enum and datetime schema nodes.
+    """Apply Unicode and datetime policies to copied scalar schema nodes.
 
     Returns:
         CoreSchema: The schema with scalar serialization policies applied.
     """
-    if schema["type"] == "enum":
-        schema["serialization"] = core_schema.plain_serializer_function_ser_schema(
-            attrgetter("value")
-        )
-    elif schema["type"] == "datetime":
+    if schema["type"] == "str":
+        return core_schema.no_info_after_validator_function(_trace_string, schema)
+    if schema["type"] == "datetime":
         return core_schema.with_info_before_validator_function(
             _iso_datetime,
             schema,
@@ -114,6 +111,15 @@ def _trace_scalar(schema: core_schema.CoreSchema) -> core_schema.CoreSchema:
         )
 
     return schema
+
+
+def _trace_string(value: str) -> str:
+    """Validate typed strings before JSON-mode serialization.
+
+    Returns:
+        str: The unchanged Unicode-scalar string.
+    """
+    return json_string(value=value, path="$")
 
 
 def _trace_dataclass(

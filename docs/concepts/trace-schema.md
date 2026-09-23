@@ -48,11 +48,16 @@ declared defaults; explicit `null` is accepted only on nullable fields. Payload
 IDs must be recorded, not generated during deserialization. These boundary
 rules do not replace the normal dataclass constructors used during execution.
 
-Body encoding uses adapter-local enum and datetime serializers in Python mode,
-then validates the body through the same reader logic before emitting record JSON.
-This extra validation pass aligns writer and reader nesting support without
-introducing a new depth cap or inheriting Pydantic's lower JSON-mode writer limit.
-Interpreter and parser recursion limits still apply; failures raise `SchemaError`.
+Body encoding validates the live result and uses Pydantic's JSON-mode
+serialization, with adapter-local Unicode validation and Python ISO datetime
+formatting. The writer does not reconstruct its output through the reader.
+
+Nesting support follows the underlying serializer, parser, and interpreter limits;
+the codec does not promise matching reader/writer depth support. In particular,
+some deeply nested external records can decode successfully but fail when
+re-encoded because Pydantic's JSON-mode writer has a lower nesting limit.
+These failures raise `SchemaError`; successful decoding alone does not guarantee
+that an unusually deep record can be emitted again.
 
 These policies belong to the cached canonical adapter, not to the public
 dataclass annotations or configuration. Fields remain `dict[str, Any]` and

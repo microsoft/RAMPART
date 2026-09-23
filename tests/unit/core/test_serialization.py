@@ -175,6 +175,14 @@ class TestRoundTrip:
         assert json.loads(encoded)["version"] == TRACE_SCHEMA_VERSION
         assert decoded == original
 
+    def test_encoding_does_not_reconstruct_the_record(self) -> None:
+        record = ResultRecord(result=_make_full_result())
+        with patch.object(_result_adapter(), "validate_json") as reader:
+            encoded = serialize_record(record=record)
+
+        reader.assert_not_called()
+        assert deserialize_record(data=encoded) == record
+
     def test_version_is_stamped_on_the_record(self) -> None:
         encoded = _record_data(ResultRecord(result=_make_full_result()))
 
@@ -994,10 +1002,10 @@ class TestJsonValueDomain:
 
 
 class TestJsonNesting:
-    @pytest.mark.parametrize("depth", [100, 180])
+    @pytest.mark.parametrize("depth", [2, 10])
     @pytest.mark.parametrize("mapping", [False, True])
     @pytest.mark.parametrize("map_index", range(5))
-    def test_deep_supported_values_round_trip(
+    def test_supported_nested_values_round_trip(
         self, *, depth: int, mapping: bool, map_index: int
     ) -> None:
         result = _make_full_result()
@@ -1012,19 +1020,24 @@ class TestJsonNesting:
         assert restored == record
         assert serialize_record(record=restored) == encoded
 
-    def test_deep_external_record_can_be_reencoded(self) -> None:
+    @pytest.mark.parametrize("mapping", [False, True])
+    def test_reader_can_accept_deeper_records_than_writer(
+        self, *, mapping: bool
+    ) -> None:
         data = _minimal_record_dict()
         data["result"]["metadata"] = {
-            "deep": _nested_json_value(depth=100, mapping=False)
+            "deep": _nested_json_value(depth=100, mapping=mapping)
         }
 
         record = deserialize_record(data=json.dumps(data))
-        encoded = serialize_record(record=record)
 
-        assert json.loads(encoded)["result"]["metadata"] == data["result"]["metadata"]
+        assert record.result.metadata == data["result"]["metadata"]
+        with pytest.raises(SchemaError, match="cannot serialize") as error:
+            serialize_record(record=record)
+        assert isinstance(error.value.__cause__, ValueError)
 
     @pytest.mark.parametrize("mapping", [False, True])
-    def test_parser_depth_failures_raise_schema_error_on_both_boundaries(
+    def test_excessive_nesting_raises_schema_error_on_both_boundaries(
         self, *, mapping: bool
     ) -> None:
         value = _nested_json_value(depth=250, mapping=mapping)
@@ -1032,7 +1045,7 @@ class TestJsonNesting:
         data = _minimal_record_dict()
         data["result"]["metadata"] = result.metadata
 
-        with pytest.raises(SchemaError, match=r"recursion|depth"):
+        with pytest.raises(SchemaError, match="cannot serialize"):
             serialize_record(record=ResultRecord(result=result))
         with pytest.raises(SchemaError, match=r"recursion|depth"):
             deserialize_record(data=json.dumps(data))
