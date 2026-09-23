@@ -293,20 +293,36 @@ class TestJsonTextBoundary:
         with pytest.raises(SchemaError, match=r"record: invalid JSON.*non-finite"):
             deserialize_record(data=data)
 
-    def test_serialization_preserves_metadata_policy(self) -> None:
+    @pytest.mark.parametrize(
+        "key",
+        [
+            "_pytest_nodeid",
+            "_pytest_test_name",
+            "_rampart_result_index",
+            "_rampart_source_worker",
+            "_rampart_transport_truncated",
+            "_rampart_original_size_bytes",
+            "_rampart_limit_bytes",
+            "_rampart_worker_format",
+            "_rampart_worker_artifact_path",
+        ],
+    )
+    @pytest.mark.parametrize("value", [object(), (1, 2), math.nan])
+    def test_transport_metadata_uses_the_same_value_domain(
+        self, *, key: str, value: object
+    ) -> None:
         result = _make_full_result(
             metadata={
-                "_rampart_source_worker": object(),
+                key: value,
                 "nested": {"_rampart_source_worker": "keep"},
             }
         )
 
-        encoded = serialize_record(record=ResultRecord(result=result))
+        with pytest.raises(SchemaError, match=rf"metadata.*{key}"):
+            serialize_record(record=ResultRecord(result=result))
 
-        assert json.loads(encoded)["result"]["metadata"] == {
-            "nested": {"_rampart_source_worker": "keep"}
-        }
-        assert "_rampart_source_worker" in result.metadata
+        assert result.metadata[key] is value
+        assert result.metadata["nested"] == {"_rampart_source_worker": "keep"}
 
     def test_serialization_rejects_non_json_values(self) -> None:
         record = ResultRecord(result=_make_full_result(metadata={"bad": math.nan}))
@@ -485,14 +501,26 @@ class TestMigrationTolerance:
 
 
 class TestValueDomain:
-    def test_reserved_metadata_keys_are_stripped(self) -> None:
+    def test_transport_metadata_is_preserved(self) -> None:
         result = _make_full_result(
-            metadata={"_pytest_nodeid": "x::y", "note": "keep me"},
+            metadata={
+                "_pytest_nodeid": "x::y",
+                "_pytest_test_name": "y",
+                "_rampart_result_index": 0,
+                "_rampart_source_worker": "gw0",
+                "_rampart_transport_truncated": True,
+                "_rampart_original_size_bytes": 4097,
+                "_rampart_limit_bytes": 4096,
+                "_rampart_worker_format": "pdf",
+                "_rampart_worker_artifact_path": "worker.pdf",
+                "note": "keep me",
+            },
         )
 
         encoded = _record_data(ResultRecord(result=result))
 
-        assert encoded["result"]["metadata"] == {"note": "keep me"}
+        assert encoded["result"]["metadata"] == result.metadata
+        assert deserialize_record(data=json.dumps(encoded)).result == result
 
     def test_harm_category_is_passed_through_as_string(self) -> None:
         result = _make_full_result()
@@ -661,12 +689,12 @@ class TestResultAdapter:
             format_checker=Draft202012Validator.FORMAT_CHECKER,
         ).validate(encoded)
 
-    def test_record_filters_only_top_level_metadata_without_mutation(self) -> None:
+    def test_record_preserves_metadata_without_mutation(self) -> None:
         original = _make_full_result(
             metadata={
                 "_rampart_source_worker": "gw0",
                 "_pytest_nodeid": "test",
-                "_rampart_worker_artifact_path": object(),
+                "_rampart_worker_artifact_path": "worker.pdf",
                 "user": {"_rampart_source_worker": "keep"},
             }
         )
@@ -679,24 +707,24 @@ class TestResultAdapter:
         assert record.result is original
         assert body["summary"] == original.summary
         assert body["metadata"] == {
-            "user": {"_rampart_source_worker": "keep", "extra": True}
+            **original.metadata,
+            "user": {"_rampart_source_worker": "keep", "extra": True},
         }
         assert original.metadata["user"] == {"_rampart_source_worker": "keep"}
         assert "_rampart_worker_artifact_path" in original.metadata
 
-    def test_decoding_retains_transport_metadata_until_reencoding(self) -> None:
+    def test_decoding_and_reencoding_retain_transport_metadata(self) -> None:
         data = _minimal_record_dict()
         data["result"]["metadata"] = {
             "_rampart_source_worker": "gw0",
+            "_rampart_transport_truncated": True,
             "nested": {"_rampart_source_worker": "keep"},
         }
 
         record = deserialize_record(data=json.dumps(data))
 
         assert record.result.metadata == data["result"]["metadata"]
-        assert _record_data(record)["result"]["metadata"] == {
-            "nested": {"_rampart_source_worker": "keep"}
-        }
+        assert _record_data(record)["result"]["metadata"] == data["result"]["metadata"]
         assert record.result.metadata == data["result"]["metadata"]
 
     @pytest.mark.parametrize("index", [None, 0, 2])

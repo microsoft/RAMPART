@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Mapping
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from datetime import datetime
 from functools import cache
 from pathlib import Path
@@ -45,21 +45,6 @@ if TYPE_CHECKING:
 
 # Single root schema version stamped on every serialized record.
 TRACE_SCHEMA_VERSION = "rampart.trace.v1"
-
-# Strip only top-level transport bookkeeping, never matching nested user keys.
-_RESERVED_METADATA_KEYS = frozenset(
-    {
-        "_pytest_nodeid",
-        "_pytest_test_name",
-        "_rampart_result_index",
-        "_rampart_source_worker",
-        "_rampart_transport_truncated",
-        "_rampart_original_size_bytes",
-        "_rampart_limit_bytes",
-        "_rampart_worker_format",
-        "_rampart_worker_artifact_path",
-    }
-)
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -140,19 +125,9 @@ def serialize_record(*, record: ResultRecord) -> str:
     Raises:
         SchemaError: If the record cannot be represented as canonical JSON.
     """
-    if not isinstance(record.result.metadata, Mapping):
-        msg = "result.metadata: expected a mapping"
-        raise SchemaError(msg)
-    metadata = {
-        key: value
-        for key, value in record.result.metadata.items()
-        if key not in _RESERVED_METADATA_KEYS
-    }
     adapter = _result_adapter()
     try:
-        validated = adapter.validate_python(
-            replace(record.result, metadata=metadata), strict=True
-        )
+        validated = adapter.validate_python(record.result, strict=True)
         # JSON-mode dumping has a lower nesting limit than the reader.
         body = adapter.dump_python(validated, mode="python", warnings="error")
         _validate_body(body)

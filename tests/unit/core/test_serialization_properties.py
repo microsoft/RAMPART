@@ -169,13 +169,13 @@ class TestGeneratedRoundTrips:
     def test_record_round_trip_matches_the_structural_schema(
         self, *, result: Result, nodeid: str | None, index: int | None
     ) -> None:
-        expected = replace(result, metadata={"user": result.metadata})
         result = replace(
-            expected,
+            result,
             metadata={
-                **expected.metadata,
+                **result.metadata,
                 "_rampart_source_worker": "gw0",
                 "_pytest_nodeid": "private",
+                "_rampart_transport_truncated": True,
             },
         )
         record = ResultRecord(result=result, pytest_nodeid=nodeid, result_index=index)
@@ -185,7 +185,7 @@ class TestGeneratedRoundTrips:
 
         restored = deserialize_record(data=encoded)
 
-        assert restored.result == expected
+        assert restored.result == result
         assert restored.pytest_nodeid == nodeid
         assert restored.result_index == index
         assert serialize_record(record=restored) == encoded

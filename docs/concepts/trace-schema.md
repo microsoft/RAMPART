@@ -151,6 +151,14 @@ the original, then use the same record codec. Caps, rendering sanitization,
 worker bookkeeping, and explicit loss/truncation markers remain transport
 responsibilities. None belongs in a second field-by-field result serializer.
 
+The codec does not reserve or filter metadata keys. Reporting and transport
+integration must share an explicit preparation policy for separating bookkeeping
+from user metadata, rather than maintaining independent exclusion lists. Apply
+that policy to a separate prepared result, preserving nested user mappings and
+the original result. Loss/truncation information must remain visible in the
+appropriate transport envelope or report; removing bookkeeping must not erase
+evidence of loss. Direct serialization does not perform this preparation.
+
 A text placeholder prepared from a binary payload is a lossy transport view,
 not a durable copy of that payload. Original format/path information must remain
 available for transport diagnostics, and the containing transport must identify
@@ -232,11 +240,10 @@ flowchart TD
 - `rampart.trace.v1` does not define a durable representation for binary or
   opaque payload artifacts. Encoding or decoding one fails closed rather than
   coercing it to text.
-- `serialize_record()` removes transport bookkeeping keys, including
-  `_rampart_source_worker`, from top-level `Result.metadata` in the encoded
-  output. Record decoding does not filter these keys.
-  Re-encoding a decoded record filters them from output without mutating the
-  result. Nested user mappings are preserved.
+- Encoding and decoding preserve supported metadata, including keys used for
+  transport bookkeeping or loss/truncation markers. Unsupported values are
+  rejected regardless of the key name. Metadata hygiene belongs to consumer
+  preparation, not to the canonical codec.
 
 ## Migration mechanics
 
