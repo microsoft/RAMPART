@@ -102,6 +102,10 @@ For a contract change, update the declaration:
   files, and references a nonempty repository migration document in `migration_note`.
   The migration obligations below still apply, including an upcaster and API/CLI.
 
+Historical schema files remain unchanged in subsequent same-major PRs, not just
+during a major bump. A `compatible` decision may update the active major's schema;
+a major bump must preserve every schema file already published at the PR base.
+
 The declaration records the current `version`, `contract_sha256`,
 `previous_contract_sha256`, `decision`, and `rationale`. For a change to an existing
 contract, the previous fingerprint must match the PR base's declaration. Obtain

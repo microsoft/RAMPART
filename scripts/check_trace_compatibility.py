@@ -186,15 +186,21 @@ def _validate_decision(
         raise ValueError(msg)
 
 
-def _preserve_schemas(*, files: dict[str, str], base: dict[str, str]) -> None:
-    """Keep published historical schemas when introducing a new major.
+def _preserve_schemas(
+    *, files: dict[str, str], base: dict[str, str], editable_schema: str | None
+) -> None:
+    """Keep historical schemas unchanged across every contract change.
 
     Raises:
         ValueError: If an earlier schema was changed or removed.
     """
     for path, text in base.items():
-        if path.endswith(".schema.json") and files.get(path) != text:
-            msg = f"A major bump must retain the previous published schema: {path}"
+        if (
+            path.endswith(".schema.json")
+            and path != editable_schema
+            and files.get(path) != text
+        ):
+            msg = f"Contract changes must retain the previous published schema: {path}"
             raise ValueError(msg)
 
 
@@ -238,8 +244,12 @@ def check_compatibility(*, root: Path, base_ref: str | None = None) -> None:
     if current == previous and files == base:
         return
     _validate_decision(root=root, current=current, previous=previous)
-    if current.version != previous.version:
-        _preserve_schemas(files=files, base=base)
+    editable_schema = (
+        f"schemas/trace.{current.version.rsplit('.', 1)[-1]}.schema.json"
+        if current.version == previous.version
+        else None
+    )
+    _preserve_schemas(files=files, base=base, editable_schema=editable_schema)
 
 
 def main() -> None:

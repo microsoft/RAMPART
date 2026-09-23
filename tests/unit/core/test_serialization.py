@@ -26,7 +26,7 @@ from unittest.mock import patch
 
 import pytest
 from jsonschema import Draft202012Validator
-from pydantic import TypeAdapter
+from pydantic import TypeAdapter, ValidationError
 
 from rampart.core import types as core_types
 from rampart.core.result import (
@@ -1165,6 +1165,17 @@ class TestJsonNesting:
 
         assert error.value.__cause__ is original_error
 
+    def test_writer_json_recursion_error_is_wrapped(self) -> None:
+        record = ResultRecord(result=_make_full_result())
+        original_error = RecursionError("maximum recursion depth exceeded")
+        with (
+            patch.object(json, "dumps", side_effect=original_error),
+            pytest.raises(SchemaError, match="record: cannot serialize JSON") as error,
+        ):
+            serialize_record(record=record)
+
+        assert error.value.__cause__ is original_error
+
     @pytest.mark.parametrize("method", ["loads", "dumps"])
     def test_reader_json_recursion_error_is_wrapped(self, method: str) -> None:
         encoded = json.dumps(_minimal_record_dict())
@@ -1188,6 +1199,31 @@ class TestJsonNesting:
             ),
             pytest.raises(
                 SchemaError, match="maximum recursion depth exceeded"
+            ) as error,
+        ):
+            deserialize_record(data=encoded)
+
+        assert error.value.__cause__ is original_error
+
+    def test_reader_adapter_json_invalid_error_is_wrapped(self) -> None:
+        encoded = json.dumps(_minimal_record_dict())
+        original_error = ValidationError.from_exception_data(
+            "Result",
+            [
+                {
+                    "type": "json_invalid",
+                    "loc": (),
+                    "input": encoded,
+                    "ctx": {"error": "recursion limit exceeded"},
+                }
+            ],
+        )
+        with (
+            patch.object(
+                _result_adapter(), "validate_json", side_effect=original_error
+            ),
+            pytest.raises(
+                SchemaError, match="result: Invalid JSON: recursion limit exceeded"
             ) as error,
         ):
             deserialize_record(data=encoded)

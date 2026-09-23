@@ -91,6 +91,29 @@ def _initial_base(*, root: Path, monkeypatch) -> CompatibilityDeclaration:
     return declaration
 
 
+def _bumped_base(*, root: Path, monkeypatch) -> CompatibilityDeclaration:
+    original = _initial_base(root=root, monkeypatch=monkeypatch)
+    _write_contract(root=root, major=2)
+    monkeypatch.setattr(compatibility, "TRACE_SCHEMA_VERSION", "rampart.trace.v2")
+    (root / "migration.md").write_text("How to migrate v1 to v2.", encoding="utf-8")
+    declaration = _write_declaration(
+        root=root,
+        major=2,
+        decision=CompatibilityDecision.NEW_MAJOR,
+        previous=original.contract_sha256,
+        migration_note="migration.md",
+    )
+    check_compatibility(root=root, base_ref="base")
+    _mock_git_base(
+        monkeypatch=monkeypatch,
+        files={
+            **_contract_files(root),
+            CompatibilityDeclaration.PATH: declaration.model_dump_json(),
+        },
+    )
+    return declaration
+
+
 class TestContractFingerprint:
     def test_is_stable_across_line_endings_and_mapping_order(self) -> None:
         assert _fingerprint({"a": "one\r\ntwo\r\n", "b": "text"}) == _fingerprint(
@@ -364,6 +387,46 @@ class TestMajorVersionDecision:
 
         with pytest.raises(ValueError, match="retain the previous published schema"):
             check_compatibility(root=tmp_path, base_ref="base")
+
+    @pytest.mark.parametrize("delete", [True, False])
+    def test_same_major_retains_historical_schemas_after_bump(
+        self, *, tmp_path, monkeypatch, delete
+    ) -> None:
+        original = _bumped_base(root=tmp_path, monkeypatch=monkeypatch)
+        schema = tmp_path / "schemas" / "trace.v1.schema.json"
+        if delete:
+            schema.unlink()
+        else:
+            schema.write_text("changed old contract", encoding="utf-8")
+        _write_declaration(
+            root=tmp_path,
+            major=2,
+            decision=CompatibilityDecision.COMPATIBLE,
+            previous=original.contract_sha256,
+        )
+
+        with pytest.raises(
+            ValueError,
+            match=r"retain the previous published schema.*trace\.v1\.schema\.json",
+        ):
+            check_compatibility(root=tmp_path, base_ref="base")
+
+    def test_same_major_can_update_active_schema_after_bump(
+        self, *, tmp_path, monkeypatch
+    ) -> None:
+        original = _bumped_base(root=tmp_path, monkeypatch=monkeypatch)
+        path = tmp_path / "schemas" / "trace.v2.schema.json"
+        schema = json.loads(path.read_text(encoding="utf-8"))
+        schema["properties"]["optional_field"] = {"type": "string"}
+        path.write_text(json.dumps(schema), encoding="utf-8")
+        _write_declaration(
+            root=tmp_path,
+            major=2,
+            decision=CompatibilityDecision.COMPATIBLE,
+            previous=original.contract_sha256,
+        )
+
+        check_compatibility(root=tmp_path, base_ref="base")
 
 
 class TestSchemaGeneration:
