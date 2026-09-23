@@ -165,7 +165,7 @@ available for transport diagnostics, and the containing transport must identify
 the loss. Do not persist that view as a full-fidelity replay artifact. The
 canonical reader itself never performs this conversion or opens a worker path.
 Supporting durable binary artifacts requires a separately designed
-representation and compatibility review; reserving an `artifacts` field alone
+representation and compatibility review; adding optional artifact metadata alone
 does not make currently rejected formats readable by older readers.
 
 ## Versioning
@@ -185,8 +185,8 @@ does not make currently rejected formats readable by older readers.
 - **Missing = not recorded (not "false").** An absent optional field means the
   producer *did not record it* — never that its value was empty, false, or zero.
   Readers supply a default for *shape* only; consumers must not infer a semantic
-  negative from absence. A v1 record with no `manifest_snapshot` means "the
-  manifest was not captured," not "there was no manifest."
+  negative from absence. An absent optional provenance field means "provenance
+  was not captured," not "no such event occurred."
   This is interpretation guidance, not field-presence tracking: decoding uses
   defaults and does not retain which fields were absent. For example, omitted
   `turns` becomes `[]` and is emitted when re-encoded.
@@ -258,18 +258,17 @@ the migration policy requires:
   artifact in place; and
 - encountering an unsupported major fails closed.
 
-## Reserved additive fields (named now, populated later)
+## Future extensions
 
-These record-level wire-only collar slots are reserved by name so they can be
-added without a major bump:
-`manifest_snapshot`, `evaluation_fingerprint`, `replay_provenance`,
-`population_ref`, plus `artifacts` / `target` / `provenance`. A field that is
-truly *intrinsic to a result* instead lands as an additive-optional field on
-`Result`, inside the referenced `result` body. Either way each is
-additive-optional; none is emitted by the current implementation.
+Introduce fields when their producers, consumers, and absence semantics are
+defined. This schema does not reserve future field names or shapes. Wire-only
+attribution belongs on `ResultRecord`; data intrinsic to a result belongs on
+`Result`, inside the referenced `result` body.
 
-Other future fields follow the same general rule: optional additions with a
-defined absence behavior do not require a major bump; structural changes do.
+Optional additions that older readers may ignore and whose absence has a defined
+default do not require a major bump. Structural changes do. Apply the compatibility
+review and declaration requirements to each extension rather than promising
+compatibility for an unimplemented representation.
 
 ## Support window
 
