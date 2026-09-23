@@ -136,20 +136,25 @@
     },
     "PopulationRef": {
       "additionalProperties": true,
+      "description": "Trial population provenance. The decoder additionally requires index to be less than size.",
       "properties": {
         "id": {
           "title": "Id",
           "type": "string"
         },
         "index": {
+          "minimum": 0,
           "title": "Index",
           "type": "integer"
         },
         "size": {
+          "minimum": 1,
           "title": "Size",
           "type": "integer"
         },
         "threshold": {
+          "maximum": 1.0,
+          "minimum": 0.0,
           "title": "Threshold",
           "type": "number"
         }
@@ -459,6 +464,7 @@
       "type": "object"
     },
     "result_index": {
+      "minimum": 0,
       "type": [
         "integer",
         "null"

@@ -578,6 +578,20 @@ class TestValueDomain:
         with pytest.raises(SchemaError, match="result_index"):
             ResultRecord(result=_make_full_result(), result_index=True)
 
+    def test_negative_result_index_is_rejected(self) -> None:
+        data = _minimal_record_dict()
+        data["result_index"] = -1
+
+        assert not Draft202012Validator(ResultRecord.json_schema()).is_valid(data)
+        with pytest.raises(
+            SchemaError, match=r"result_index.*greater than or equal to 0"
+        ):
+            ResultRecord(result=_make_full_result(), result_index=-1)
+        with pytest.raises(
+            SchemaError, match=r"result_index.*greater than or equal to 0"
+        ):
+            deserialize_record(data=json.dumps(data))
+
 
 class TestBinaryPayloadFailsClosed:
     def test_encoding_a_binary_payload_fails_closed(self, tmp_path) -> None:
@@ -795,7 +809,103 @@ class TestResultAdapter:
             deserialize_record(data=json.dumps(data))
 
 
+class TestPopulationInvariants:
+    @pytest.mark.parametrize(
+        ("field", "invalid"),
+        [
+            ("index", -1),
+            ("size", -1),
+            ("size", 0),
+            ("threshold", -0.1),
+            ("threshold", 1.1),
+        ],
+    )
+    def test_numeric_bounds_apply_to_both_boundaries_and_schema(
+        self, *, field: str, invalid: float
+    ) -> None:
+        result = _make_full_result()
+        record = ResultRecord(result=result)
+        data = _record_data(record)
+        data["result"]["population"][field] = invalid
+        assert result.population is not None
+        result.population = replace(result.population, **{field: invalid})
+
+        assert not Draft202012Validator(ResultRecord.json_schema()).is_valid(data)
+        with pytest.raises(SchemaError, match=rf"population\.{field}") as error:
+            serialize_record(record=record)
+        assert error.value.__cause__ is not None
+        with pytest.raises(SchemaError, match=rf"population\.{field}"):
+            deserialize_record(data=json.dumps(data))
+        assert getattr(result.population, field) == invalid
+
+    @pytest.mark.parametrize(("index", "size"), [(1, 1), (5, 5), (6, 5)])
+    def test_index_must_be_less_than_size(self, *, index: int, size: int) -> None:
+        result = _make_full_result()
+        data = _record_data(ResultRecord(result=result))
+        result.population = PopulationRef(
+            id="pop-1", index=index, size=size, threshold=0.5
+        )
+        data["result"]["population"].update(index=index, size=size)
+
+        Draft202012Validator(ResultRecord.json_schema()).validate(data)
+        with pytest.raises(
+            SchemaError, match=r"population.*index must be less than size"
+        ):
+            serialize_record(record=ResultRecord(result=result))
+        with pytest.raises(
+            SchemaError, match=r"population.*index must be less than size"
+        ):
+            deserialize_record(data=json.dumps(data))
+
+    @pytest.mark.parametrize(("index", "size"), [(0, 1), (0, 5), (4, 5)])
+    @pytest.mark.parametrize("threshold", [0.0, 0.5, 1.0])
+    def test_valid_boundaries_round_trip(
+        self, *, index: int, size: int, threshold: float
+    ) -> None:
+        result = _make_full_result()
+        result.population = PopulationRef(
+            id="pop-1", index=index, size=size, threshold=threshold
+        )
+        record = ResultRecord(result=result, result_index=0)
+
+        encoded = serialize_record(record=record)
+
+        assert deserialize_record(data=encoded) == record
+        Draft202012Validator(ResultRecord.json_schema()).validate(json.loads(encoded))
+
+    def test_schema_publishes_bounds_and_cross_field_caveat(self) -> None:
+        schema = ResultRecord.json_schema()
+        population = schema["$defs"]["PopulationRef"]
+
+        assert schema["properties"]["result_index"]["minimum"] == 0
+        assert population["properties"]["index"]["minimum"] == 0
+        assert population["properties"]["size"]["minimum"] == 1
+        assert population["properties"]["threshold"]["minimum"] == 0
+        assert population["properties"]["threshold"]["maximum"] == 1
+        assert "index to be less than size" in population["description"]
+
+
 class TestAdapterIsolation:
+    def test_live_population_construction_and_regular_adapters_are_unchanged(
+        self,
+    ) -> None:
+        data = {"id": "pop-1", "index": -1, "size": 0, "threshold": 2.0}
+        population = PopulationRef(**data)
+        regular = _regular_adapter(PopulationRef)
+        original_schema = regular.json_schema()
+        assert regular.validate_python(data) == population
+        result = _make_full_result()
+        result.population = population
+
+        with pytest.raises(SchemaError, match="population"):
+            serialize_record(record=ResultRecord(result=result))
+        ResultRecord.json_schema()
+
+        assert regular.validate_python(data) == population
+        assert _regular_adapter(PopulationRef).validate_python(data) == population
+        assert regular.json_schema() == original_schema
+        assert _regular_adapter(PopulationRef).json_schema() == original_schema
+
     def test_cold_adapter_resolves_types_without_changing_their_module(self) -> None:
         _result_adapter.cache_clear()
 

@@ -48,6 +48,12 @@ declared defaults; explicit `null` is accepted only on nullable fields. Payload
 IDs must be recorded, not generated during deserialization. These boundary
 rules do not replace the normal dataclass constructors used during execution.
 
+When recorded, `result_index` must be a nonnegative integer. Population references
+require a positive `size`, a zero-based `index` less than `size`, and a `threshold`
+in `[0, 1]`. These invariants are enforced by the canonical record boundary and
+adapter, without changing live `PopulationRef` construction or other adapters.
+Scalar bounds are included in the generated JSON Schema.
+
 Body encoding validates the live result and uses Pydantic's JSON-mode
 serialization, with adapter-local Unicode validation and Python ISO datetime
 formatting. The writer does not reconstruct its output through the reader.
@@ -134,6 +140,9 @@ The decoder additionally enforces these representation rules:
 - Strings and mapping keys must contain Unicode scalar values. Surrogate code
   points in Python strings are rejected, not replaced or combined. Valid JSON
   surrogate-pair escapes for characters such as emoji remain supported.
+- A population's `index` must be less than its `size`. Standard JSON Schema cannot
+  compare these two field values; this cross-field requirement is documented in
+  the generated schema and enforced during canonical encoding and decoding.
 
 External producers should emit integer notation for integer fields, supported
 ISO datetime strings, and finite numbers, then exercise the canonical reader

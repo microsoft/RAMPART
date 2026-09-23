@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING
 
 from pydantic_core import core_schema
 
+from rampart.core.result import PopulationRef
 from rampart.core.types import Payload, PayloadFormat
 
 if TYPE_CHECKING:
@@ -131,7 +132,7 @@ def _trace_dataclass(
     """Configure a copied dataclass schema without changing its class.
 
     Returns:
-        CoreSchema: A revalidating schema with trace-only payload guards.
+        CoreSchema: A revalidating schema with trace-only invariant checks.
     """
     schema["schema"] = _trace_schema(
         schema=schema["schema"], handler=handler, references=references
@@ -147,7 +148,75 @@ def _trace_dataclass(
         return core_schema.no_info_before_validator_function(
             _trace_payload, schema, ref=reference
         )
+    if schema["cls"] is PopulationRef:
+        schema["schema"] = _population_fields(schema["schema"])
+        reference = schema.pop("ref", None)
+        return core_schema.no_info_after_validator_function(
+            _validate_population, schema, ref=reference
+        )
     return schema
+
+
+def _population_fields(schema: core_schema.CoreSchema) -> core_schema.CoreSchema:
+    """Constrain population fields in the adapter and its generated JSON Schema.
+
+    Returns:
+        CoreSchema: The copied dataclass arguments with numeric bounds.
+
+    Raises:
+        TypeError: If the generated population schema has an unexpected shape.
+    """
+    if schema["type"] != "dataclass-args":
+        msg = "PopulationRef must have a dataclass-args schema."
+        raise TypeError(msg)
+    return {
+        **schema,
+        "fields": [
+            {
+                **field,
+                "schema": _population_field_schema(
+                    name=field["name"], schema=field["schema"]
+                ),
+            }
+            for field in schema["fields"]
+        ],
+    }
+
+
+def _population_field_schema(
+    *, name: str, schema: core_schema.CoreSchema
+) -> core_schema.CoreSchema:
+    """Add bounds without changing the live population dataclass annotations.
+
+    Returns:
+        CoreSchema: A constrained numeric schema, or the unchanged field schema.
+
+    Raises:
+        TypeError: If a constrained population field has an unexpected schema.
+    """
+    if schema["type"] == "int" and name in {"index", "size"}:
+        return {**schema, "ge": 0 if name == "index" else 1}
+    if schema["type"] == "float" and name == "threshold":
+        return {**schema, "ge": 0.0, "le": 1.0}
+    if name in {"index", "size", "threshold"}:
+        msg = f"Unexpected schema for PopulationRef.{name}: {schema['type']}"
+        raise TypeError(msg)
+    return schema
+
+
+def _validate_population(value: PopulationRef) -> PopulationRef:
+    """Enforce the cross-field population invariant after field validation.
+
+    Returns:
+        PopulationRef: The validated population reference.
+
+    Raises:
+        ValueError: If the index is outside the population.
+    """
+    if value.index >= value.size:
+        msg = "index must be less than size"
+        raise ValueError(msg)
+    return value
 
 
 def _trace_payload(value: object) -> object:

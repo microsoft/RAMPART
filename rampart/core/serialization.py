@@ -54,7 +54,7 @@ class ResultRecord:
     Args:
         result (Result): The referenced result; its fields are not copied.
         pytest_nodeid (str | None): Producing test location, when recorded.
-        result_index (int | None): Within-node ordinal, when recorded.
+        result_index (int | None): Nonnegative within-node ordinal, when recorded.
     """
 
     VERSION: ClassVar[str] = TRACE_SCHEMA_VERSION
@@ -67,7 +67,7 @@ class ResultRecord:
         """Validate attribution without copying or revalidating the live result.
 
         Raises:
-            SchemaError: If attribution has invalid types.
+            SchemaError: If attribution has invalid types or values.
         """
         if self.pytest_nodeid is not None and not isinstance(self.pytest_nodeid, str):
             msg = "record.pytest_nodeid: expected a string or null"
@@ -79,6 +79,9 @@ class ResultRecord:
                 raise SchemaError(str(exc)) from exc
         if self.result_index is not None and type(self.result_index) is not int:
             msg = "record.result_index: expected an integer or null"
+            raise SchemaError(msg)
+        if self.result_index is not None and self.result_index < 0:
+            msg = "record.result_index: must be greater than or equal to 0"
             raise SchemaError(msg)
 
     @classmethod
@@ -108,7 +111,7 @@ class ResultRecord:
                 "version": {"type": "string", "const": TRACE_SCHEMA_VERSION},
                 "result": body,
                 "pytest_nodeid": {"type": ["string", "null"]},
-                "result_index": {"type": ["integer", "null"]},
+                "result_index": {"type": ["integer", "null"], "minimum": 0},
             },
         }
 
@@ -259,6 +262,11 @@ class _ResultJsonSchema(GenerateJsonSchema):
             definitions["Payload"]["description"] = (
                 "Recorded text payload. Binary formats and file artifacts "
                 "are not supported by this trace schema."
+            )
+        if "PopulationRef" in definitions:
+            definitions["PopulationRef"]["description"] = (
+                "Trial population provenance. The decoder additionally requires "
+                "index to be less than size."
             )
         return result
 
