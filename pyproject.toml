@@ -133,6 +133,9 @@ external = ["RMP001", "RMP002"]
 "scripts/generate_trace_schema.py" = [
   "implicit-namespace-package", # Standalone schema generation command
 ]
+"scripts/check_trace_compatibility.py" = [
+  "implicit-namespace-package", # Standalone schema compatibility gate
+]
 "tests/integration/conftest.py" = [
   "unused-noqa", # Ruff 0.16.4 does not recognize pytest-fixture-autouse.
 ]

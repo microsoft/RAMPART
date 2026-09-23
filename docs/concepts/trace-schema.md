@@ -68,9 +68,47 @@ restrictions and the request invariant (a prompt or at least one attachment).
 The open Draft 2020-12 contract is committed at `schemas/trace.v1.schema.json`.
 
 Regenerate it with `uv run python scripts/generate_trace_schema.py`.
-CI runs the same command with `--check` to detect drift. Changes to generated
-output still require a compatibility review; generation does not decide whether
-a version bump is needed.
+The generator selects the filename from `TRACE_SCHEMA_VERSION`. CI runs the same
+command with `--check` to detect drift.
+
+### Required compatibility decision
+
+Schema drift checking alone does not establish compatibility. A separate CI gate
+requires a checked-in decision in `schemas/trace-compatibility.json`, bound to the
+contract content by SHA-256 fingerprints. The inputs are `result.py`, `types.py`,
+`serialization.py`, `_schema.py`, and all published `trace.v*.schema.json` files.
+Watching the models and codec policies also catches changes that do not appear
+in JSON Schema. This is deliberately conservative: even a nonsemantic edit to
+these inputs needs a compatibility rationale.
+
+For a contract change, update the declaration:
+
+- **`initial`** introduces the first contract where the PR base has no trace schema.
+- **`compatible`** retains the current major and explains why the change preserves
+  compatibility, such as an additive-optional field with a defined absence behavior.
+- **`new-major`** increments the major by one, retains earlier published schema
+  files, and references a nonempty repository migration document in `migration_note`.
+  The migration obligations below still apply, including an upcaster and API/CLI.
+
+The declaration records the current `version`, `contract_sha256`,
+`previous_contract_sha256`, `decision`, and `rationale`. For a change to an existing
+contract, the previous fingerprint must match the PR base's declaration. Obtain
+the current fingerprint after regenerating the schema:
+
+```text
+uv run python scripts/check_trace_compatibility.py --fingerprint
+uv run python scripts/check_trace_compatibility.py --base-ref <PR-base-commit>
+```
+
+PR CI compares against the actual target base commit; a stale declaration fails
+even if the schema was regenerated. Unchanged contracts need no new decision.
+Without `--base-ref`, including on main-branch pushes, the command checks the
+declaration's version and current content fingerprint only.
+
+**The declaration is a review gate, not proof of compatibility.** Reviewers must
+assess the rationale, semantic behavior, and required migration implementation.
+A regenerated schema or a `compatible` assertion does not make a breaking change
+safe. Keep the input list current if contract policy moves to additional modules.
 
 ### Structural schema and decoder semantics
 
@@ -207,8 +245,8 @@ tooling is implemented. If a later structural change introduces a new major,
 the migration policy requires:
 
 - writers emit the latest supported major;
-- support for an older major uses an explicit adjacent upcaster
-  (`vN-1 → vN`);
+- each major bump ships an adjacent upcaster (`vN-1 → vN`) and an explicit
+  migration API/CLI;
 - migrating persisted data is an explicit operation; reading never rewrites an
   artifact in place; and
 - encountering an unsupported major fails closed.

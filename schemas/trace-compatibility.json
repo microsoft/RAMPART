@@ -1,0 +1,8 @@
+{
+  "version": "rampart.trace.v1",
+  "contract_sha256": "12fed9156cacc7e0ae0fc5d408b337bf8d3e44bc260562ba6d2e2e9ce76f5ec7",
+  "previous_contract_sha256": null,
+  "decision": "initial",
+  "rationale": "Introduces the first canonical trace contract; the PR base has no published trace schema. Existing xdist and reporting serializers are unchanged and adopt the contract in separate follow-ups.",
+  "migration_note": null
+}

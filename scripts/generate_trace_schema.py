@@ -9,7 +9,7 @@ import argparse
 import json
 from pathlib import Path
 
-from rampart.core.serialization import ResultRecord
+from rampart.core.serialization import TRACE_SCHEMA_VERSION, ResultRecord
 
 
 def main() -> None:
@@ -21,7 +21,10 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--check", action="store_true")
     args = parser.parse_args()
-    path = Path(__file__).resolve().parents[1] / "schemas" / "trace.v1.schema.json"
+    version = TRACE_SCHEMA_VERSION.rsplit(".", 1)[-1]
+    path = (
+        Path(__file__).resolve().parents[1] / "schemas" / f"trace.{version}.schema.json"
+    )
     content = json.dumps(ResultRecord.json_schema(), indent=2, sort_keys=True) + "\n"
     if args.check:
         if not path.exists() or path.read_text(encoding="utf-8") != content:
