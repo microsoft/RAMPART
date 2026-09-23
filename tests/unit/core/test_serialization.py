@@ -1130,43 +1130,67 @@ class TestJsonNesting:
         assert restored == record
         assert serialize_record(record=restored) == encoded
 
-    @pytest.mark.parametrize("mapping", [False, True])
-    def test_reader_can_accept_deeper_records_than_writer(
-        self, *, mapping: bool
-    ) -> None:
-        data = _minimal_record_dict()
-        data["result"]["metadata"] = {
-            "deep": _nested_json_value(depth=100, mapping=mapping)
-        }
-
-        record = deserialize_record(data=json.dumps(data))
-
-        assert record.result.metadata == data["result"]["metadata"]
-        with pytest.raises(SchemaError, match="cannot serialize") as error:
+    def test_writer_validation_recursion_error_is_wrapped(self) -> None:
+        record = ResultRecord(result=_make_full_result())
+        original_error = RecursionError("maximum recursion depth exceeded")
+        with (
+            patch.object(
+                _result_adapter(), "validate_python", side_effect=original_error
+            ),
+            pytest.raises(
+                SchemaError, match=r"cannot serialize.*RecursionError"
+            ) as error,
+        ):
             serialize_record(record=record)
-        assert isinstance(error.value.__cause__, ValueError)
 
-    @pytest.mark.parametrize("mapping", [False, True])
-    def test_excessive_nesting_raises_schema_error_on_both_boundaries(
-        self, *, mapping: bool
+        assert error.value.__cause__ is original_error
+
+    @pytest.mark.parametrize(
+        "original_error",
+        [
+            ValueError("Circular reference detected (depth exceeded)"),
+            RecursionError("maximum recursion depth exceeded"),
+        ],
+    )
+    def test_adapter_serialization_error_is_wrapped(
+        self, original_error: Exception
     ) -> None:
-        value = _nested_json_value(depth=250, mapping=mapping)
-        result = _make_full_result(metadata={"deep": value})
-        data = _minimal_record_dict()
-        data["result"]["metadata"] = result.metadata
-
-        with pytest.raises(SchemaError, match="cannot serialize"):
-            serialize_record(record=ResultRecord(result=result))
-        with pytest.raises(SchemaError, match=r"recursion|depth"):
-            deserialize_record(data=json.dumps(data))
-
-    def test_adapter_serialization_value_error_is_wrapped(self) -> None:
-        original_error = ValueError("Circular reference detected (depth exceeded)")
         with (
             patch.object(_result_adapter(), "dump_python", side_effect=original_error),
-            pytest.raises(SchemaError, match=r"cannot serialize.*ValueError") as error,
+            pytest.raises(
+                SchemaError, match=rf"cannot serialize.*{type(original_error).__name__}"
+            ) as error,
         ):
             serialize_record(record=ResultRecord(result=_make_full_result()))
+
+        assert error.value.__cause__ is original_error
+
+    @pytest.mark.parametrize("method", ["loads", "dumps"])
+    def test_reader_json_recursion_error_is_wrapped(self, method: str) -> None:
+        encoded = json.dumps(_minimal_record_dict())
+        original_error = RecursionError("maximum recursion depth exceeded")
+        with (
+            patch.object(json, method, side_effect=original_error),
+            pytest.raises(
+                SchemaError, match="maximum recursion depth exceeded"
+            ) as error,
+        ):
+            deserialize_record(data=encoded)
+
+        assert error.value.__cause__ is original_error
+
+    def test_reader_adapter_recursion_error_is_wrapped(self) -> None:
+        encoded = json.dumps(_minimal_record_dict())
+        original_error = RecursionError("maximum recursion depth exceeded")
+        with (
+            patch.object(
+                _result_adapter(), "validate_json", side_effect=original_error
+            ),
+            pytest.raises(
+                SchemaError, match="maximum recursion depth exceeded"
+            ) as error,
+        ):
+            deserialize_record(data=encoded)
 
         assert error.value.__cause__ is original_error
 

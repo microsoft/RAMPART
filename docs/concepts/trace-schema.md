@@ -59,9 +59,10 @@ serialization, with adapter-local Unicode validation and Python ISO datetime
 formatting. The writer does not reconstruct its output through the reader.
 
 Nesting support follows the underlying serializer, parser, and interpreter limits;
-the codec does not promise matching reader/writer depth support. In particular,
+these can vary by platform and runtime. The codec does not promise a portable
+maximum depth or matching reader/writer depth support. In particular,
 some deeply nested external records can decode successfully but fail when
-re-encoded because Pydantic's JSON-mode writer has a lower nesting limit.
+re-encoded when Pydantic's JSON-mode writer has a lower nesting limit.
 These failures raise `SchemaError`; successful decoding alone does not guarantee
 that an unusually deep record can be emitted again.
 
