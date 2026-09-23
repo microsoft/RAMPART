@@ -1,0 +1,8 @@
+{
+  "version": "rampart.trace.v1",
+  "contract_sha256": "da1a36daa27b5fc2cdaf4305ba3aa743f52789643de94ed97916ebbaa5fc2b47",
+  "previous_contract_sha256": null,
+  "decision": "initial",
+  "rationale": "Introduces the first canonical trace contract; the PR base has no published trace schema. Supported metadata is preserved without transport-specific filtering; shared consumer preparation owns bookkeeping separation and loss/truncation visibility. Normal JSON-mode serialization retains Unicode and Python ISO datetime policies but does not promise matching reader/writer nesting limits. Canonical ordinals are nonnegative; population size is positive, index is below size, and threshold is in [0, 1], without changing live dataclasses. These restrictions refine the initial unreleased contract, not a compatible change to an already-published v1. Existing xdist and reporting serializers are unchanged and adopt the contract in separate follow-ups.",
+  "migration_note": null
+}

@@ -23,6 +23,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          fetch-depth: 0
           persist-credentials: false
 
       - name: Set up Python
@@ -49,6 +50,14 @@ jobs:
 
       - name: ty
         run: uv run ty check
+
+      - name: Trace schema drift
+        run: uv run python scripts/generate_trace_schema.py --check
+
+      - name: Trace compatibility decision
+        env:
+          TRACE_SCHEMA_BASE: ${{ github.event.pull_request.base.sha }}
+        run: uv run python scripts/check_trace_compatibility.py --base-ref "$TRACE_SCHEMA_BASE"
 
   test:
     name: Test (Python ${{ matrix.python-version }})

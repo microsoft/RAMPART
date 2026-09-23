@@ -1,0 +1,484 @@
+{
+  "$defs": {
+    "EvalOutcome": {
+      "enum": [
+        "detected",
+        "not_detected",
+        "undetermined"
+      ],
+      "title": "EvalOutcome",
+      "type": "string"
+    },
+    "EvalResult": {
+      "additionalProperties": true,
+      "properties": {
+        "confidence": {
+          "default": 1.0,
+          "title": "Confidence",
+          "type": "number"
+        },
+        "evidence": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidence",
+          "type": "array"
+        },
+        "outcome": {
+          "$ref": "#/$defs/EvalOutcome"
+        },
+        "rationale": {
+          "default": "",
+          "title": "Rationale",
+          "type": "string"
+        },
+        "undetermined_operands": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Undetermined Operands",
+          "type": "array"
+        }
+      },
+      "required": [
+        "outcome"
+      ],
+      "title": "EvalResult",
+      "type": "object"
+    },
+    "HarmCategory": {
+      "enum": [
+        "memory_poisoning",
+        "prompt_injection",
+        "jailbreak",
+        "data_exfiltration",
+        "over_permissive_action",
+        "data_leakage",
+        "content_safety",
+        "hallucination",
+        "behavioral_regression"
+      ],
+      "title": "HarmCategory",
+      "type": "string"
+    },
+    "InjectionRecord": {
+      "additionalProperties": true,
+      "properties": {
+        "payload_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Payload Id"
+        },
+        "surface_name": {
+          "title": "Surface Name",
+          "type": "string"
+        }
+      },
+      "required": [
+        "payload_id",
+        "surface_name"
+      ],
+      "title": "InjectionRecord",
+      "type": "object"
+    },
+    "ObservabilityLevel": {
+      "enum": [
+        "tool_and_side_effects",
+        "tool_only",
+        "response_only"
+      ],
+      "title": "ObservabilityLevel",
+      "type": "string"
+    },
+    "Payload": {
+      "additionalProperties": true,
+      "description": "Recorded text payload. Binary formats and file artifacts are not supported by this trace schema.",
+      "properties": {
+        "artifact": {
+          "default": null,
+          "type": "null"
+        },
+        "content": {
+          "title": "Content",
+          "type": "string"
+        },
+        "format": {
+          "default": "text",
+          "enum": [
+            "text",
+            "html",
+            "markdown"
+          ],
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "metadata": {
+          "additionalProperties": true,
+          "title": "Metadata",
+          "type": "object"
+        }
+      },
+      "required": [
+        "content",
+        "id"
+      ],
+      "title": "Payload",
+      "type": "object"
+    },
+    "PopulationRef": {
+      "additionalProperties": true,
+      "description": "Trial population provenance. The decoder additionally requires index to be less than size.",
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "index": {
+          "minimum": 0,
+          "title": "Index",
+          "type": "integer"
+        },
+        "size": {
+          "minimum": 1,
+          "title": "Size",
+          "type": "integer"
+        },
+        "threshold": {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Threshold",
+          "type": "number"
+        }
+      },
+      "required": [
+        "id",
+        "index",
+        "size",
+        "threshold"
+      ],
+      "title": "PopulationRef",
+      "type": "object"
+    },
+    "Request": {
+      "additionalProperties": true,
+      "anyOf": [
+        {
+          "properties": {
+            "prompt": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "prompt"
+          ]
+        },
+        {
+          "properties": {
+            "attachments": {
+              "minItems": 1,
+              "type": "array"
+            }
+          },
+          "required": [
+            "attachments"
+          ]
+        }
+      ],
+      "properties": {
+        "attachments": {
+          "items": {
+            "$ref": "#/$defs/Payload"
+          },
+          "title": "Attachments",
+          "type": "array"
+        },
+        "prompt": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Prompt"
+        }
+      },
+      "title": "Request",
+      "type": "object"
+    },
+    "Response": {
+      "additionalProperties": true,
+      "properties": {
+        "metadata": {
+          "additionalProperties": true,
+          "title": "Metadata",
+          "type": "object"
+        },
+        "side_effects": {
+          "items": {
+            "$ref": "#/$defs/SideEffect"
+          },
+          "title": "Side Effects",
+          "type": "array"
+        },
+        "text": {
+          "title": "Text",
+          "type": "string"
+        },
+        "tool_calls": {
+          "items": {
+            "$ref": "#/$defs/ToolCall"
+          },
+          "title": "Tool Calls",
+          "type": "array"
+        }
+      },
+      "required": [
+        "text"
+      ],
+      "title": "Response",
+      "type": "object"
+    },
+    "SafetyStatus": {
+      "enum": [
+        "safe",
+        "unsafe",
+        "undetermined",
+        "error"
+      ],
+      "title": "SafetyStatus",
+      "type": "string"
+    },
+    "SideEffect": {
+      "additionalProperties": true,
+      "properties": {
+        "details": {
+          "additionalProperties": true,
+          "title": "Details",
+          "type": "object"
+        },
+        "kind": {
+          "title": "Kind",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "title": "SideEffect",
+      "type": "object"
+    },
+    "ToolCall": {
+      "additionalProperties": true,
+      "properties": {
+        "arguments": {
+          "additionalProperties": true,
+          "title": "Arguments",
+          "type": "object"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "result": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Result"
+        },
+        "timestamp": {
+          "anyOf": [
+            {
+              "description": "Python ISO 8601 datetime; UTC offset is optional. Parseability is enforced by the record decoder, not this schema.",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Timestamp"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "ToolCall",
+      "type": "object"
+    },
+    "Turn": {
+      "additionalProperties": true,
+      "properties": {
+        "driver_reasoning": {
+          "default": "",
+          "title": "Driver Reasoning",
+          "type": "string"
+        },
+        "eval_result": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/EvalResult"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "request": {
+          "$ref": "#/$defs/Request"
+        },
+        "response": {
+          "$ref": "#/$defs/Response"
+        },
+        "timestamp": {
+          "anyOf": [
+            {
+              "description": "Python ISO 8601 datetime; UTC offset is optional. Parseability is enforced by the record decoder, not this schema.",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Timestamp"
+        },
+        "turn_number": {
+          "default": 0,
+          "title": "Turn Number",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "request",
+        "response"
+      ],
+      "title": "Turn",
+      "type": "object"
+    }
+  },
+  "$id": "urn:rampart:trace:v1",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": true,
+  "description": "Structural trace contract. The record decoder additionally requires parseable Python ISO datetimes, finite numbers, Unicode scalar strings, and integer fields without floating-point notation.",
+  "properties": {
+    "pytest_nodeid": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "result": {
+      "additionalProperties": true,
+      "properties": {
+        "duration_seconds": {
+          "default": 0.0,
+          "title": "Duration Seconds",
+          "type": "number"
+        },
+        "harm_category": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/HarmCategory"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Harm Category"
+        },
+        "injections": {
+          "items": {
+            "$ref": "#/$defs/InjectionRecord"
+          },
+          "title": "Injections",
+          "type": "array"
+        },
+        "metadata": {
+          "additionalProperties": true,
+          "title": "Metadata",
+          "type": "object"
+        },
+        "observability_level": {
+          "$ref": "#/$defs/ObservabilityLevel"
+        },
+        "population": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PopulationRef"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "status": {
+          "$ref": "#/$defs/SafetyStatus"
+        },
+        "strategy": {
+          "default": "",
+          "title": "Strategy",
+          "type": "string"
+        },
+        "summary": {
+          "title": "Summary",
+          "type": "string"
+        },
+        "turns": {
+          "items": {
+            "$ref": "#/$defs/Turn"
+          },
+          "title": "Turns",
+          "type": "array"
+        }
+      },
+      "required": [
+        "status",
+        "summary",
+        "observability_level"
+      ],
+      "title": "Result",
+      "type": "object"
+    },
+    "result_index": {
+      "minimum": 0,
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "version": {
+      "const": "rampart.trace.v1",
+      "type": "string"
+    }
+  },
+  "required": [
+    "version",
+    "result"
+  ],
+  "title": "ResultRecord",
+  "type": "object"
+}
