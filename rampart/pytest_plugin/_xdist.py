@@ -995,9 +995,26 @@ def _deserialize_confidence(*, typed: dict[str, Any]) -> float:
     try:
         number = float(raw_confidence)
     except (OverflowError, ValueError) as exc:
-        msg = f"Confidence could not be converted to float: {raw_confidence!r}."
+        msg = "Confidence could not be converted to float."
         raise WorkerOutputError(msg) from exc
     return number if math.isfinite(number) else math.nan
+
+
+def _deserialize_eval_text(*, value: object, field: str) -> str:
+    """Render evaluation text without escaping the worker error boundary.
+
+    Returns:
+        str: Rendered text with terminal escapes removed.
+
+    Raises:
+        WorkerOutputError: If the value cannot be rendered as text.
+    """
+    try:
+        text = str(value)
+    except (TypeError, ValueError) as exc:
+        msg = f"EvalResult {field} could not be rendered as text."
+        raise WorkerOutputError(msg) from exc
+    return _strip_ansi(text=text)
 
 
 def _deserialize_eval_result(*, data: object) -> EvalResult | None:
@@ -1007,7 +1024,8 @@ def _deserialize_eval_result(*, data: object) -> EvalResult | None:
         EvalResult | None: The deserialized result, or None.
 
     Raises:
-        WorkerOutputError: If ``data`` is not a dict.
+        WorkerOutputError: If ``data`` is not a dict or an evaluation field
+            cannot be decoded.
     """
     if data is None:
         return None
@@ -1022,8 +1040,13 @@ def _deserialize_eval_result(*, data: object) -> EvalResult | None:
         "list[Any]",
         raw_evidence if isinstance(raw_evidence, list) else [],
     )
-    evidence: list[str] = [_strip_ansi(text=str(e)) for e in evidence_items]
-    rationale = _strip_ansi(text=str(typed.get("rationale", "")))
+    evidence = [
+        _deserialize_eval_text(value=e, field="evidence") for e in evidence_items
+    ]
+    rationale = _deserialize_eval_text(
+        value=typed.get("rationale", ""),
+        field="rationale",
+    )
     raw_undetermined = typed.get("undetermined_operands", [])
     undetermined_items = cast(
         "list[Any]",
@@ -1035,7 +1058,12 @@ def _deserialize_eval_result(*, data: object) -> EvalResult | None:
         dict.fromkeys(
             stripped
             for u in undetermined_items
-            if (stripped := _strip_ansi(text=str(u)).strip())
+            if (
+                stripped := _deserialize_eval_text(
+                    value=u,
+                    field="undetermined_operands",
+                ).strip()
+            )
         ),
     )
     return EvalResult(
@@ -1295,7 +1323,7 @@ def _deserialize_population_ref(*, data: object) -> PopulationRef | None:
     try:
         normalized_threshold = float(threshold)
     except (OverflowError, ValueError) as exc:
-        msg = f"Expected finite number for population threshold, got {threshold!r}."
+        msg = "Expected finite number for population threshold."
         raise WorkerOutputError(msg) from exc
     if not math.isfinite(normalized_threshold):
         msg = f"Expected finite number for population threshold, got {threshold!r}."

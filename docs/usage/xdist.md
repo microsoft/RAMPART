@@ -182,6 +182,10 @@ The private xdist envelope is versioned independently from public result data.
 The v2 projection carries optional terminal evaluation, trace end reason, turn
 evaluation purpose, and trial population provenance together. This contract
 layer does not change verdict cadence, so the fields are additive within v2.
+Numeric overflow in evaluation confidence or population thresholds, and
+unrenderable evaluation text, reject the report envelope and mark the run
+incomplete. The controller preserves previously received results instead of
+aborting or merging the malformed report as a successful result.
 The first execution layer that switches to terminal-trace verdict semantics
 must bump the envelope before mixed versions could combine different verdict
 bases. Oversized-result markers retain population provenance when the marker
