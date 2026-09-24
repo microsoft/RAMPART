@@ -145,6 +145,7 @@ nav:
       - getting-started/index.md
       - Installation: getting-started/installation.md
       - Quickstart: getting-started/quickstart.md
+      - RAMPARTner: getting-started/onboarding-skill.md
   - Concepts:
       - concepts/index.md
       - Overview: concepts/overview.md
