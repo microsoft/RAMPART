@@ -33,7 +33,12 @@ from rampart.core._schema import (
 )
 from rampart.core.errors import SchemaError, UnsupportedSchemaVersionError
 from rampart.core.result import Result
-from rampart.core.types import Payload, PayloadFormat, Request
+from rampart.core.types import (
+    Payload,
+    PayloadFormat,
+    Request,
+    Turn,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -44,7 +49,7 @@ if TYPE_CHECKING:
 
 
 # Single root schema version stamped on every serialized record.
-TRACE_SCHEMA_VERSION = "rampart.trace.v1"
+TRACE_SCHEMA_VERSION = "rampart.trace.v2"
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -211,8 +216,8 @@ def _reject_json_constant(value: str) -> Never:
     raise ValueError(msg)
 
 
-def _decode_v1(data: Mapping[str, Any]) -> ResultRecord:
-    """Reconstruct a v1 envelope through the current body codec.
+def _decode_v2(data: Mapping[str, Any]) -> ResultRecord:
+    """Reconstruct a v2 envelope through the current body codec.
 
     Returns:
         ResultRecord: The reconstructed record.
@@ -225,7 +230,7 @@ def _decode_v1(data: Mapping[str, Any]) -> ResultRecord:
 
 
 _DECODERS: dict[str, Callable[[Mapping[str, Any]], ResultRecord]] = {
-    TRACE_SCHEMA_VERSION: _decode_v1,
+    TRACE_SCHEMA_VERSION: _decode_v2,
 }
 
 
@@ -292,6 +297,14 @@ class _ResultJsonSchema(GenerateJsonSchema):
                 {
                     "required": ["attachments"],
                     "properties": {"attachments": {"type": "array", "minItems": 1}},
+                },
+            ]
+        elif schema["cls"] is Turn:
+            result["anyOf"] = [
+                {"properties": {"eval_purpose": {"type": "null"}}},
+                {
+                    "required": ["eval_result"],
+                    "properties": {"eval_result": {"type": "object"}},
                 },
             ]
         return result

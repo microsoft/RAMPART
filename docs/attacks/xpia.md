@@ -159,12 +159,12 @@ Place the cheaper evaluator on the left side of `|` — it short-circuits if the
 The `&` above asks whether both happened, so one condition that definitively did not happen settles the result even if the adapter could not observe the other. Use `|` when either condition on its own would count as the attack succeeding. When the adapter does not report the channel the left condition needs, the result records that on [`EvalResult`][rampart.core.types.EvalResult]. Reversing those two operands records nothing, because a `NOT_DETECTED` left operand short-circuits `&` before the other one runs. See the note on undetermined operands in [Authoring Tests](../usage/authoring-tests.md#composing-evaluators).
 
 !!! warning "Multi-turn scope"
-    State the temporal scope explicitly for multi-turn attacks. The complete
-    positive and negated mapping is maintained in the
+    `ResponseContains` requires an explicit temporal scope, even for a
+    single-turn attack. The complete positive and negated mapping is maintained in the
     [Temporal Scope table](../usage/authoring-tests.md#temporal-scope).
-    Omitting `scope` inspects only the current response and emits a
-    `FutureWarning` for multi-turn contexts. Scope applies only to turns in the
-    evaluator context; it does not control execution length or early stopping.
+    Use `CURRENT_TURN` only when earlier responses should be ignored. Scope
+    applies only to turns in the evaluator context; it does not control
+    execution length or early stopping.
 
 ### LLMDriver for Adaptive Triggers
 
@@ -233,7 +233,7 @@ See [`Attacks.xpia()`][rampart.attacks.Attacks.xpia] for the full API reference.
 | `inject` | `InjectionHandle \| list[InjectionHandle] \| None` | `None` | Prepared injections from `surface.inject()`. `None` for inline XPIA. |
 | `trigger` | `str \| list[str] \| Request \| list[Request] \| PromptDriver` | required | Benign prompt(s) that cause retrieval of injected content. |
 | `evaluator` | [`Evaluator`][rampart.core.evaluator.Evaluator] | required | What attack condition to detect. |
-| `max_turns` | `int` | `5` | Maximum prompt-response exchanges before `ERROR`. |
+| `max_turns` | `int` | `5` | Maximum prompt-response exchanges; reaching the limit resolves the trace normally. |
 | `event_handlers` | `list[ExecutionEventHandler] \| None` | `None` | Additional lifecycle event handlers. |
 
 ---
@@ -249,5 +249,3 @@ This only fires when all three conditions hold:
 3. Zero tool calls were observed
 
 It is a backstop for evaluators that cannot say up front what evidence they need, such as `LLMJudge`, where the answer depends on the objective. `ToolCalled` and `SideEffectOccurred` return `UNDETERMINED` themselves, so on their own they do not reach this check as `SAFE`. A composition still can, so the backstop stays.
-
-
