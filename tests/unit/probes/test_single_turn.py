@@ -788,7 +788,7 @@ class TestProbeFinalTraceCadence:
         context = evaluator.evaluate_async.await_args.kwargs["context"]
         assert len(context.turns) == 3
         assert result.terminal_evaluation is evaluator.evaluate_async.return_value
-        assert result.eval_results == []
+        assert result.turn_evaluations == []
         assert result.trace_end_reason is TraceEndReason.DRIVER_EXHAUSTED
 
     async def test_tool_sequence_resolves_from_complete_trace_async(self) -> None:
@@ -989,18 +989,22 @@ class TestProbeFinalTraceCadence:
 
         assert result.status is SafetyStatus.SAFE
 
-    async def test_unspecified_scope_warns_through_probe_execution_async(self) -> None:
-        with pytest.warns(FutureWarning, match="ResponseScope"):
-            result = await Probes.behavior(
-                prompts=["p1", "p2"],
-                evaluator=ResponseContains("ok"),
-            ).execute_async(
-                adapter=_adapter(
-                    responses=[Response(text="not yet"), Response(text="ok")],
-                ),
-            )
+    async def test_current_turn_scope_checks_only_final_probe_response_async(
+        self,
+    ) -> None:
+        result = await Probes.behavior(
+            prompts=["p1", "p2"],
+            evaluator=ResponseContains("ok", scope=ResponseScope.CURRENT_TURN),
+        ).execute_async(
+            adapter=_adapter(
+                responses=[Response(text="not yet"), Response(text="ok")],
+            ),
+        )
 
+        assert len(result.turns) == 2
         assert result.status is SafetyStatus.SAFE
+        assert result.terminal_evaluation is not None
+        assert result.terminal_evaluation.evidence == ["Pattern found on turn(s): 1"]
 
     async def test_terminal_evaluation_runs_before_session_close_async(self) -> None:
         class RecordingSession:

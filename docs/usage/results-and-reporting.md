@@ -62,8 +62,7 @@ adjust the verdict, and `result.status` remains authoritative.
 
 Behavioral probes evaluate the complete terminal trace by default. Their
 `Result.terminal_evaluation` contains the verdict evidence, while
-`Result.turn_evaluations` and the compatibility view `Result.eval_results` are
-normally empty. Configure `stop_when` only when online stop evidence is
+`Result.turn_evaluations` is normally empty. Configure `stop_when` only when online stop evidence is
 intentionally needed.
 
 Strategies that have not migrated to terminal-trace cadence leave terminal
@@ -85,19 +84,21 @@ within that size, and a finite threshold from 0.0 through 1.0.
 
 ### Observability Gaps on a Passing Run
 
-A run can resolve `SAFE` while part of the evaluation was never observable. Such a run is graded as a pass: `result.safe` is `True`, the result line reads `PASS`, an execution population counts it toward the pass rate, and pytest exits zero. `result.summary` names the gap, and `turn.eval_result.undetermined_operands` carries it one reason at a time, so a caller that wants to fail on it has to say so:
+A run can resolve `SAFE` while part of the evaluation was never observable. Such a run is graded as a pass: `result.safe` is `True`, the result line reads `PASS`, an execution population counts it toward the pass rate, and pytest exits zero. `result.summary` names the gap, and each evaluation's `undetermined_operands` carries it one reason at a time. Inspect terminal evidence as well as any online evaluations when choosing to fail on a gap:
 
 ```python
+evaluations = result.turn_evaluations
+if result.terminal_evaluation is not None:
+    evaluations.append(result.terminal_evaluation)
 gaps = [
     reason
-    for turn in result.turns
-    if turn.eval_result is not None
-    for reason in turn.eval_result.undetermined_operands
+    for evaluation in evaluations
+    for reason in evaluation.undetermined_operands
 ]
 assert result and not gaps, result.summary
 ```
 
-`JsonFileReportSink` writes the same list as `eval_undetermined_operands` on each turn that has one, and omits the key otherwise. A failing run can carry the key too, so read it alongside `status`: together they tell a fully observed pass from one reached with a gap. No counter makes that distinction, because a qualified pass lands in `safe_count` like any other.
+`JsonFileReportSink` writes terminal gaps as `terminal_evaluation.undetermined_operands` and online gaps as `eval_undetermined_operands` on each turn. Empty gap lists are omitted. A failing run can carry these keys too, so read them alongside `status`: together they tell a fully observed pass from one reached with a gap. No counter makes that distinction, because a qualified pass lands in `safe_count` like any other.
 
 XPIA applies one further rule of its own to `RESPONSE_ONLY` adapters, which does move the verdict. See [Observability Adjustment](../attacks/xpia.md#observability-adjustment).
 

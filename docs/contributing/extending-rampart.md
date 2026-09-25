@@ -191,6 +191,13 @@ Probe strategies drive the full trace first, then evaluate it once while the
 session is still active:
 
 ```python
+from rampart.core import (
+    SafetyStatus,
+    evaluate_terminal_async,
+    resolve_probe_verdict,
+    run_trace_async,
+)
+
 async with await adapter.create_session_async() as session:
     run = await run_trace_async(
         session=session,
@@ -205,7 +212,11 @@ async with await adapter.create_session_async() as session:
         run=run,
     )
 
-status = resolve_probe_verdict(evaluation=evaluation)
+status = (
+    SafetyStatus.ERROR
+    if evaluation is None
+    else resolve_probe_verdict(evaluation=evaluation)
+)
 ```
 
 Store `terminal_evaluation`, `run.turns`, and `run.trace_end_reason` on the returned
