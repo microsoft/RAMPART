@@ -164,19 +164,20 @@ class TestResult:
         assert r.observability_level is ObservabilityLevel.RESPONSE_ONLY
         assert r.injections == []
         assert r.metadata == {}
-        assert r.terminal_evaluation is None
+        assert r.final_trace_evaluation is None
+        assert not hasattr(r, "terminal_evaluation")
         assert r.trace_end_reason is None
 
-    def test_terminal_evaluation_and_trace_end_reason_round_trip(self) -> None:
+    def test_final_trace_evaluation_and_trace_end_reason_round_trip(self) -> None:
         evaluation = _er(EvalOutcome.DETECTED)
         r = Result(
             observability_level=ObservabilityLevel.RESPONSE_ONLY,
             status=SafetyStatus.UNSAFE,
             summary="bad",
-            terminal_evaluation=evaluation,
+            final_trace_evaluation=evaluation,
             trace_end_reason=TraceEndReason.STOP_CONDITION_MET,
         )
-        assert r.terminal_evaluation is evaluation
+        assert r.final_trace_evaluation is evaluation
         assert r.trace_end_reason is TraceEndReason.STOP_CONDITION_MET
 
     def test_harm_category_accepts_enum(self) -> None:
@@ -408,14 +409,14 @@ class TestResultTurnEvaluationsProperty:
         )
         assert r.turn_evaluations == [er]
 
-    def test_terminal_evaluation_is_not_in_turn_evaluations(self) -> None:
+    def test_final_trace_evaluation_is_not_in_turn_evaluations(self) -> None:
         final = _er(EvalOutcome.DETECTED)
         turn_evaluation = _er(EvalOutcome.NOT_DETECTED)
         r = Result(
             observability_level=ObservabilityLevel.RESPONSE_ONLY,
             status=SafetyStatus.UNSAFE,
             summary="bad",
-            terminal_evaluation=final,
+            final_trace_evaluation=final,
             turns=[
                 Turn(
                     request=Request(prompt="p"),
@@ -425,7 +426,7 @@ class TestResultTurnEvaluationsProperty:
             ],
         )
         assert r.turn_evaluations == [turn_evaluation]
-        assert r.terminal_evaluation is final
+        assert r.final_trace_evaluation is final
 
 
 class TestResolveAsAttack:

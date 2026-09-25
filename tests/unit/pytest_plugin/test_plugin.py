@@ -869,7 +869,7 @@ class TestPytestRuntestLogreport:
         assert rampart_session.is_incomplete is True
 
     @pytest.mark.parametrize("exponent", [400, 10_000])
-    @pytest.mark.parametrize("field", ["terminal_evaluation", "turns", "population"])
+    @pytest.mark.parametrize("field", ["final_trace_evaluation", "turns", "population"])
     def test_overflowing_evaluation_or_population_marks_run_incomplete(
         self,
         *,
@@ -880,7 +880,7 @@ class TestPytestRuntestLogreport:
         nodeid = "test_plugin.py::test_stream"
         evaluation = {"outcome": "detected", "confidence": 10**exponent}
         malformed_fields = {
-            "terminal_evaluation": evaluation,
+            "final_trace_evaluation": evaluation,
             "turns": [
                 {
                     "request": {"prompt": "p"},
@@ -917,7 +917,7 @@ class TestPytestRuntestLogreport:
         assert rampart_session._results == []
         assert "Failed to merge streamed Result report from worker gw0" in caplog.text
 
-    @pytest.mark.parametrize("location", ["terminal_evaluation", "turns"])
+    @pytest.mark.parametrize("location", ["final_trace_evaluation", "turns"])
     @pytest.mark.parametrize(
         "field", ["rationale", "evidence", "undetermined_operands"]
     )
@@ -942,7 +942,7 @@ class TestPytestRuntestLogreport:
         }
         payload["results"][0][location] = (
             evaluation
-            if location == "terminal_evaluation"
+            if location == "final_trace_evaluation"
             else [
                 {
                     "request": {"prompt": "p"},

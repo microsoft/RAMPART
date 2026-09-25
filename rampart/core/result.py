@@ -159,7 +159,7 @@ class Result:
             that a report states a level someone chose rather than one the
             framework assumed. Built-in strategies pass
             ``adapter.observability_profile``.
-        terminal_evaluation: Evaluator output for the terminal trace. It is an
+        final_trace_evaluation: Evaluator output for the final trace. It is an
             input to status; execution policy may adjust the final status.
             None for manual/error results and execution strategies that have
             not migrated to terminal-trace verdicts.
@@ -182,7 +182,7 @@ class Result:
     status: SafetyStatus
     summary: str
     observability_level: ObservabilityLevel
-    terminal_evaluation: EvalResult | None = None
+    final_trace_evaluation: EvalResult | None = None
     turns: list[Turn] = field(default_factory=list[Turn])
     trace_end_reason: TraceEndReason | None = None
     duration_seconds: float = 0.0
@@ -455,7 +455,7 @@ def _summarize_undetermined_operands(*, eval_results: list[EvalResult]) -> str:
     every turn of a multi-turn run, and anything past the first two is
     counted rather than dropped silently. Private because it words the
     built-in summaries; a strategy that words its own can read the same
-    reasons off ``Result.terminal_evaluation`` or ``Result.turn_evaluations``.
+    reasons off ``Result.final_trace_evaluation`` or ``Result.turn_evaluations``.
 
     Reads every result, unlike ``_explain_undetermined``, which reads the
     same field but prefers results that are themselves UNDETERMINED. The

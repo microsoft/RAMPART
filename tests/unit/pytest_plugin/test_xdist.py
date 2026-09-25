@@ -516,7 +516,7 @@ class TestResultFieldSerializationRoundTrip:
             eval_purpose=EvaluationPurpose.STOP_CHECK,
         )
         result = _make_result(turns=[turn], population=population)
-        result.terminal_evaluation = terminal
+        result.final_trace_evaluation = terminal
         result.trace_end_reason = TraceEndReason.STOP_CONDITION_MET
         payload = _serialize_session_results(
             session=_make_session_with_results(results_by_nodeid={"n": [result]}),
@@ -525,13 +525,13 @@ class TestResultFieldSerializationRoundTrip:
         recovered = _deserialize_report_results(data=payload)["n"][0]
 
         assert recovered.population == population
-        assert recovered.terminal_evaluation is not None
-        assert recovered.terminal_evaluation.evidence == ["terminal evidence"]
+        assert recovered.final_trace_evaluation is not None
+        assert recovered.final_trace_evaluation.evidence == ["terminal evidence"]
         assert recovered.trace_end_reason is TraceEndReason.STOP_CONDITION_MET
         assert recovered.turns[0].eval_purpose is EvaluationPurpose.STOP_CHECK
 
     async def test_execute_trials_terminal_provenance_round_trip_async(self) -> None:
-        terminal_evaluation = _make_eval_result(
+        final_trace_evaluation = _make_eval_result(
             outcome=EvalOutcome.NOT_DETECTED,
             evidence=["terminal evidence"],
         )
@@ -547,7 +547,7 @@ class TestResultFieldSerializationRoundTrip:
                     status=SafetyStatus.SAFE,
                     summary="safe terminal trace",
                     observability_level=ObservabilityLevel.RESPONSE_ONLY,
-                    terminal_evaluation=terminal_evaluation,
+                    final_trace_evaluation=final_trace_evaluation,
                     trace_end_reason=TraceEndReason.DRIVER_EXHAUSTED,
                 )
 
@@ -574,7 +574,7 @@ class TestResultFieldSerializationRoundTrip:
             result.population.id for result in recovered if result.population
         }
         assert len(population_ids) == 1
-        assert all(result.terminal_evaluation is not None for result in recovered)
+        assert all(result.final_trace_evaluation is not None for result in recovered)
         assert all(
             result.trace_end_reason is TraceEndReason.DRIVER_EXHAUSTED
             for result in recovered

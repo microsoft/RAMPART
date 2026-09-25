@@ -40,7 +40,7 @@ def _make_result() -> Result:
         status=SafetyStatus.SAFE,
         summary="terminal and online evidence remain independent",
         observability_level=ObservabilityLevel.RESPONSE_ONLY,
-        terminal_evaluation=EvalResult(outcome=EvalOutcome.NOT_DETECTED),
+        final_trace_evaluation=EvalResult(outcome=EvalOutcome.NOT_DETECTED),
         turns=[
             Turn(
                 request=Request(prompt="request"),
@@ -54,7 +54,9 @@ def _make_result() -> Result:
 
 
 def _evaluation(*, result: Result, terminal: bool) -> EvalResult:
-    evaluation = result.terminal_evaluation if terminal else result.turns[0].eval_result
+    evaluation = (
+        result.final_trace_evaluation if terminal else result.turns[0].eval_result
+    )
     assert evaluation is not None
     return evaluation
 
@@ -62,12 +64,14 @@ def _evaluation(*, result: Result, terminal: bool) -> EvalResult:
 def _wire_evaluation(*, data: dict[str, Any], terminal: bool) -> dict[str, Any]:
     result = data["result"]
     return (
-        result["terminal_evaluation"] if terminal else result["turns"][0]["eval_result"]
+        result["final_trace_evaluation"]
+        if terminal
+        else result["turns"][0]["eval_result"]
     )
 
 
 def _evaluation_path(*, terminal: bool, field: str) -> str:
-    placement = r"terminal_evaluation" if terminal else r"turns\[0\]\.eval_result"
+    placement = r"final_trace_evaluation" if terminal else r"turns\[0\]\.eval_result"
     return rf"result.*{placement}\.{field}"
 
 
@@ -193,7 +197,7 @@ class TestEvaluationPlacement:
 
         assert result == original == restored
         assert _evaluation(result=restored, terminal=terminal).outcome is outcome
-        assert restored.terminal_evaluation is not restored.turns[0].eval_result
+        assert restored.final_trace_evaluation is not restored.turns[0].eval_result
         Draft202012Validator(ResultRecord.json_schema()).validate(json.loads(encoded))
 
     def test_independent_eval_adapters_keep_their_own_policies(
@@ -225,6 +229,20 @@ class TestEvaluationPlacement:
 
 
 class TestTraceProvenance:
+    def test_final_trace_evaluation_replaces_the_old_field_name(self) -> None:
+        data = json.loads(serialize_record(record=ResultRecord(result=_make_result())))
+        body = data["result"]
+
+        assert body["final_trace_evaluation"]["outcome"] == "not_detected"
+        assert "terminal_evaluation" not in body
+
+        body["terminal_evaluation"] = body.pop("final_trace_evaluation")
+        restored = deserialize_record(data=json.dumps(data)).result
+
+        assert restored.final_trace_evaluation is None
+        assert not hasattr(restored, "terminal_evaluation")
+        Draft202012Validator(ResultRecord.json_schema()).validate(data)
+
     @pytest.mark.parametrize("reason", [None, *TraceEndReason])
     @pytest.mark.parametrize("purpose", [None, *EvaluationPurpose])
     def test_trace_enums_round_trip(
@@ -268,7 +286,7 @@ class TestTraceProvenance:
     def test_unrecorded_provenance_is_not_inferred(self, *, omit: bool) -> None:
         data = json.loads(serialize_record(record=ResultRecord(result=_make_result())))
         for target, names in [
-            (data["result"], ["terminal_evaluation", "trace_end_reason"]),
+            (data["result"], ["final_trace_evaluation", "trace_end_reason"]),
             (data["result"]["turns"][0], ["eval_purpose"]),
         ]:
             for name in names:
@@ -279,7 +297,7 @@ class TestTraceProvenance:
 
         restored = deserialize_record(data=json.dumps(data)).result
 
-        assert restored.terminal_evaluation is None
+        assert restored.final_trace_evaluation is None
         assert restored.trace_end_reason is None
         assert restored.turns[0].eval_purpose is None
         assert restored.turns[0].eval_result is not None

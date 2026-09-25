@@ -641,7 +641,7 @@ class TestXdistTrialAggregation:
                         status=SafetyStatus.SAFE,
                         summary="safe terminal trace",
                         observability_level=ObservabilityLevel.RESPONSE_ONLY,
-                        terminal_evaluation=terminal,
+                        final_trace_evaluation=terminal,
                         trace_end_reason=TraceEndReason.DRIVER_EXHAUSTED,
                         turns=[Turn(
                             request=Request(prompt="p"),
@@ -681,7 +681,7 @@ class TestXdistTrialAggregation:
         assert all(item["size"] == 2 for item in populations)
         assert all(item["threshold"] == pytest.approx(0.5) for item in populations)
         assert all(
-            item["terminal_evaluation"]["evidence"] == ["terminal evidence"]
+            item["final_trace_evaluation"]["evidence"] == ["terminal evidence"]
             for item in streamed
         )
         assert all(item["trace_end_reason"] == "driver_exhausted" for item in streamed)

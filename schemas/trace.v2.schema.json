@@ -441,6 +441,17 @@
           "title": "Duration Seconds",
           "type": "number"
         },
+        "final_trace_evaluation": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/EvalResult"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
         "harm_category": {
           "anyOf": [
             {
@@ -493,17 +504,6 @@
         "summary": {
           "title": "Summary",
           "type": "string"
-        },
-        "terminal_evaluation": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/EvalResult"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null
         },
         "trace_end_reason": {
           "anyOf": [

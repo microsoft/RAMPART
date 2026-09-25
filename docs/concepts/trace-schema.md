@@ -55,7 +55,8 @@ enforce these invariants, and the canonical adapter revalidates existing instanc
 at the write boundary as well as decoded records. Scalar bounds, including the
 nonempty ID, are included in the generated JSON Schema.
 
-`Result.terminal_evaluation` records evaluation of the completed trace.
+`Result.final_trace_evaluation` records evaluation of the trace when execution
+stops, including when the turn budget is reached.
 `Turn.eval_result` remains separate online evidence; `Turn.eval_purpose` records
 why that online evaluation ran. A non-null purpose requires an evaluation on the
 same turn. `Result.trace_end_reason` records why turn production stopped. These
@@ -293,7 +294,9 @@ V2 narrows population IDs to nonempty strings. It also records optional terminal
 evaluation, trace-end reason, and online evaluation purpose, and consistently
 applies canonical validation to both terminal and online evaluations. The new
 optional fields alone would not require a major bump; the narrowed ID domain
-does. The `terminal_evaluation` name is retained without an alias.
+does. The field is named `final_trace_evaluation` in the Python API, canonical
+records, JSON reports, and xdist transport. The earlier `terminal_evaluation`
+spelling is removed without an alias.
 
 Writers emit v2, and this reader accepts only v2. No v1 reader, adjacent upcaster,
 or persisted-data migration API/CLI is shipped. Historical v1 schema files are

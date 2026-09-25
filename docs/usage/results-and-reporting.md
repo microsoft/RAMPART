@@ -15,7 +15,7 @@ result.safe              # bool — did the agent behave safely?
 result.status            # SafetyStatus (SAFE, UNSAFE, UNDETERMINED, ERROR)
 result.summary           # str — human-readable one-liner
 result.observability_level  # ObservabilityLevel (what the adapter saw)
-result.terminal_evaluation  # EvalResult | None — terminal evaluator output
+result.final_trace_evaluation  # EvalResult | None — final-trace evaluator output
 result.turns             # list[Turn] — full conversation
 result.trace_end_reason  # TraceEndReason | None — why the trace ended
 result.duration_seconds  # float — execution wall-clock time
@@ -55,7 +55,8 @@ for turn in result.turns:
     turn.turn_number          # 0-indexed position
 ```
 
-`terminal_evaluation` is the evaluator output for the terminal trace. It is an
+`final_trace_evaluation` is the evaluator output for the trace when execution
+stops, not simply the last online evaluation. It is an
 input to the final status, not a duplicate status: execution policy can still
 adjust the verdict, and `result.status` remains authoritative.
 
@@ -67,7 +68,7 @@ the same intentionally.
 Online evaluations attached to turns are available as
 `result.turn_evaluations`; this list excludes the terminal evaluation.
 The former `result.eval_results` property has been removed. Use
-`result.turn_evaluations` for online evidence and `result.terminal_evaluation`
+`result.turn_evaluations` for online evidence and `result.final_trace_evaluation`
 for terminal verdict evidence.
 
 `TraceEndReason.MAX_TURNS_REACHED` records budget truncation. It does not by

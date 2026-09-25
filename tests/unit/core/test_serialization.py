@@ -123,7 +123,7 @@ def _make_full_result(*, metadata: dict | None = None) -> Result:
         status=SafetyStatus.UNSAFE,
         summary="a violation was detected",
         observability_level=ObservabilityLevel.TOOL_AND_SIDE_EFFECTS,
-        terminal_evaluation=replace(
+        final_trace_evaluation=replace(
             _make_eval_result(),
             outcome=EvalOutcome.NOT_DETECTED,
             rationale="the terminal trace differs from the online check",
@@ -248,8 +248,8 @@ class TestRoundTrip:
         assert turn.eval_result is not None
         assert turn.eval_result.outcome is EvalOutcome.DETECTED
         assert turn.eval_purpose is EvaluationPurpose.STOP_CHECK
-        assert decoded.terminal_evaluation is not None
-        assert decoded.terminal_evaluation.outcome is EvalOutcome.NOT_DETECTED
+        assert decoded.final_trace_evaluation is not None
+        assert decoded.final_trace_evaluation.outcome is EvalOutcome.NOT_DETECTED
         assert decoded.trace_end_reason is TraceEndReason.STOP_CONDITION_MET
         assert decoded.injections[0].surface_name == "SharePoint"
         assert decoded.population == PopulationRef(
@@ -459,7 +459,7 @@ class TestFieldExhaustiveness:
             (ToolCall, turn["response"]["tool_calls"][0]),
             (SideEffect, turn["response"]["side_effects"][0]),
             (EvalResult, turn["eval_result"]),
-            (EvalResult, body["terminal_evaluation"]),
+            (EvalResult, body["final_trace_evaluation"]),
             (InjectionRecord, body["injections"][0]),
             (PopulationRef, body["population"]),
         ]
@@ -501,7 +501,7 @@ class TestMigrationTolerance:
         decoded = deserialize_record(data=json.dumps(_minimal_record_dict())).result
 
         assert decoded.status is SafetyStatus.SAFE
-        assert decoded.terminal_evaluation is None
+        assert decoded.final_trace_evaluation is None
         assert decoded.trace_end_reason is None
         assert decoded.turns == []
         assert decoded.duration_seconds == pytest.approx(0.0)
@@ -691,7 +691,7 @@ class TestResultAdapter:
         assert isinstance(turn.response.tool_calls[0], ToolCall)
         assert isinstance(turn.response.side_effects[0], SideEffect)
         assert isinstance(turn.eval_result, EvalResult)
-        assert isinstance(restored.result.terminal_evaluation, EvalResult)
+        assert isinstance(restored.result.final_trace_evaluation, EvalResult)
         assert isinstance(restored.result.injections[0], InjectionRecord)
         assert isinstance(restored.result.population, PopulationRef)
         assert "version" not in body
@@ -699,7 +699,7 @@ class TestResultAdapter:
         assert body["observability_level"] == "tool_and_side_effects"
         assert body["turns"][0]["request"]["attachments"][0]["format"] == "markdown"
         assert body["turns"][0]["eval_result"]["outcome"] == "detected"
-        assert body["terminal_evaluation"]["outcome"] == "not_detected"
+        assert body["final_trace_evaluation"]["outcome"] == "not_detected"
         assert body["turns"][0]["eval_purpose"] == "stop_check"
         assert body["trace_end_reason"] == "stop_condition_met"
         assert body["turns"][0]["timestamp"] == _TIMESTAMP.isoformat()
@@ -1374,7 +1374,7 @@ class TestGeneratedSchema:
             turn["response"]["tool_calls"][0],
             turn["response"]["side_effects"][0],
             turn["eval_result"],
-            body["terminal_evaluation"],
+            body["final_trace_evaluation"],
             body["injections"][0],
             body["population"],
         ]
@@ -1397,7 +1397,7 @@ class TestGeneratedSchema:
             (("result", "turns", 0, "request", "attachments", 0, "artifact"), "file"),
             (("result", "turns", 0, "request", "attachments", 0, "format"), "unknown"),
             (("result", "turns", 0, "eval_result", "outcome"), "unknown"),
-            (("result", "terminal_evaluation", "outcome"), "unknown"),
+            (("result", "final_trace_evaluation", "outcome"), "unknown"),
             (("result", "trace_end_reason"), "unknown"),
             (("result", "turns", 0, "eval_purpose"), "unknown"),
             (("result", "injections", 0, "payload_id"), 123),

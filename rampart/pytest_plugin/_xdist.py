@@ -508,9 +508,9 @@ def _serialize_result(*, result: Result, nodeid: str) -> dict[str, Any]:
         "safe": result.safe,
         "status": result.status.value,
         "summary": result.summary,
-        "terminal_evaluation": (
-            _serialize_eval_result(eval_result=result.terminal_evaluation)
-            if result.terminal_evaluation is not None
+        "final_trace_evaluation": (
+            _serialize_eval_result(eval_result=result.final_trace_evaluation)
+            if result.final_trace_evaluation is not None
             else None
         ),
         "turns": [_serialize_turn(turn=t, nodeid=nodeid) for t in result.turns],
@@ -598,7 +598,7 @@ def _truncated_result_data(
             "RAMPART Result exceeded the xdist transport size cap; "
             "full content was truncated."
         ),
-        "terminal_evaluation": None,
+        "final_trace_evaluation": None,
         "turns": [],
         "trace_end_reason": None,
         "duration_seconds": 0.0,
@@ -1376,8 +1376,8 @@ def _deserialize_result(*, data: object) -> Result:
     return Result(
         status=_deserialize_safety_status(value=typed.get("status")),
         summary=_strip_ansi(text=str(typed.get("summary", ""))),
-        terminal_evaluation=_deserialize_eval_result(
-            data=typed.get("terminal_evaluation"),
+        final_trace_evaluation=_deserialize_eval_result(
+            data=typed.get("final_trace_evaluation"),
         ),
         turns=[
             _deserialize_turn(data=t)

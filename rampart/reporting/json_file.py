@@ -127,9 +127,9 @@ class JsonFileReportSink:
             "safe": result.safe,
             "status": result.status.value,
             "summary": result.summary,
-            "terminal_evaluation": (
-                self._serialize_eval_result(result.terminal_evaluation)
-                if result.terminal_evaluation is not None
+            "final_trace_evaluation": (
+                self._serialize_eval_result(result.final_trace_evaluation)
+                if result.final_trace_evaluation is not None
                 else None
             ),
             "trace_end_reason": (

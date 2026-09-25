@@ -105,7 +105,7 @@ class TestSerializeResult:
             size=5,
             threshold=0.8,
         )
-        result.terminal_evaluation = EvalResult(
+        result.final_trace_evaluation = EvalResult(
             outcome=EvalOutcome.DETECTED,
             evidence=["terminal evidence"],
             rationale="terminal rationale",
@@ -120,7 +120,8 @@ class TestSerializeResult:
         data = sink._serialize_result(result)
 
         assert data["population"]["id"] == "population-1"
-        assert data["terminal_evaluation"]["outcome"] == "detected"
+        assert data["final_trace_evaluation"]["outcome"] == "detected"
+        assert "terminal_evaluation" not in data
         assert data["trace_end_reason"] == "stop_condition_met"
         assert data["turns"][0]["eval_purpose"] == "stop_check"
 

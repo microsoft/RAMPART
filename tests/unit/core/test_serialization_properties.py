@@ -161,7 +161,7 @@ def _results() -> SearchStrategy[Result]:
         status=st.sampled_from(SafetyStatus),
         summary=st.text(max_size=100),
         observability_level=st.sampled_from(ObservabilityLevel),
-        terminal_evaluation=st.none() | _evaluations(),
+        final_trace_evaluation=st.none() | _evaluations(),
         turns=st.lists(_turns(), max_size=3),
         trace_end_reason=st.none() | st.sampled_from(TraceEndReason),
         duration_seconds=st.floats(min_value=0, allow_infinity=False),
@@ -193,7 +193,7 @@ class TestGeneratedRoundTrips:
                 status=SafetyStatus.SAFE,
                 summary="recorded trace",
                 observability_level=ObservabilityLevel.RESPONSE_ONLY,
-                terminal_evaluation=terminal,
+                final_trace_evaluation=terminal,
                 trace_end_reason=reason,
                 turns=[
                     Turn(
@@ -210,7 +210,7 @@ class TestGeneratedRoundTrips:
         restored = deserialize_record(data=encoded)
 
         assert restored == record
-        assert restored.result.terminal_evaluation == terminal
+        assert restored.result.final_trace_evaluation == terminal
         assert restored.result.turns[0].eval_result == online
         assert restored.result.trace_end_reason is reason
         assert restored.result.turns[0].eval_purpose is purpose
