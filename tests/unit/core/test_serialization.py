@@ -47,6 +47,7 @@ from rampart.core.serialization import (
 from rampart.core.types import (
     EvalOutcome,
     EvalResult,
+    EvaluationPurpose,
     ObservabilityLevel,
     Payload,
     PayloadFormat,
@@ -54,6 +55,7 @@ from rampart.core.types import (
     Response,
     SideEffect,
     ToolCall,
+    TraceEndReason,
     Turn,
 )
 
@@ -109,6 +111,7 @@ def _make_turn() -> Turn:
         request=request,
         response=response,
         eval_result=_make_eval_result(),
+        eval_purpose=EvaluationPurpose.STOP_CHECK,
         turn_number=3,
         timestamp=_TIMESTAMP,
         driver_reasoning="escalate",
@@ -120,7 +123,13 @@ def _make_full_result(*, metadata: dict | None = None) -> Result:
         status=SafetyStatus.UNSAFE,
         summary="a violation was detected",
         observability_level=ObservabilityLevel.TOOL_AND_SIDE_EFFECTS,
+        final_trace_evaluation=replace(
+            _make_eval_result(),
+            outcome=EvalOutcome.NOT_DETECTED,
+            rationale="the terminal trace differs from the online check",
+        ),
         turns=[_make_turn()],
+        trace_end_reason=TraceEndReason.STOP_CONDITION_MET,
         duration_seconds=1.5,
         harm_category="prompt_injection",
         strategy="xpia",
@@ -187,7 +196,7 @@ class TestRoundTrip:
         encoded = _record_data(ResultRecord(result=_make_full_result()))
 
         assert encoded["version"] == TRACE_SCHEMA_VERSION
-        assert ResultRecord.VERSION == "rampart.trace.v1"
+        assert ResultRecord.VERSION == "rampart.trace.v2"
 
     def test_serialize_record_includes_attribution(self) -> None:
         record = ResultRecord(
@@ -238,6 +247,10 @@ class TestRoundTrip:
         assert turn.response.side_effects[0].kind == "http_request"
         assert turn.eval_result is not None
         assert turn.eval_result.outcome is EvalOutcome.DETECTED
+        assert turn.eval_purpose is EvaluationPurpose.STOP_CHECK
+        assert decoded.final_trace_evaluation is not None
+        assert decoded.final_trace_evaluation.outcome is EvalOutcome.NOT_DETECTED
+        assert decoded.trace_end_reason is TraceEndReason.STOP_CONDITION_MET
         assert decoded.injections[0].surface_name == "SharePoint"
         assert decoded.population == PopulationRef(
             id="pop-1", index=0, size=5, threshold=0.8
@@ -446,6 +459,7 @@ class TestFieldExhaustiveness:
             (ToolCall, turn["response"]["tool_calls"][0]),
             (SideEffect, turn["response"]["side_effects"][0]),
             (EvalResult, turn["eval_result"]),
+            (EvalResult, body["final_trace_evaluation"]),
             (InjectionRecord, body["injections"][0]),
             (PopulationRef, body["population"]),
         ]
@@ -456,10 +470,11 @@ class TestFieldExhaustiveness:
 
 
 class TestVersionDispatch:
-    def test_unknown_major_fails_closed(self) -> None:
-        data = {"version": "rampart.trace.v2", "result": {}}
+    @pytest.mark.parametrize("version", ["rampart.trace.v1", "rampart.trace.v3"])
+    def test_unsupported_major_fails_closed(self, version: str) -> None:
+        data = {**_minimal_record_dict(), "version": version}
 
-        with pytest.raises(UnsupportedSchemaVersionError, match="v2"):
+        with pytest.raises(UnsupportedSchemaVersionError, match=re.escape(version)):
             deserialize_record(data=json.dumps(data))
 
     def test_missing_version_fails_closed(self) -> None:
@@ -486,6 +501,8 @@ class TestMigrationTolerance:
         decoded = deserialize_record(data=json.dumps(_minimal_record_dict())).result
 
         assert decoded.status is SafetyStatus.SAFE
+        assert decoded.final_trace_evaluation is None
+        assert decoded.trace_end_reason is None
         assert decoded.turns == []
         assert decoded.duration_seconds == pytest.approx(0.0)
         assert decoded.harm_category is None
@@ -674,6 +691,7 @@ class TestResultAdapter:
         assert isinstance(turn.response.tool_calls[0], ToolCall)
         assert isinstance(turn.response.side_effects[0], SideEffect)
         assert isinstance(turn.eval_result, EvalResult)
+        assert isinstance(restored.result.final_trace_evaluation, EvalResult)
         assert isinstance(restored.result.injections[0], InjectionRecord)
         assert isinstance(restored.result.population, PopulationRef)
         assert "version" not in body
@@ -681,6 +699,9 @@ class TestResultAdapter:
         assert body["observability_level"] == "tool_and_side_effects"
         assert body["turns"][0]["request"]["attachments"][0]["format"] == "markdown"
         assert body["turns"][0]["eval_result"]["outcome"] == "detected"
+        assert body["final_trace_evaluation"]["outcome"] == "not_detected"
+        assert body["turns"][0]["eval_purpose"] == "stop_check"
+        assert body["trace_end_reason"] == "stop_condition_met"
         assert body["turns"][0]["timestamp"] == _TIMESTAMP.isoformat()
         assert body["turns"][0]["response"]["tool_calls"][0]["timestamp"] == (
             _TIMESTAMP.isoformat()
@@ -828,7 +849,7 @@ class TestPopulationInvariants:
         data = _record_data(record)
         data["result"]["population"][field] = invalid
         assert result.population is not None
-        result.population = replace(result.population, **{field: invalid})
+        result.population.__dict__[field] = invalid
 
         assert not Draft202012Validator(ResultRecord.json_schema()).is_valid(data)
         with pytest.raises(SchemaError, match=rf"population\.{field}") as error:
@@ -842,19 +863,14 @@ class TestPopulationInvariants:
     def test_index_must_be_less_than_size(self, *, index: int, size: int) -> None:
         result = _make_full_result()
         data = _record_data(ResultRecord(result=result))
-        result.population = PopulationRef(
-            id="pop-1", index=index, size=size, threshold=0.5
-        )
+        assert result.population is not None
+        result.population.__dict__.update(index=index, size=size)
         data["result"]["population"].update(index=index, size=size)
 
         Draft202012Validator(ResultRecord.json_schema()).validate(data)
-        with pytest.raises(
-            SchemaError, match=r"population.*index must be less than size"
-        ):
+        with pytest.raises(SchemaError, match=r"population.*index.*size"):
             serialize_record(record=ResultRecord(result=result))
-        with pytest.raises(
-            SchemaError, match=r"population.*index must be less than size"
-        ):
+        with pytest.raises(SchemaError, match=r"population.*index.*size"):
             deserialize_record(data=json.dumps(data))
 
     @pytest.mark.parametrize(("index", "size"), [(0, 1), (0, 5), (4, 5)])
@@ -878,33 +894,65 @@ class TestPopulationInvariants:
         population = schema["$defs"]["PopulationRef"]
 
         assert schema["properties"]["result_index"]["minimum"] == 0
+        assert population["properties"]["id"]["minLength"] == 1
         assert population["properties"]["index"]["minimum"] == 0
         assert population["properties"]["size"]["minimum"] == 1
         assert population["properties"]["threshold"]["minimum"] == 0
         assert population["properties"]["threshold"]["maximum"] == 1
         assert "index to be less than size" in population["description"]
 
+    def test_empty_id_is_rejected_by_constructor_and_both_boundaries(self) -> None:
+        result = _make_full_result()
+        data = _record_data(ResultRecord(result=result))
+        data["result"]["population"]["id"] = ""
+
+        with pytest.raises(ValueError, match="population id must be non-empty"):
+            PopulationRef(id="", index=0, size=1, threshold=0.5)
+
+        assert result.population is not None
+        result.population.__dict__["id"] = ""
+        assert not Draft202012Validator(ResultRecord.json_schema()).is_valid(data)
+        with pytest.raises(SchemaError, match=r"population\.id"):
+            serialize_record(record=ResultRecord(result=result))
+        with pytest.raises(SchemaError, match=r"population\.id"):
+            deserialize_record(data=json.dumps(data))
+
 
 class TestAdapterIsolation:
-    def test_live_population_construction_and_regular_adapters_are_unchanged(
+    def test_regular_adapters_preserve_constructor_valid_population_behavior(
         self,
     ) -> None:
-        data = {"id": "pop-1", "index": -1, "size": 0, "threshold": 2.0}
+        data = {"id": "pop-1", "index": 0, "size": 1, "threshold": 0.5}
         population = PopulationRef(**data)
         regular = _regular_adapter(PopulationRef)
         original_schema = regular.json_schema()
         assert regular.validate_python(data) == population
         result = _make_full_result()
         result.population = population
-
-        with pytest.raises(SchemaError, match="population"):
-            serialize_record(record=ResultRecord(result=result))
+        serialize_record(record=ResultRecord(result=result))
         ResultRecord.json_schema()
 
         assert regular.validate_python(data) == population
         assert _regular_adapter(PopulationRef).validate_python(data) == population
         assert regular.json_schema() == original_schema
         assert _regular_adapter(PopulationRef).json_schema() == original_schema
+
+    def test_canonical_revalidation_does_not_change_regular_instance_validation(
+        self,
+    ) -> None:
+        result = _make_full_result()
+        assert result.population is not None
+        regular = _regular_adapter(PopulationRef)
+        result.population.__dict__["id"] = ""
+
+        with pytest.raises(SchemaError, match=r"population\.id"):
+            serialize_record(record=ResultRecord(result=result))
+
+        assert regular.validate_python(result.population) is result.population
+        assert (
+            _regular_adapter(PopulationRef).validate_python(result.population)
+            is result.population
+        )
 
     def test_cold_adapter_resolves_types_without_changing_their_module(self) -> None:
         _result_adapter.cache_clear()
@@ -1078,7 +1126,7 @@ class TestJsonValueDomain:
     @pytest.mark.parametrize("number", ["1e400", "-1e400"])
     def test_overflowing_json_numbers_are_rejected(self, number: str) -> None:
         data = (
-            '{"version": "rampart.trace.v1", "result": {'
+            f'{{"version": "{TRACE_SCHEMA_VERSION}", "result": {{'
             '"status": "safe", "summary": "clean", '
             '"observability_level": "response_only", '
             f'"metadata": {{"bad": {number}}}}}}}'
@@ -1326,6 +1374,7 @@ class TestGeneratedSchema:
             turn["response"]["tool_calls"][0],
             turn["response"]["side_effects"][0],
             turn["eval_result"],
+            body["final_trace_evaluation"],
             body["injections"][0],
             body["population"],
         ]
@@ -1348,6 +1397,9 @@ class TestGeneratedSchema:
             (("result", "turns", 0, "request", "attachments", 0, "artifact"), "file"),
             (("result", "turns", 0, "request", "attachments", 0, "format"), "unknown"),
             (("result", "turns", 0, "eval_result", "outcome"), "unknown"),
+            (("result", "final_trace_evaluation", "outcome"), "unknown"),
+            (("result", "trace_end_reason"), "unknown"),
+            (("result", "turns", 0, "eval_purpose"), "unknown"),
             (("result", "injections", 0, "payload_id"), 123),
             (("pytest_nodeid",), 123),
             (("result_index",), True),

@@ -1,8 +1,8 @@
 {
-  "version": "rampart.trace.v1",
-  "contract_sha256": "da1a36daa27b5fc2cdaf4305ba3aa743f52789643de94ed97916ebbaa5fc2b47",
-  "previous_contract_sha256": null,
-  "decision": "initial",
-  "rationale": "Introduces the first canonical trace contract; the PR base has no published trace schema. Supported metadata is preserved without transport-specific filtering; shared consumer preparation owns bookkeeping separation and loss/truncation visibility. Normal JSON-mode serialization retains Unicode and Python ISO datetime policies but does not promise matching reader/writer nesting limits. Canonical ordinals are nonnegative; population size is positive, index is below size, and threshold is in [0, 1], without changing live dataclasses. These restrictions refine the initial unreleased contract, not a compatible change to an already-published v1. Existing xdist and reporting serializers are unchanged and adopt the contract in separate follow-ups.",
-  "migration_note": null
+  "version": "rampart.trace.v2",
+  "contract_sha256": "ad6e853e46dbdf05dda4460ea476e218f9ed8273a565a396bc484eae1c608d66",
+  "previous_contract_sha256": "da1a36daa27b5fc2cdaf4305ba3aa743f52789643de94ed97916ebbaa5fc2b47",
+  "decision": "new-major",
+  "rationale": "Compared with the actual PR target upstream/main at 6c8a8b74f729d6768014793031610493ebe7f74f, v2 narrows PopulationRef.id from any string to a nonempty string. Live population constructors and canonical boundary revalidation enforce the provenance invariants; the fingerprint now also tracks their shared _population.py policy. Optional final_trace_evaluation, trace_end_reason, and turn eval_purpose fields have defined absence semantics and do not conflate final verdict input with online evidence. The unmerged terminal_evaluation spelling is replaced by final_trace_evaluation across the API, canonical schema, xdist transport, and JSON reports without an alias. Shared EvalResult definitions consistently apply canonical strict-type, finite-number, and Unicode policies without changing independent adapters. The published v1 schema is preserved unchanged, but this codec reads and writes only v2 and rejects unsupported versions. No aliases, deprecation window, dual reader, or upcaster is promised. Removing the aggregate probe resolver does not change the wire schema. Canonical serializer adoption by xdist and reporting remains separate; the xdist v3 envelope independently prevents mixed worker verdict semantics.",
+  "migration_note": "docs/concepts/trace-schema.md"
 }

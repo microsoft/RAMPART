@@ -26,6 +26,11 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 
+@pytest.fixture
+def _baseline_version(monkeypatch) -> None:
+    monkeypatch.setattr(compatibility, "TRACE_SCHEMA_VERSION", "rampart.trace.v1")
+
+
 def _write_contract(*, root: Path, major: int = 1) -> None:
     for path in CompatibilityDeclaration.SOURCES:
         target = root / path
@@ -126,6 +131,7 @@ class TestContractFingerprint:
         assert original != _fingerprint({"a": "two"})
 
 
+@pytest.mark.usefixtures("_baseline_version")
 class TestCompatibilityDeclaration:
     def test_initial_contract_against_pre_schema_base(
         self, tmp_path, monkeypatch
@@ -299,6 +305,7 @@ class TestCompatibilityDeclaration:
             check_compatibility(root=tmp_path, base_ref="missing")
 
 
+@pytest.mark.usefixtures("_baseline_version")
 class TestMajorVersionDecision:
     def test_bump_requires_decision_and_migration_note(
         self, tmp_path, monkeypatch

@@ -147,7 +147,7 @@ When adding a new attack, test:
 Similar to attacks, but:
 
 1. No injection phase to test
-2. Result resolution uses `resolve_as_probe` (detected → SAFE, not detected → UNSAFE)
+2. Result resolution uses `resolve_probe_verdict` over one terminal evaluation (detected → SAFE, not detected → UNSAFE)
 
 ### Testing a New Evaluator
 
