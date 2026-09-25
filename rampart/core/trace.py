@@ -8,6 +8,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field, replace
 from typing import TYPE_CHECKING
 
+from rampart.common.text import safe_str_list
 from rampart.core.types import (
     EvalContext,
     EvalResult,
@@ -80,6 +81,23 @@ def _evaluation_context(
         turns=list(raw_turns),
         observability_level=observability_level,
         manifest=manifest,
+    )
+
+
+def _matches_terminal_context(*, context: EvalContext, run: TraceRun) -> bool:
+    """Check that the raw trace and adapter context are unchanged.
+
+    Returns:
+        bool: Whether this context can supply the terminal judgment.
+    """
+    return (
+        context.observability_level is run.observability_level
+        and context.manifest is run.manifest
+        and len(context.turns) == len(run.raw_turns)
+        and all(
+            evaluated is terminal
+            for evaluated, terminal in zip(context.turns, run.raw_turns, strict=True)
+        )
     )
 
 
@@ -182,8 +200,9 @@ async def evaluate_terminal_async(
         EvalResult | None: Final evaluation, or None when no turns exist.
 
     Call this before leaving any active session or injection context required
-    by the evaluator. Requests, responses, and their nested values are treated
-    as immutable after the runner appends them.
+    by the evaluator. Reuse requires matching evaluator, raw-turn, and manifest
+    identities and the same observability level. Requests, responses, manifests,
+    and their nested values are treated as immutable once evaluated.
     """
     if not run.raw_turns:
         return None
@@ -192,17 +211,15 @@ async def evaluate_terminal_async(
     if (
         record is not None
         and record.evaluator is evaluator
-        and len(record.context.turns) == len(run.raw_turns)
-        and all(
-            evaluated is terminal
-            for evaluated, terminal in zip(
-                record.context.turns,
-                run.raw_turns,
-                strict=True,
-            )
-        )
+        and _matches_terminal_context(context=record.context, run=run)
     ):
-        return replace(record.result, evidence=list(record.result.evidence))
+        return replace(
+            record.result,
+            evidence=safe_str_list(value=record.result.evidence),
+            undetermined_operands=safe_str_list(
+                value=record.result.undetermined_operands,
+            ),
+        )
 
     context = _evaluation_context(
         raw_turns=run.raw_turns,
