@@ -165,7 +165,7 @@ class TestXPIAEarlyStop:
         assert result.trace_end_reason is TraceEndReason.STOP_CONDITION_MET
         assert evaluator.evaluate_async.await_count == 2
 
-    async def test_explicit_non_firing_stop_reuses_terminal_evaluation_async(
+    async def test_explicit_non_firing_stop_reuses_final_trace_evaluation_async(
         self,
     ) -> None:
         evaluator = _mock_evaluator(EvalOutcome.NOT_DETECTED)
@@ -231,7 +231,7 @@ class TestXPIAEarlyStop:
         assert result.status is SafetyStatus.UNSAFE
         assert len(result.turns) == 2
         assert result.trace_end_reason is TraceEndReason.DRIVER_EXHAUSTED
-        assert result.terminal_evaluation is not None
+        assert result.final_trace_evaluation is not None
 
     async def test_any_turn_response_evaluator_is_auto_stoppable_async(self) -> None:
         result = await Attacks.xpia(
@@ -273,7 +273,7 @@ class TestXPIAMaxTurns:
         ).execute_async(adapter=_adapter())
 
         assert result.status is SafetyStatus.ERROR
-        assert result.terminal_evaluation is None
+        assert result.final_trace_evaluation is None
         assert result.trace_end_reason is TraceEndReason.MAX_TURNS_REACHED
         evaluator.evaluate_async.assert_not_awaited()
 
@@ -325,7 +325,7 @@ class TestXPIACleanup:
         assert "evaluator boom" in result.summary
         handle.__aexit__.assert_awaited_once()
 
-    async def test_terminal_evaluation_runs_before_injection_cleanup_async(
+    async def test_final_trace_evaluation_runs_before_injection_cleanup_async(
         self,
     ) -> None:
         handle = _mock_handle()
@@ -360,7 +360,7 @@ class TestXPIACleanup:
         ).execute_async(adapter=_adapter())
 
         assert result.status is SafetyStatus.ERROR
-        assert result.terminal_evaluation is None
+        assert result.final_trace_evaluation is None
         assert result.trace_end_reason is None
 
 
@@ -375,7 +375,7 @@ class TestXPIAZeroTurns:
         ).execute_async(adapter=_adapter())
 
         assert result.status is SafetyStatus.ERROR
-        assert result.terminal_evaluation is None
+        assert result.final_trace_evaluation is None
         assert result.trace_end_reason is TraceEndReason.DRIVER_EXHAUSTED
         evaluator.evaluate_async.assert_not_awaited()
 
@@ -900,7 +900,7 @@ class TestXPIAUnsafeSummary:
 
         assert summary == "Attack objective detected"
 
-    async def test_terminal_evaluation_supplies_the_evidence_async(self) -> None:
+    async def test_final_trace_evaluation_supplies_the_evidence_async(self) -> None:
         exfiltration = SideEffect(kind="http_request", details={"url": "evil.com"})
 
         result = await Attacks.xpia(
@@ -920,8 +920,8 @@ class TestXPIAUnsafeSummary:
         )
 
         assert result.turn_evaluations == []
-        assert result.terminal_evaluation is not None
-        assert result.terminal_evaluation.outcome is EvalOutcome.DETECTED
+        assert result.final_trace_evaluation is not None
+        assert result.final_trace_evaluation.outcome is EvalOutcome.DETECTED
         assert result.status is SafetyStatus.UNSAFE
         assert result.summary.startswith(
             "Attack objective detected: Side effect 'http_request'",

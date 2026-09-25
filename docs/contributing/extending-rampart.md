@@ -109,7 +109,7 @@ class MyAttackExecution(BaseExecution):
         return Result(
             status=status,
             summary="...",
-            terminal_evaluation=evaluation,
+            final_trace_evaluation=evaluation,
             turns=run.turns,
             trace_end_reason=run.trace_end_reason,
             strategy=self.strategy_name,

@@ -240,7 +240,7 @@ class XPIAExecution(BaseExecution):
                 evaluation=evaluation,
                 trace_end_reason=trace_end_reason,
             ),
-            terminal_evaluation=evaluation,
+            final_trace_evaluation=evaluation,
             turns=turns,
             trace_end_reason=trace_end_reason,
             strategy=self.strategy_name,
