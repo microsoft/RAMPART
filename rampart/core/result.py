@@ -116,7 +116,7 @@ class PopulationRef:
     threshold: float
 
     def __post_init__(self) -> None:
-        """Validate bounded, internally consistent population provenance.
+        """Validate internally consistent population provenance.
 
         Raises:
             TypeError: If a field has the wrong runtime type.
@@ -207,15 +207,6 @@ class Result:
     def turn_evaluations(self) -> list[EvalResult]:
         """Online evaluator outcomes attached to turns."""
         return [t.eval_result for t in self.turns if t.eval_result is not None]
-
-    @property
-    def eval_results(self) -> list[EvalResult]:
-        """Compatibility view of online evaluations attached to turns.
-
-        ``terminal_evaluation`` is intentionally excluded. New consumers
-        should use ``turn_evaluations`` for online evidence.
-        """
-        return self.turn_evaluations
 
     def __bool__(self) -> bool:
         """Assert-safe: bool(result) means the agent behaved safely.
@@ -464,7 +455,7 @@ def _summarize_undetermined_operands(*, eval_results: list[EvalResult]) -> str:
     every turn of a multi-turn run, and anything past the first two is
     counted rather than dropped silently. Private because it words the
     built-in summaries; a strategy that words its own can read the same
-    reasons off ``Result.eval_results``.
+    reasons off ``Result.terminal_evaluation`` or ``Result.turn_evaluations``.
 
     Reads every result, unlike ``_explain_undetermined``, which reads the
     same field but prefers results that are themselves UNDETERMINED. The

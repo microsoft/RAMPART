@@ -49,10 +49,21 @@ IDs must be recorded, not generated during deserialization. These boundary
 rules do not replace the normal dataclass constructors used during execution.
 
 When recorded, `result_index` must be a nonnegative integer. Population references
-require a positive `size`, a zero-based `index` less than `size`, and a `threshold`
-in `[0, 1]`. These invariants are enforced by the canonical record boundary and
-adapter, without changing live `PopulationRef` construction or other adapters.
-Scalar bounds are included in the generated JSON Schema.
+require a nonempty string `id`, a positive `size`, a zero-based `index` less than
+`size`, and a finite `threshold` in `[0, 1]`. Live `PopulationRef` constructors
+enforce these invariants, and the canonical adapter revalidates existing instances
+at the write boundary as well as decoded records. Scalar bounds, including the
+nonempty ID, are included in the generated JSON Schema.
+
+`Result.terminal_evaluation` records evaluation of the completed trace.
+`Turn.eval_result` remains separate online evidence; `Turn.eval_purpose` records
+why that online evaluation ran. A non-null purpose requires an evaluation on the
+same turn. `Result.trace_end_reason` records why turn production stopped. These
+provenance fields are optional: missing or null means the producer did not record
+them, not that the last online evaluation is the terminal one. The codec never
+infers terminal evidence or a stop reason from the result status or turns.
+Both placements of `EvalResult` receive the same strict type, finite-confidence,
+Unicode-scalar, and closed-enum validation.
 
 Body encoding validates the live result and uses Pydantic's JSON-mode
 serialization, with adapter-local Unicode validation and Python ISO datetime
@@ -66,18 +77,24 @@ re-encoded when Pydantic's JSON-mode writer has a lower nesting limit.
 These failures raise `SchemaError`; successful decoding alone does not guarantee
 that an unusually deep record can be emitted again.
 
-These policies belong to the cached canonical adapter, not to the public
-dataclass annotations or configuration. Fields remain `dict[str, Any]` and
+Canonical serialization policies belong to the cached adapter, not to the public
+dataclass annotations or configuration. Shared dataclass definitions reuse the
+adapter's configured copy at every occurrence. Fields remain `dict[str, Any]` and
 `datetime | None`. Independently constructed Pydantic adapters retain their
-normal behavior, including live binary payload support.
+normal behavior, including live binary payload support and ordinary instance
+validation. Constructor invariants still apply when those adapters construct a
+new instance.
 The canonical adapter supplies its own `datetime` / `Path` resolution namespace;
 the shared types module keeps those imports under `TYPE_CHECKING`.
 
 `ResultRecord.json_schema()` returns the adapter-derived body schema plus the
 versioned envelope. Small schema customizations describe the trace-only payload
 restrictions and the request invariant (a prompt or at least one attachment).
+It also describes the dependency between a turn's purpose and evaluation.
 `JsonSchemaValue` is the return type, not a separate model or validator.
-The open Draft 2020-12 contract is committed at `schemas/trace.v1.schema.json`.
+The active open Draft 2020-12 contract is committed at
+`schemas/trace.v2.schema.json`; `schemas/trace.v1.schema.json` is retained unchanged
+as the historical description of v1.
 
 Regenerate it with `uv run python scripts/generate_trace_schema.py`.
 The generator selects the filename from `TRACE_SCHEMA_VERSION`. CI runs the same
@@ -88,7 +105,8 @@ command with `--check` to detect drift.
 Schema drift checking alone does not establish compatibility. A separate CI gate
 requires a checked-in decision in `schemas/trace-compatibility.json`, bound to the
 contract content by SHA-256 fingerprints. The inputs are `result.py`, `types.py`,
-`serialization.py`, `_schema.py`, and all published `trace.v*.schema.json` files.
+`serialization.py`, `_schema.py`, `_population.py`, and all published
+`trace.v*.schema.json` files.
 Watching the models and codec policies also catches changes that do not appear
 in JSON Schema. This is deliberately conservative: even a nonsemantic edit to
 these inputs needs a compatibility rationale.
@@ -100,7 +118,8 @@ For a contract change, update the declaration:
   compatibility, such as an additive-optional field with a defined absence behavior.
 - **`new-major`** increments the major by one, retains earlier published schema
   files, and references a nonempty repository migration document in `migration_note`.
-  The migration obligations below still apply, including an upcaster and API/CLI.
+  The note explains the break and the actual reader/migration support shipped;
+  it does not require an upcaster or dual reader.
 
 Historical schema files remain unchanged in subsequent same-major PRs, not just
 during a major bump. A `compatible` decision may update the active major's schema;
@@ -122,7 +141,7 @@ Without `--base-ref`, including on main-branch pushes, the command checks the
 declaration's version and current content fingerprint only.
 
 **The declaration is a review gate, not proof of compatibility.** Reviewers must
-assess the rationale, semantic behavior, and required migration implementation.
+assess the rationale, semantic behavior, and any claimed migration support.
 A regenerated schema or a `compatible` assertion does not make a breaking change
 safe. Keep the input list current if contract policy moves to additional modules.
 
@@ -190,10 +209,10 @@ does not make currently rejected formats readable by older readers.
 ## Versioning
 
 - Every serialized record carries one root `version` field. The current schema
-  is **`rampart.trace.v1`**.
+  is **`rampart.trace.v2`**.
 - The record version is **independent** of transport or projection versions,
-  including the existing xdist envelope version (`rampart.xdist.v2`). Each
-  version describes its own layer and may evolve separately.
+  including xdist's versioned envelope. A transport's cadence or version number
+  does not select the canonical trace major.
 - There is a **single root version** — nested types (`Turn`, `Payload`,
   `EvalResult`, …) do not carry their own versions.
 
@@ -210,13 +229,14 @@ does not make currently rejected formats readable by older readers.
   defaults and does not retain which fields were absent. For example, omitted
   `turns` becomes `[]` and is emitted when re-encoded.
 - **Structural change = major bump.** Removing, renaming, or retyping a field,
-  or changing its meaning or nesting, bumps `vN → vN+1` with a changelog and a
-  migration note.
+  changing its meaning or nesting, or narrowing its accepted value domain bumps
+  `vN → vN+1` with a changelog and a migration note. Rejecting previously accepted
+  empty population IDs is a domain-narrowing change, not an optional addition.
 
 ```mermaid
 flowchart TD
     change([proposed schema change]) --> q1{"adds a field only?"}
-    q1 -- no --> struct["structural:<br/>remove / rename / retype /<br/>change meaning or nesting"]
+    q1 -- no --> struct["structural:<br/>remove / rename / retype /<br/>change meaning, nesting, or accepted values"]
     q1 -- yes --> q2{"optional with a<br/>well-defined default?"}
     q2 -- no --> struct
     q2 -- yes --> add["additive-optional"]
@@ -227,8 +247,10 @@ flowchart TD
 
 ## Reader posture
 
-- Readers tolerate unknown fields and **fail closed on an unknown major** — a
+- Readers tolerate unknown fields and **fail closed on an unsupported major** — a
   record is never best-effort parsed across a major boundary.
+- This reader supports only v2. Retaining the v1 schema does not register a v1
+  decoder; v1 records raise `UnsupportedSchemaVersionError`, as do future majors.
 - Forward compatibility is **additive-only within a major**. A newer major read
   by an older framework fails closed by design.
 - Schema descriptions and validators derived from this format must remain open
@@ -236,8 +258,9 @@ flowchart TD
 
 ## Enum posture
 
-- The closed enums — `SafetyStatus`, `EvalOutcome`, `ObservabilityLevel`, and
-  `PayloadFormat` — **fail closed** on an unknown value. A serialized safety
+- The closed enums — `SafetyStatus`, `EvalOutcome`, `EvaluationPurpose`,
+  `TraceEndReason`, `ObservabilityLevel`, and `PayloadFormat` — **fail closed**
+  on an unknown value. A serialized safety
   result must never silently misread one; there is no warn-and-degrade path.
 - `HarmCategory` is the sole exception: it travels as a **passthrough string**
   and is never coerced, so a new harm label from a future producer round-trips
@@ -256,7 +279,7 @@ flowchart TD
 - Timestamps retain Python's ISO 8601 representation, including naive datetimes
   and UTC offsets. The schema describes strings rather than RFC 3339
   `date-time`, which would exclude some supported Python datetimes.
-- `rampart.trace.v1` does not define a durable representation for binary or
+- `rampart.trace.v2` does not define a durable representation for binary or
   opaque payload artifacts. Encoding or decoding one fails closed rather than
   coercing it to text.
 - Encoding and decoding preserve supported metadata, including keys used for
@@ -264,18 +287,27 @@ flowchart TD
   rejected regardless of the key name. Metadata hygiene belongs to consumer
   preparation, not to the canonical codec.
 
-## Migration mechanics
+## v1 to v2 migration note
 
-Only `rampart.trace.v1` exists today. No upcaster or persisted-data migration
-tooling is implemented. If a later structural change introduces a new major,
-the migration policy requires:
+V2 narrows population IDs to nonempty strings. It also records optional terminal
+evaluation, trace-end reason, and online evaluation purpose, and consistently
+applies canonical validation to both terminal and online evaluations. The new
+optional fields alone would not require a major bump; the narrowed ID domain
+does. The `terminal_evaluation` name is retained without an alias.
 
-- writers emit the latest supported major;
-- each major bump ships an adjacent upcaster (`vN-1 → vN`) and an explicit
-  migration API/CLI;
-- migrating persisted data is an explicit operation; reading never rewrites an
-  artifact in place; and
-- encountering an unsupported major fails closed.
+Writers emit v2, and this reader accepts only v2. No v1 reader, adjacent upcaster,
+or persisted-data migration API/CLI is shipped. Historical v1 schema files are
+retained for consumers that need to inspect old records, not as a support-window
+promise.
+
+Persisted v1 data must not be silently relabeled or parsed through the v2 reader.
+Consumers choosing to migrate it must perform an explicit, application-owned
+conversion into a separate v2 record and validate the result with
+`deserialize_record()`. An empty population ID requires a legitimate identifier
+from the producer's provenance or regeneration of the record; do not invent one.
+Leave unrecorded terminal evaluation, stop reason, and turn purpose absent or
+null rather than inferring them from the last online evaluation. Preserve the
+original artifact; reading never rewrites persisted data in place.
 
 ## Future extensions
 
@@ -289,12 +321,11 @@ default do not require a major bump. Structural changes do. Apply the compatibil
 review and declaration requirements to each extension rather than promising
 compatibility for an unimplemented representation.
 
-## Support window
+## Pre-1.0 support policy
 
-This is a release-support commitment; the current reader supports only
-`rampart.trace.v1`.
-
-Starting with the first release that writes durable trace records by default,
-RAMPART supports reading `vN` and `vN-1` for **two subsequent framework
-releases** (one deprecation cycle). The window is keyed on releases, not time.
-Any major bump includes a changelog entry and migration note.
+RAMPART does not promise deprecation periods, compatibility aliases, a two-release
+support window, dual readers, or mandatory upcasters. Breaking changes may replace
+old APIs directly. Every canonical major change still requires an explicit
+version/compatibility decision, unchanged historical schema descriptions, and a
+changelog entry and migration note describing actual support. Unsupported
+versions always fail closed.

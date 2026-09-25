@@ -6,8 +6,6 @@
 Result, SafetyStatus, HarmCategory, resolve functions.
 """
 
-import warnings
-
 import pytest
 
 from rampart.core.result import (
@@ -159,7 +157,7 @@ class TestResult:
             summary="ok",
         )
         assert r.turns == []
-        assert r.eval_results == []
+        assert r.turn_evaluations == []
         assert r.duration_seconds == pytest.approx(0.0)
         assert r.harm_category is None
         assert r.strategy == ""
@@ -355,16 +353,18 @@ class TestPopulationRef:
 class TestResultTurnEvaluationsProperty:
     """Turn evaluations remain separate from the terminal evaluation."""
 
-    def test_empty_turns_gives_empty_eval_results(self) -> None:
+    def test_removed_eval_results_property_is_absent(self) -> None:
+        assert not hasattr(_result(SafetyStatus.SAFE), "eval_results")
+
+    def test_empty_turns_gives_empty_turn_evaluations(self) -> None:
         r = Result(
             observability_level=ObservabilityLevel.RESPONSE_ONLY,
             status=SafetyStatus.SAFE,
             summary="ok",
         )
         assert r.turn_evaluations == []
-        assert r.eval_results == []
 
-    def test_turns_with_eval_results_returned_in_order(self) -> None:
+    def test_turn_evaluations_returned_in_order(self) -> None:
         er1 = _er(EvalOutcome.NOT_DETECTED)
         er2 = _er(EvalOutcome.DETECTED)
         turns = [
@@ -386,7 +386,6 @@ class TestResultTurnEvaluationsProperty:
             turns=turns,
         )
         assert r.turn_evaluations == [er1, er2]
-        assert r.eval_results == r.turn_evaluations
 
     def test_turns_without_eval_result_filtered(self) -> None:
         er = _er(EvalOutcome.DETECTED)
@@ -409,7 +408,7 @@ class TestResultTurnEvaluationsProperty:
         )
         assert r.turn_evaluations == [er]
 
-    def test_final_evaluation_is_not_in_turn_eval_results(self) -> None:
+    def test_terminal_evaluation_is_not_in_turn_evaluations(self) -> None:
         final = _er(EvalOutcome.DETECTED)
         turn_evaluation = _er(EvalOutcome.NOT_DETECTED)
         r = Result(
@@ -426,7 +425,7 @@ class TestResultTurnEvaluationsProperty:
             ],
         )
         assert r.turn_evaluations == [turn_evaluation]
-        assert r.eval_results == [turn_evaluation]
+        assert r.terminal_evaluation is final
 
 
 class TestResolveAsAttack:
@@ -815,14 +814,6 @@ class TestExplainUndetermined:
         )
 
         assert detail == "nothing to say"
-
-
-def test_legacy_resolvers_remain_warning_free() -> None:
-    """The additive API does not start the legacy deprecation clock."""
-    with warnings.catch_warnings():
-        warnings.simplefilter("error")
-        assert resolve_as_attack(eval_results=[]) is SafetyStatus.ERROR
-        assert resolve_as_probe(eval_results=[]) is SafetyStatus.ERROR
 
 
 class TestResolveAttackVerdict:

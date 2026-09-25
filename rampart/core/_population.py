@@ -16,7 +16,7 @@ def validate_population_id(value: object) -> str:
 
     Raises:
         TypeError: If ``value`` is not a string.
-        ValueError: If ``value`` is empty or exceeds the transport bound.
+        ValueError: If ``value`` is empty.
     """
     if not isinstance(value, str):
         msg = "population id must be a string"

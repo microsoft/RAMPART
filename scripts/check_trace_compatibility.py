@@ -37,6 +37,7 @@ class CompatibilityDeclaration(BaseModel):
         "rampart/core/types.py",
         "rampart/core/serialization.py",
         "rampart/core/_schema.py",
+        "rampart/core/_population.py",
     )
 
     model_config = ConfigDict(extra="forbid", strict=True, frozen=True)

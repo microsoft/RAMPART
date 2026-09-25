@@ -65,9 +65,10 @@ until their follow-up migration; manually constructed and error results may do
 the same intentionally.
 
 Online evaluations attached to turns are available as
-`result.turn_evaluations`. The older `result.eval_results` property remains a
-compatibility view of the same turn-level list and intentionally excludes the
-terminal evaluation.
+`result.turn_evaluations`; this list excludes the terminal evaluation.
+The former `result.eval_results` property has been removed. Use
+`result.turn_evaluations` for online evidence and `result.terminal_evaluation`
+for terminal verdict evidence.
 
 `TraceEndReason.MAX_TURNS_REACHED` records budget truncation. It does not by
 itself claim that the scenario reached semantic completion; each execution
