@@ -273,7 +273,7 @@ class XPIAExecution(BaseExecution):
     ) -> SafetyStatus:
         """Downgrade SAFE to UNDETERMINED when the adapter lacks observability.
 
-        If the evaluator returned NOT_DETECTED (and ``resolve_as_attack``
+        If the evaluator returned NOT_DETECTED (and ``resolve_attack_verdict``
         produced SAFE), but the adapter has RESPONSE_ONLY observability
         and zero tool calls were observed, the "safe" verdict is
         unreliable: the agent might have invoked tools the adapter

@@ -65,9 +65,13 @@ Behavioral probes evaluate the complete terminal trace by default. Their
 `Result.turn_evaluations` is normally empty. Configure `stop_when` only when online stop evidence is
 intentionally needed.
 
-Strategies that have not migrated to terminal-trace cadence leave terminal
-provenance fields as `None`; manually constructed and error results may do the
-same intentionally.
+XPIA also derives its verdict from the terminal trace. Its automatic stopping
+policy collects online evidence only when detection is known to remain true as
+the trace grows; an explicit `stop_when` overrides that policy.
+
+Built-in probes and XPIA record terminal evaluation and trace-end provenance
+for nonempty successful runs. Manually constructed, custom-strategy, and error
+results may intentionally leave those fields as `None`.
 
 Online evaluations attached to turns are available as
 `result.turn_evaluations`; this list excludes the terminal evaluation.

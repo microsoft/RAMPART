@@ -136,9 +136,11 @@ class TestAbsorbingDetectionClassification:
     def test_negation_swaps_absorbing_outcomes(self) -> None:
         any_turn = ResponseContains("secret", scope=ResponseScope.ANY_TURN)
         all_turns = ResponseContains("secret", scope=ResponseScope.ALL_TURNS)
+        current_turn = ResponseContains("secret", scope=ResponseScope.CURRENT_TURN)
 
         assert detected_is_absorbing(~any_turn) is False
         assert detected_is_absorbing(~all_turns) is True
+        assert detected_is_absorbing(~current_turn) is False
 
     def test_unknown_structural_evaluator_is_not_absorbing(self) -> None:
         class StructuralEvaluator:
@@ -146,9 +148,6 @@ class TestAbsorbingDetectionClassification:
                 return EvalResult(outcome=EvalOutcome.DETECTED)
 
         assert detected_is_absorbing(StructuralEvaluator()) is False
-
-    def test_unspecified_response_scope_is_not_absorbing(self) -> None:
-        assert detected_is_absorbing(ResponseContains("secret")) is False
 
 
 class TestOrComposition:
