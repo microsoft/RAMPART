@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from unittest.mock import AsyncMock
 
 import pytest
@@ -24,7 +25,13 @@ from rampart.core.types import (
     Turn,
 )
 from rampart.drivers.static import StaticDriver
+from rampart.evaluators import ToolCalled
 from tests.fixtures import MockSession
+
+
+class _FailingIterable:
+    def __iter__(self) -> object:
+        raise RuntimeError("evidence unavailable")
 
 
 def _session(*responses: str) -> MockSession:
@@ -160,6 +167,95 @@ class TestRunTraceAsync:
 
 
 class TestEvaluateTerminalAsync:
+    async def test_changed_observability_requires_new_judgment_async(self) -> None:
+        evaluator = ToolCalled("send_email")
+        run = await run_trace_async(
+            session=_session("r"),
+            driver=StaticDriver(prompts=["p"]),
+            max_turns=1,
+            observability_level=ObservabilityLevel.TOOL_AND_SIDE_EFFECTS,
+            stop_when=evaluator,
+        )
+        updated_run = replace(
+            run,
+            observability_level=ObservabilityLevel.RESPONSE_ONLY,
+        )
+
+        result = await evaluate_terminal_async(evaluator=evaluator, run=updated_run)
+
+        assert run.latest_online_evaluation is not None
+        assert run.latest_online_evaluation.result.outcome is EvalOutcome.NOT_DETECTED
+        assert result is not None
+        assert result.outcome is EvalOutcome.UNDETERMINED
+
+    @pytest.mark.parametrize("manifest", [None, AppManifest(name="agent")])
+    async def test_changed_manifest_requires_new_judgment_async(
+        self,
+        manifest: AppManifest | None,
+    ) -> None:
+        evaluator = _evaluator(EvalOutcome.NOT_DETECTED, EvalOutcome.DETECTED)
+        run = await run_trace_async(
+            session=_session("r"),
+            driver=StaticDriver(prompts=["p"]),
+            max_turns=1,
+            observability_level=ObservabilityLevel.TOOL_AND_SIDE_EFFECTS,
+            stop_when=evaluator,
+            manifest=AppManifest(name="agent"),
+        )
+
+        result = await evaluate_terminal_async(
+            evaluator=evaluator,
+            run=replace(run, manifest=manifest),
+        )
+
+        assert result is not None and result.outcome is EvalOutcome.DETECTED
+        assert evaluator.evaluate_async.await_count == 2
+        assert (
+            evaluator.evaluate_async.await_args.kwargs["context"].manifest is manifest
+        )
+
+    @pytest.mark.parametrize(
+        ("evidence", "expected"),
+        [
+            (None, []),
+            (42, []),
+            (_FailingIterable(), []),
+            ("confirmed", ["confirmed"]),
+            (["confirmed"], ["confirmed"]),
+        ],
+    )
+    async def test_reuse_preserves_verdict_with_optional_evidence_async(
+        self,
+        evidence: object,
+        expected: list[str],
+    ) -> None:
+        online = EvalResult(
+            outcome=EvalOutcome.DETECTED,
+            evidence=evidence,  # ty: ignore[invalid-argument-type]
+            rationale="condition confirmed",
+            undetermined_operands=["missing side effects"],
+        )
+        evaluator = AsyncMock(spec=Evaluator)
+        evaluator.evaluate_async.return_value = online
+        run = await run_trace_async(
+            session=_session("r"),
+            driver=StaticDriver(prompts=["p"]),
+            max_turns=1,
+            observability_level=ObservabilityLevel.TOOL_AND_SIDE_EFFECTS,
+            stop_when=evaluator,
+        )
+
+        result = await evaluate_terminal_async(evaluator=evaluator, run=run)
+
+        assert result is not None
+        assert result.outcome is EvalOutcome.DETECTED
+        assert result.rationale == online.rationale
+        assert result.evidence == expected
+        assert result.evidence is not online.evidence
+        assert result.undetermined_operands == online.undetermined_operands
+        assert result.undetermined_operands is not online.undetermined_operands
+        evaluator.evaluate_async.assert_awaited_once()
+
     async def test_empty_trace_skips_evaluator_async(self) -> None:
         evaluator = _evaluator(EvalOutcome.DETECTED)
         run = await run_trace_async(
@@ -193,6 +289,7 @@ class TestEvaluateTerminalAsync:
             max_turns=1,
             observability_level=ObservabilityLevel.TOOL_AND_SIDE_EFFECTS,
             stop_when=evaluator,
+            manifest=AppManifest(name="agent"),
         )
         online_result = run.latest_online_evaluation
         assert online_result is not None
