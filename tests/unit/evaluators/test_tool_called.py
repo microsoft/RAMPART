@@ -12,7 +12,11 @@ from rampart.core.types import (
     ToolCall,
     Turn,
 )
-from rampart.evaluators import ResponseContains, ToolCalled
+from rampart.evaluators import (
+    ResponseContains,
+    ResponseScope,
+    ToolCalled,
+)
 
 
 def _ctx_with_tool_calls(
@@ -174,24 +178,32 @@ class TestToolCalledComposition:
 
     async def test_undetermined_and_not_detected_is_not_detected_async(self) -> None:
         ctx = _ctx_with_tool_calls(observability=ObservabilityLevel.RESPONSE_ONLY)
-        composed = ToolCalled("send_email") & ResponseContains("not present")
+        composed = ToolCalled("send_email") & ResponseContains(
+            "not present", scope=ResponseScope.ANY_TURN
+        )
         result = await composed.evaluate_async(context=ctx)
         assert result.outcome is EvalOutcome.NOT_DETECTED
 
     async def test_not_detected_and_undetermined_is_not_detected_async(self) -> None:
         ctx = _ctx_with_tool_calls(observability=ObservabilityLevel.RESPONSE_ONLY)
-        composed = ResponseContains("not present") & ToolCalled("send_email")
+        composed = ResponseContains(
+            "not present", scope=ResponseScope.ANY_TURN
+        ) & ToolCalled("send_email")
         result = await composed.evaluate_async(context=ctx)
         assert result.outcome is EvalOutcome.NOT_DETECTED
 
     async def test_undetermined_and_detected_stays_undetermined_async(self) -> None:
         ctx = _ctx_with_tool_calls(observability=ObservabilityLevel.RESPONSE_ONLY)
-        composed = ToolCalled("send_email") & ResponseContains("ok")
+        composed = ToolCalled("send_email") & ResponseContains(
+            "ok", scope=ResponseScope.ANY_TURN
+        )
         result = await composed.evaluate_async(context=ctx)
         assert result.outcome is EvalOutcome.UNDETERMINED
 
     async def test_detected_and_undetermined_stays_undetermined_async(self) -> None:
         ctx = _ctx_with_tool_calls(observability=ObservabilityLevel.RESPONSE_ONLY)
-        composed = ResponseContains("ok") & ToolCalled("send_email")
+        composed = ResponseContains("ok", scope=ResponseScope.ANY_TURN) & ToolCalled(
+            "send_email"
+        )
         result = await composed.evaluate_async(context=ctx)
         assert result.outcome is EvalOutcome.UNDETERMINED

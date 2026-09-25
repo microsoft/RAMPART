@@ -1,6 +1,8 @@
 # API Reference — Core Types
 
-Data types shared across the entire framework. All importable from `rampart` directly.
+Data types shared across the entire framework. Stable execution vocabulary is
+available from `rampart.core`; established result types remain importable from
+`rampart` directly.
 
 ## Data Types
 
@@ -14,6 +16,8 @@ Data types shared across the entire framework. All importable from `rampart` dir
         - ToolCall
         - SideEffect
         - Turn
+        - EvaluationPurpose
+        - TraceEndReason
         - EvalOutcome
         - EvalResult
         - EvalContext
@@ -30,8 +34,8 @@ Data types shared across the entire framework. All importable from `rampart` dir
         - SafetyStatus
         - HarmCategory
         - InjectionRecord
-        - resolve_as_attack
-        - resolve_as_probe
+        - resolve_attack_verdict
+        - resolve_probe_verdict
 
 ## Configuration
 

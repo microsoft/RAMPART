@@ -6,7 +6,6 @@
 from __future__ import annotations
 
 import re
-import warnings
 from enum import Enum
 from typing import TYPE_CHECKING
 
@@ -35,13 +34,6 @@ class ResponseScope(Enum):
     CURRENT_TURN = "current_turn"
 
 
-_UNSPECIFIED_SCOPE_WARNING = (
-    "ResponseContains evaluated a multi-turn transcript without an explicit "
-    "ResponseScope and inspected only the current response. Choose ANY_TURN, "
-    "ALL_TURNS, or CURRENT_TURN to make the intended quantifier explicit."
-)
-
-
 class ResponseContains(BaseEvaluator):
     """Detects whether response text contains a target pattern.
 
@@ -51,9 +43,11 @@ class ResponseContains(BaseEvaluator):
     Args:
         target (str | re.Pattern | Callable[[str], bool]):
             Pattern to find (positional-only).
+        scope (ResponseScope): Which responses to inspect. Must be explicit.
         case_sensitive (bool): Whether substring match is case-sensitive.
-        scope (ResponseScope | None): Which responses to inspect. None preserves
-            current-turn behavior and warns for multi-turn contexts.
+
+    Raises:
+        TypeError: If scope is not a ResponseScope.
     """
 
     def __init__(
@@ -61,13 +55,22 @@ class ResponseContains(BaseEvaluator):
         target: str | re.Pattern[str] | Callable[[str], bool],
         /,
         *,
+        scope: ResponseScope,
         case_sensitive: bool = False,
-        scope: ResponseScope | None = None,
     ) -> None:
-        """Initialize with target pattern, case sensitivity, and scope."""
+        """Initialize with target pattern, case sensitivity, and scope.
+
+        Raises:
+            TypeError: If scope is not a ResponseScope.
+        """
+        if not isinstance(scope, ResponseScope):
+            msg = "scope must be a ResponseScope."
+            raise TypeError(msg)
         self._target = target
         self._case_sensitive = case_sensitive
         self._scope = scope
+        self._detected_absorbing = scope is ResponseScope.ANY_TURN
+        self._not_detected_absorbing = scope is ResponseScope.ALL_TURNS
 
     async def evaluate_async(self, *, context: EvalContext) -> EvalResult:
         """Check response text for the target pattern within the scope.
@@ -83,10 +86,9 @@ class ResponseContains(BaseEvaluator):
             msg = "No turns in context."
             raise ValueError(msg)
 
-        scope = self._resolve_scope(context=context)
-        if scope is ResponseScope.CURRENT_TURN:
+        if self._scope is ResponseScope.CURRENT_TURN:
             return self._evaluate_current_turn(context=context)
-        return self._evaluate_quantified(context=context, scope=scope)
+        return self._evaluate_quantified(context=context, scope=self._scope)
 
     def _evaluate_quantified(
         self,
@@ -190,18 +192,6 @@ class ResponseContains(BaseEvaluator):
         ]
         return f"{prefix}: {', '.join(turn_numbers)}"
 
-    def _resolve_scope(self, *, context: EvalContext) -> ResponseScope:
-        """Resolve the scope and warn about ambiguous multi-turn evaluation.
-
-        Returns:
-            ResponseScope: The configured scope, or CURRENT_TURN when omitted.
-        """
-        if self._scope is not None:
-            return self._scope
-        if len(context.turns) > 1:
-            warnings.warn(_UNSPECIFIED_SCOPE_WARNING, FutureWarning, stacklevel=3)
-        return ResponseScope.CURRENT_TURN
-
     def _evaluate_current_turn(self, *, context: EvalContext) -> EvalResult:
         """Evaluate only the most recent response.
 
@@ -211,7 +201,9 @@ class ResponseContains(BaseEvaluator):
         if self._matches(context.text):
             return EvalResult(
                 outcome=EvalOutcome.DETECTED,
-                evidence=["Pattern found in response text"],
+                evidence=[
+                    f"Pattern found on turn(s): {context.current_turn.turn_number}",
+                ],
                 rationale="Response contains target pattern",
             )
 

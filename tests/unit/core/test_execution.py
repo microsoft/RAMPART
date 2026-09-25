@@ -4,6 +4,7 @@
 import asyncio
 import types
 from typing import Self
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -19,8 +20,6 @@ from rampart.core.execution import (
 from rampart.core.manifest import AppManifest
 from rampart.core.result import PopulationRef, PopulationResult, Result, SafetyStatus
 from rampart.core.types import (
-    EvalContext,
-    EvalResult,
     ObservabilityLevel,
     Request,
     Response,
@@ -359,6 +358,23 @@ class TestExecuteTrials:
 
         assert handler.events == []
 
+    @pytest.mark.parametrize("threshold", [True, float("nan"), float("inf")])
+    async def test_rejects_malformed_threshold_before_factory_async(
+        self,
+        threshold: object,
+    ) -> None:
+        factory = MagicMock(return_value=_SuccessExecution())
+
+        with pytest.raises((TypeError, ValueError)):
+            await execute_trials_async(
+                execution_factory=factory,
+                adapter=_StubAdapter(),
+                n=1,
+                threshold=threshold,  # ty: ignore[invalid-argument-type]
+            )
+
+        factory.assert_not_called()
+
 
 class TestPopulationPublicExports:
     def test_execute_trials_exported_from_rampart(self) -> None:
@@ -565,138 +581,10 @@ class TestDriverErrorHandling:
         assert ExecutionEvent.ON_POST_EXECUTE in event_types
 
 
-class TestEvaluateTurnAsync:
-    async def test_observability_level_is_required_async(self) -> None:
-        from unittest.mock import AsyncMock
+class TestRemovedTurnEvaluator:
+    def test_per_turn_helper_is_not_exported(self) -> None:
+        from rampart import core
+        from rampart.core import execution
 
-        from rampart.core.execution import evaluate_turn_async
-
-        with pytest.raises(TypeError, match="observability_level"):
-            await evaluate_turn_async(  # ty: ignore[missing-argument]
-                evaluator=AsyncMock(),
-                history=[],
-                request=Request(prompt="hello"),
-                response=Response(text="world"),
-                turn_number=0,
-            )
-
-    async def test_returns_turn_with_eval_result_async(self) -> None:
-        from unittest.mock import AsyncMock
-
-        from rampart.core.execution import evaluate_turn_async
-        from rampart.core.types import (
-            EvalOutcome,
-            Request,
-            Response,
-        )
-
-        evaluator = AsyncMock()
-        evaluator.evaluate_async.return_value = EvalResult(
-            outcome=EvalOutcome.DETECTED,
-            rationale="found it",
-        )
-
-        turn = await evaluate_turn_async(
-            observability_level=ObservabilityLevel.TOOL_AND_SIDE_EFFECTS,
-            evaluator=evaluator,
-            history=[],
-            request=Request(prompt="hello"),
-            response=Response(text="world"),
-            turn_number=0,
-        )
-
-        assert turn.eval_result is not None
-        assert turn.eval_result.outcome is EvalOutcome.DETECTED
-        assert turn.request.prompt == "hello"
-        assert turn.response.text == "world"
-        assert turn.turn_number == 0
-
-    async def test_includes_history_in_context_async(self) -> None:
-        from unittest.mock import AsyncMock
-
-        from rampart.core.execution import evaluate_turn_async
-        from rampart.core.types import (
-            EvalOutcome,
-            Request,
-            Response,
-            Turn,
-        )
-
-        captured_context = None
-
-        def capture_eval(*, context: EvalContext) -> EvalResult:
-            nonlocal captured_context
-            captured_context = context
-            return EvalResult(outcome=EvalOutcome.NOT_DETECTED)
-
-        evaluator = AsyncMock()
-        evaluator.evaluate_async.side_effect = capture_eval
-
-        history_turn = Turn(
-            request=Request(prompt="prev"),
-            response=Response(text="prev_resp"),
-        )
-
-        await evaluate_turn_async(
-            observability_level=ObservabilityLevel.TOOL_AND_SIDE_EFFECTS,
-            evaluator=evaluator,
-            history=[history_turn],
-            request=Request(prompt="current"),
-            response=Response(text="current_resp"),
-            turn_number=1,
-            driver_reasoning="test reasoning",
-        )
-
-        assert captured_context is not None
-        assert len(captured_context.turns) == 2
-        assert captured_context.turns[0].request.prompt == "prev"
-        assert captured_context.turns[1].request.prompt == "current"
-
-    async def test_passes_observability_level_to_context_async(self) -> None:
-        from unittest.mock import AsyncMock
-
-        from rampart.core.execution import evaluate_turn_async
-        from rampart.core.types import EvalOutcome, Request, Response
-
-        captured_context = None
-
-        def capture_eval(*, context: EvalContext) -> EvalResult:
-            nonlocal captured_context
-            captured_context = context
-            return EvalResult(outcome=EvalOutcome.NOT_DETECTED)
-
-        evaluator = AsyncMock()
-        evaluator.evaluate_async.side_effect = capture_eval
-
-        await evaluate_turn_async(
-            evaluator=evaluator,
-            history=[],
-            request=Request(prompt="hello"),
-            response=Response(text="world"),
-            turn_number=0,
-            observability_level=ObservabilityLevel.RESPONSE_ONLY,
-        )
-
-        assert captured_context is not None
-        assert captured_context.observability_level is ObservabilityLevel.RESPONSE_ONLY
-
-    async def test_preserves_driver_reasoning_async(self) -> None:
-        from unittest.mock import AsyncMock
-
-        from rampart.core.execution import evaluate_turn_async
-        from rampart.core.types import EvalOutcome, Request, Response
-
-        evaluator = AsyncMock()
-        evaluator.evaluate_async.return_value = EvalResult(outcome=EvalOutcome.DETECTED)
-
-        turn = await evaluate_turn_async(
-            observability_level=ObservabilityLevel.TOOL_AND_SIDE_EFFECTS,
-            evaluator=evaluator,
-            history=[],
-            request=Request(prompt="p"),
-            response=Response(text="r"),
-            turn_number=0,
-            driver_reasoning="choosing carefully",
-        )
-
-        assert turn.driver_reasoning == "choosing carefully"
+        for module in (core, execution):
+            assert not hasattr(module, "evaluate_turn_async")

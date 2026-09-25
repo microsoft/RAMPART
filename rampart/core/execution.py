@@ -14,25 +14,17 @@ import logging
 import time
 import uuid
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from enum import Enum
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
+from rampart.core._population import validate_population_parameters
 from rampart.core.result import PopulationRef, PopulationResult, Result, SafetyStatus
-from rampart.core.types import (
-    EvalContext,
-    ObservabilityLevel,
-    Request,
-    Response,
-    Turn,
-)
 
 if TYPE_CHECKING:
     from collections.abc import Callable
 
     from rampart.core.adapter import AgentAdapter
-    from rampart.core.evaluator import Evaluator
-    from rampart.core.manifest import AppManifest
 
 logger = logging.getLogger(__name__)
 
@@ -377,7 +369,7 @@ async def execute_trials_async(
         TypeError: If n is not a non-boolean integer.
         ValueError: If n is less than 1 or threshold is outside [0.0, 1.0].
     """
-    _validate_trial_parameters(
+    n, threshold = _validate_trial_parameters(
         n=n,
         threshold=threshold,
     )
@@ -407,68 +399,19 @@ def _validate_trial_parameters(
     *,
     n: int,
     threshold: float,
-) -> None:
+) -> tuple[int, float]:
     """Validate trial population parameters.
+
+    Returns:
+        tuple[int, float]: Validated count and normalized threshold.
 
     Raises:
         TypeError: If n is not a non-boolean integer.
         ValueError: If n is less than 1 or threshold is outside [0.0, 1.0].
     """
-    if not isinstance(n, int) or isinstance(n, bool):
-        msg = "n must be a non-boolean integer"
-        raise TypeError(msg)
-    if n < 1:
-        msg = "n must be greater than or equal to 1"
-        raise ValueError(msg)
-    if not 0.0 <= threshold <= 1.0:
-        msg = "threshold must be between 0.0 and 1.0"
-        raise ValueError(msg)
-
-
-async def evaluate_turn_async(
-    *,
-    evaluator: Evaluator,
-    history: list[Turn],
-    request: Request,
-    response: Response,
-    turn_number: int,
-    observability_level: ObservabilityLevel,
-    driver_reasoning: str = "",
-    manifest: AppManifest | None = None,
-) -> Turn:
-    """Create a Turn, evaluate it, and return the Turn with eval_result attached.
-
-    Builds a provisional Turn (eval_result=None), passes it to the
-    evaluator inside an EvalContext that includes the full history,
-    then returns a frozen copy with the eval_result populated.
-
-    Args:
-        evaluator: The evaluator to invoke.
-        history: All prior completed turns.
-        request: What was sent to the agent this turn.
-        response: What the agent returned this turn.
-        turn_number: Position in the conversation (0-indexed).
-        observability_level: What the adapter can observe. Required, so
-            that evaluators can tell missing evidence apart from an
-            evidence channel the adapter does not report. Execution
-            strategies pass ``adapter.observability_profile``.
-        driver_reasoning: Why the driver chose this request.
-        manifest: The agent's declared capabilities.
-
-    Returns:
-        Turn: An immutable Turn with eval_result populated.
-    """
-    provisional = Turn(
-        request=request,
-        response=response,
-        turn_number=turn_number,
-        driver_reasoning=driver_reasoning,
+    return validate_population_parameters(
+        size=n,
+        threshold=threshold,
+        size_name="n",
+        threshold_name="threshold",
     )
-    result = await evaluator.evaluate_async(
-        context=EvalContext(
-            turns=[*history, provisional],
-            manifest=manifest,
-            observability_level=observability_level,
-        ),
-    )
-    return replace(provisional, eval_result=result)

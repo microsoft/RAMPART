@@ -26,11 +26,16 @@ RAMPART follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`)
 !!! note "Pre-1.0 stability"
     While RAMPART is below `1.0`, minor version bumps may include breaking changes. The API is stabilizing but not yet frozen. The first stable release will be `1.0.0`.
 
-## 3. Remove Deprecated Functionality
+## 3. Review Breaking Changes
 
-If you are incrementing the minor version, search the codebase for the new minor version (no leading `v`) to find occurrences where functionality was deprecated and announced for removal in this version. Typically, functionality is deprecated and stays for two minor versions before being removed.
+During pre-1.0 development, remove obsolete APIs directly rather than maintaining
+deprecated aliases, warnings, or a fixed support window. Migrate in-tree callers,
+tests, and documentation together, and explain required caller changes in the
+release notes.
 
-If you find functionality to remove, merge the removal PR to `main` before proceeding.
+Breaking persisted-data changes still require an explicit schema-version and
+compatibility decision; see [Trace Schema](../concepts/trace-schema.md).
+Merge the completed changes to `main` before proceeding.
 
 ## 4. Prepare Release Metadata
 
