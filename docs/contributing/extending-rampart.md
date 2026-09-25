@@ -219,7 +219,7 @@ status = (
 )
 ```
 
-Store `terminal_evaluation`, `run.turns`, and `run.trace_end_reason` on the returned
+Store `final_trace_evaluation`, `run.turns`, and `run.trace_end_reason` on the returned
 `Result`. Most probes skip the injection phase. For a complete working
 reference, see
 [`rampart/probes/_single_turn.py`](https://github.com/microsoft/RAMPART/blob/main/rampart/probes/_single_turn.py).

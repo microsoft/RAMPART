@@ -423,7 +423,7 @@ class TestProbeInfrastructureError:
         assert result.safe is False
         assert result.status == SafetyStatus.ERROR
         assert "InfrastructureError" in result.summary
-        assert result.terminal_evaluation is None
+        assert result.final_trace_evaluation is None
         assert result.trace_end_reason is None
 
 
@@ -787,7 +787,7 @@ class TestProbeFinalTraceCadence:
         evaluator.evaluate_async.assert_awaited_once()
         context = evaluator.evaluate_async.await_args.kwargs["context"]
         assert len(context.turns) == 3
-        assert result.terminal_evaluation is evaluator.evaluate_async.return_value
+        assert result.final_trace_evaluation is evaluator.evaluate_async.return_value
         assert result.turn_evaluations == []
         assert result.trace_end_reason is TraceEndReason.DRIVER_EXHAUSTED
 
@@ -833,7 +833,7 @@ class TestProbeFinalTraceCadence:
         ).execute_async(adapter=_adapter(responses=[Response(text="unused")]))
 
         assert result.status is SafetyStatus.ERROR
-        assert result.terminal_evaluation is None
+        assert result.final_trace_evaluation is None
         assert result.trace_end_reason is TraceEndReason.DRIVER_EXHAUSTED
         evaluator.evaluate_async.assert_not_awaited()
 
@@ -927,7 +927,7 @@ class TestProbeFinalTraceCadence:
         verdict.evaluate_async.assert_awaited_once()
         context = verdict.evaluate_async.await_args.kwargs["context"]
         assert len(context.turns) == 2
-        assert result.terminal_evaluation is verdict.evaluate_async.return_value
+        assert result.final_trace_evaluation is verdict.evaluate_async.return_value
 
     async def test_explicit_stop_feedback_is_available_to_driver_async(self) -> None:
         class RecordingDriver:
@@ -1003,10 +1003,10 @@ class TestProbeFinalTraceCadence:
 
         assert len(result.turns) == 2
         assert result.status is SafetyStatus.SAFE
-        assert result.terminal_evaluation is not None
-        assert result.terminal_evaluation.evidence == ["Pattern found on turn(s): 1"]
+        assert result.final_trace_evaluation is not None
+        assert result.final_trace_evaluation.evidence == ["Pattern found on turn(s): 1"]
 
-    async def test_terminal_evaluation_runs_before_session_close_async(self) -> None:
+    async def test_final_trace_evaluation_runs_before_session_close_async(self) -> None:
         class RecordingSession:
             def __init__(self) -> None:
                 self.closed = False

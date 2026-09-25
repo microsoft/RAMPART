@@ -61,7 +61,7 @@ input to the final status, not a duplicate status: execution policy can still
 adjust the verdict, and `result.status` remains authoritative.
 
 Behavioral probes evaluate the complete terminal trace by default. Their
-`Result.terminal_evaluation` contains the verdict evidence, while
+`Result.final_trace_evaluation` contains the verdict evidence, while
 `Result.turn_evaluations` is normally empty. Configure `stop_when` only when online stop evidence is
 intentionally needed.
 
@@ -88,8 +88,8 @@ A run can resolve `SAFE` while part of the evaluation was never observable. Such
 
 ```python
 evaluations = result.turn_evaluations
-if result.terminal_evaluation is not None:
-    evaluations.append(result.terminal_evaluation)
+if result.final_trace_evaluation is not None:
+    evaluations.append(result.final_trace_evaluation)
 gaps = [
     reason
     for evaluation in evaluations
@@ -98,7 +98,7 @@ gaps = [
 assert result and not gaps, result.summary
 ```
 
-`JsonFileReportSink` writes terminal gaps as `terminal_evaluation.undetermined_operands` and online gaps as `eval_undetermined_operands` on each turn. Empty gap lists are omitted. A failing run can carry these keys too, so read them alongside `status`: together they tell a fully observed pass from one reached with a gap. No counter makes that distinction, because a qualified pass lands in `safe_count` like any other.
+`JsonFileReportSink` writes terminal gaps as `final_trace_evaluation.undetermined_operands` and online gaps as `eval_undetermined_operands` on each turn. Empty gap lists are omitted. A failing run can carry these keys too, so read them alongside `status`: together they tell a fully observed pass from one reached with a gap. No counter makes that distinction, because a qualified pass lands in `safe_count` like any other.
 
 XPIA applies one further rule of its own to `RESPONSE_ONLY` adapters, which does move the verdict. See [Observability Adjustment](../attacks/xpia.md#observability-adjustment).
 
