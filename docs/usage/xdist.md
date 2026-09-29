@@ -124,6 +124,9 @@ normal Results from the same worker continue to stream. The controller records
 the run as incomplete in `TestRunReport.metadata`. Configured limits below 4 KiB
 use a 4 KiB effective minimum so the marker itself always fits.
 
+Truncation markers preserve population provenance when it fits; otherwise,
+`_rampart_population_ref_omitted` records its omission.
+
 ---
 
 ## Incomplete Runs
@@ -137,6 +140,9 @@ report.metadata["incomplete_reasons"]    # list[str] — one per failure
 ```
 
 Reports are still emitted with whatever data was collected. For safety-critical CI, sinks or post-processing should check the `incomplete` flag and fail the build accordingly.
+
+Malformed worker results also mark the run incomplete without discarding
+previously received results.
 
 ---
 
@@ -177,18 +183,3 @@ does not discard normal Results from that worker.
   same version everywhere.
 - `pytest-xdist` itself does not support interactive debugging (`--pdb`, `--trace`);
   use single-process mode for debugging.
-
-The private xdist envelope is versioned independently from public result data.
-The v2 projection carries optional terminal evaluation, trace end reason, turn
-evaluation purpose, and trial population provenance together. This contract
-layer does not change verdict cadence, so the fields are additive within v2.
-Numeric overflow in evaluation confidence or population thresholds, and
-unrenderable evaluation text, reject the report envelope and mark the run
-incomplete. The controller preserves previously received results instead of
-aborting or merging the malformed report as a successful result.
-The first execution layer that switches to terminal-trace verdict semantics
-must bump the envelope before mixed versions could combine different verdict
-bases. Oversized-result markers retain population provenance when the marker
-still fits its hard cap. Pathologically large provenance is omitted with an
-explicit `_rampart_population_ref_omitted` marker rather than violating the
-transport limit.

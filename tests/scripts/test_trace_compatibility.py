@@ -100,13 +100,12 @@ def _bumped_base(*, root: Path, monkeypatch) -> CompatibilityDeclaration:
     original = _initial_base(root=root, monkeypatch=monkeypatch)
     _write_contract(root=root, major=2)
     monkeypatch.setattr(compatibility, "TRACE_SCHEMA_VERSION", "rampart.trace.v2")
-    (root / "migration.md").write_text("How to migrate v1 to v2.", encoding="utf-8")
     declaration = _write_declaration(
         root=root,
         major=2,
         decision=CompatibilityDecision.NEW_MAJOR,
         previous=original.contract_sha256,
-        migration_note="migration.md",
+        migration_note="Convert v1 records explicitly into separate v2 records.",
     )
     check_compatibility(root=root, base_ref="base")
     _mock_git_base(
@@ -249,6 +248,18 @@ class TestCompatibilityDeclaration:
         with pytest.raises(ValidationError, match=field):
             check_compatibility(root=tmp_path)
 
+    @pytest.mark.parametrize("note", [1, False, [], {}])
+    def test_migration_note_rejects_non_text_values(self, *, tmp_path, note) -> None:
+        _write_contract(root=tmp_path)
+        declaration = _write_declaration(root=tmp_path).model_dump(mode="json")
+        declaration["migration_note"] = note
+        (tmp_path / CompatibilityDeclaration.PATH).write_text(
+            json.dumps(declaration), encoding="utf-8"
+        )
+
+        with pytest.raises(ValidationError, match="migration_note"):
+            check_compatibility(root=tmp_path)
+
     def test_cannot_reinitialize_an_existing_untracked_schema(
         self, tmp_path, monkeypatch
     ) -> None:
@@ -307,35 +318,36 @@ class TestCompatibilityDeclaration:
 
 @pytest.mark.usefixtures("_baseline_version")
 class TestMajorVersionDecision:
-    def test_bump_requires_decision_and_migration_note(
-        self, tmp_path, monkeypatch
-    ) -> None:
-        original = _initial_base(root=tmp_path, monkeypatch=monkeypatch)
-        _write_contract(root=tmp_path, major=2)
-        monkeypatch.setattr(compatibility, "TRACE_SCHEMA_VERSION", "rampart.trace.v2")
-        (tmp_path / "migration.md").write_text(
-            "How to migrate v1 to v2.", encoding="utf-8"
-        )
-        _write_declaration(
-            root=tmp_path,
-            major=2,
-            decision=CompatibilityDecision.NEW_MAJOR,
-            previous=original.contract_sha256,
-            migration_note="migration.md",
-        )
-
-        check_compatibility(root=tmp_path, base_ref="base")
-
     @pytest.mark.parametrize(
-        "note", [None, "", "missing.md", "../outside.md", "empty.md"]
+        "note",
+        [
+            "Convert v1 records explicitly into separate v2 records.",
+            "Preserve data/v1 records.\nWrite and validate separate data/v2 records.",
+        ],
     )
-    def test_bump_rejects_missing_or_invalid_migration_note(
+    def test_bump_accepts_inline_migration_note_without_document(
         self, *, tmp_path, monkeypatch, note
     ) -> None:
         original = _initial_base(root=tmp_path, monkeypatch=monkeypatch)
         _write_contract(root=tmp_path, major=2)
         monkeypatch.setattr(compatibility, "TRACE_SCHEMA_VERSION", "rampart.trace.v2")
-        (tmp_path / "empty.md").touch()
+        _write_declaration(
+            root=tmp_path,
+            major=2,
+            decision=CompatibilityDecision.NEW_MAJOR,
+            previous=original.contract_sha256,
+            migration_note=note,
+        )
+
+        check_compatibility(root=tmp_path, base_ref="base")
+
+    @pytest.mark.parametrize("note", [None, "", " \t\n"])
+    def test_bump_rejects_missing_or_blank_migration_note(
+        self, *, tmp_path, monkeypatch, note
+    ) -> None:
+        original = _initial_base(root=tmp_path, monkeypatch=monkeypatch)
+        _write_contract(root=tmp_path, major=2)
+        monkeypatch.setattr(compatibility, "TRACE_SCHEMA_VERSION", "rampart.trace.v2")
         _write_declaration(
             root=tmp_path,
             major=2,
@@ -381,15 +393,12 @@ class TestMajorVersionDecision:
         else:
             schema.write_text("changed old contract", encoding="utf-8")
         monkeypatch.setattr(compatibility, "TRACE_SCHEMA_VERSION", "rampart.trace.v2")
-        (tmp_path / "migration.md").write_text(
-            "How to migrate v1 to v2.", encoding="utf-8"
-        )
         _write_declaration(
             root=tmp_path,
             major=2,
             decision=CompatibilityDecision.NEW_MAJOR,
             previous=original.contract_sha256,
-            migration_note="migration.md",
+            migration_note="Convert v1 records explicitly into separate v2 records.",
         )
 
         with pytest.raises(ValueError, match="retain the previous published schema"):

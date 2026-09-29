@@ -118,7 +118,7 @@ For a contract change, update the declaration:
 - **`compatible`** retains the current major and explains why the change preserves
   compatibility, such as an additive-optional field with a defined absence behavior.
 - **`new-major`** increments the major by one, retains earlier published schema
-  files, and references a nonempty repository migration document in `migration_note`.
+  files, and includes nonempty inline migration instructions in `migration_note`.
   The note explains the break and the actual reader/migration support shipped;
   it does not require an upcaster or dual reader.
 
@@ -288,29 +288,18 @@ flowchart TD
   rejected regardless of the key name. Metadata hygiene belongs to consumer
   preparation, not to the canonical codec.
 
-## v1 to v2 migration note
+## Migration mechanics
 
-V2 narrows population IDs to nonempty strings. It also records optional terminal
-evaluation, trace-end reason, and online evaluation purpose, and consistently
-applies canonical validation to both terminal and online evaluations. The new
-optional fields alone would not require a major bump; the narrowed ID domain
-does. The field is named `final_trace_evaluation` in the Python API, canonical
-records, JSON reports, and xdist transport. The earlier `terminal_evaluation`
-spelling is removed without an alias.
+Writers emit the latest supported major. Each major bump records its migration
+instructions and actual reader/tooling support inline in
+`schemas/trace-compatibility.json`.
 
-Writers emit v2, and this reader accepts only v2. No v1 reader, adjacent upcaster,
-or persisted-data migration API/CLI is shipped. Historical v1 schema files are
-retained for consumers that need to inspect old records, not as a support-window
-promise.
-
-Persisted v1 data must not be silently relabeled or parsed through the v2 reader.
-Consumers choosing to migrate it must perform an explicit, application-owned
-conversion into a separate v2 record and validate the result with
-`deserialize_record()`. An empty population ID requires a legitimate identifier
-from the producer's provenance or regeneration of the record; do not invent one.
-Leave unrecorded terminal evaluation, stop reason, and turn purpose absent or
-null rather than inferring them from the last online evaluation. Preserve the
-original artifact; reading never rewrites persisted data in place.
+- Migrating persisted data is an explicit operation into separate records;
+  preserve the originals and validate converted records against the target major.
+- Reading never rewrites an artifact in place or silently relabels its version.
+- Encountering an unsupported major fails closed.
+- Under the current support policy, an executable migration utility, adjacent
+  upcaster, or dual reader is not required.
 
 ## Future extensions
 
@@ -324,11 +313,13 @@ default do not require a major bump. Structural changes do. Apply the compatibil
 review and declaration requirements to each extension rather than promising
 compatibility for an unimplemented representation.
 
-## Pre-1.0 support policy
+## Support policy
 
-RAMPART does not promise deprecation periods, compatibility aliases, a two-release
-support window, dual readers, or mandatory upcasters. Breaking changes may replace
-old APIs directly. Every canonical major change still requires an explicit
-version/compatibility decision, unchanged historical schema descriptions, and a
-changelog entry and migration note describing actual support. Unsupported
-versions always fail closed.
+Schema compatibility guarantees follow RAMPART's project-wide deprecation policy,
+not a specific release number. The current policy does not promise deprecation
+periods, compatibility aliases, a fixed support window, dual readers, or mandatory
+upcasters. Revisit these guarantees when the project-wide deprecation policy changes.
+
+Every canonical major change still requires an explicit version/compatibility
+decision, unchanged historical schema descriptions, and a changelog entry and
+migration note describing actual support. Unsupported versions always fail closed.

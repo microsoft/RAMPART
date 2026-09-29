@@ -28,10 +28,11 @@ RAMPART follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`)
 
 ## 3. Review Breaking Changes
 
-During pre-1.0 development, remove obsolete APIs directly rather than maintaining
-deprecated aliases, warnings, or a fixed support window. Migrate in-tree callers,
-tests, and documentation together, and explain required caller changes in the
-release notes.
+Under the current project-wide deprecation policy, remove obsolete APIs directly
+rather than maintaining deprecated aliases, warnings, or a fixed support window.
+Revisit these guarantees when the project-wide deprecation policy changes, rather
+than tying them to a specific release number. Migrate in-tree callers, tests, and
+documentation together, and explain required caller changes in the release notes.
 
 Breaking persisted-data changes still require an explicit schema-version and
 compatibility decision; see [Trace Schema](../concepts/trace-schema.md).
