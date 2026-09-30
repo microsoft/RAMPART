@@ -31,7 +31,7 @@ sequenceDiagram
 2. **Wait** — Handles call `wait_until_ready_async()` to allow indexing. Runs concurrently for multiple surfaces.
 3. **Trigger** — Send benign prompts that cause the agent to retrieve the injected content. Triggers are never adversarial — the attack is in the payload, not the prompt.
 4. **Stop (optional)** — Check `stop_when` after each response and stop when detected.
-5. **Evaluate** — Check the attack objective once over the terminal trace.
+5. **Evaluate** — Check the attack objective once over the final trace.
 6. **Clean up** — Remove injected content. Guaranteed via `AsyncExitStack`, even on exceptions.
 7. **Result** — Map the final evaluation using attack semantics.
 
@@ -165,7 +165,7 @@ The `&` above asks whether both happened, so one condition that definitively did
     [Temporal Scope table](../usage/authoring-tests.md#temporal-scope).
     Use `CURRENT_TURN` only when earlier responses should be ignored.
 
-    XPIA verdict evaluators receive the terminal trace. Automatic stopping is
+    XPIA verdict evaluators receive the final trace. Automatic stopping is
     enabled only when detection is known to remain true as the trace grows.
     Scope applies only to turns in the evaluator context; it does not control
     execution length or early stopping.
@@ -209,9 +209,24 @@ assert result, result.summary
 !!! note "Adaptive driver budgets"
     `LLMDriver` does not stop itself. The default `stop_when="auto"` stops
     early for stable built-in conditions such as `ToolCalled`, but unknown or
-    stochastic evaluators run to `max_turns` and evaluate the terminal trace
+    stochastic evaluators run to `max_turns` and evaluate the final trace
     once. Use an explicit `stop_when` when that online judgment intentionally
     defines the end of the attack scenario.
+
+!!! note "Upgrading from per-turn attack verdicts"
+    Earlier releases evaluated XPIA after each response and stopped at the
+    first detection. XPIA now evaluates the final trace once, so single-trigger
+    attacks with deterministic evaluators keep the same verdicts. The default
+    `stop_when="auto"` still stops early for stable built-in conditions such as
+    `ToolCalled`. Other evaluators, including LLM judges, no longer stop early
+    by default: they are called once on the final trace, and adaptive drivers
+    can run up to `max_turns`. Pass the same evaluator as `stop_when` to restore
+    per-turn early stopping without a duplicate final call. With the default,
+    a stochastic evaluator is sampled once per run instead of once per turn, so
+    trial pass rates can shift. Replace `resolve_as_attack(eval_results=...)`
+    with `resolve_attack_verdict(evaluation=...)`, and replace
+    `evaluate_turn_async` with `run_trace_async` and
+    `evaluate_final_trace_async`.
 
 ---
 
