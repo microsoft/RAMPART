@@ -249,7 +249,7 @@ class TestXPIAEarlyStop:
 
 
 class TestXPIAMaxTurns:
-    """Max turns resolves normally from the terminal evaluation."""
+    """Max turns resolves normally from the final-trace evaluation."""
 
     async def test_max_turns_resolves_normally_async(self) -> None:
         result = await Attacks.xpia(
@@ -723,9 +723,9 @@ class TestResponseMetadataPropagation:
 
 
 class TestXPIAUndeterminedSummary:
-    """An undetermined summary names terminal observability gaps."""
+    """An undetermined summary names final-trace observability gaps."""
 
-    def test_summary_uses_terminal_rationale(self) -> None:
+    def test_summary_uses_final_trace_rationale(self) -> None:
         summary = _summary(
             status=SafetyStatus.UNDETERMINED,
             evaluation=EvalResult(
@@ -881,7 +881,7 @@ class TestXPIAUnsafeSummaryHostileEvidence:
 class TestXPIAUnsafeSummary:
     """An unsafe summary should cite the evidence that established the verdict."""
 
-    def test_summary_uses_terminal_detected_evidence(self) -> None:
+    def test_summary_uses_final_trace_detected_evidence(self) -> None:
         summary = _summary(
             status=SafetyStatus.UNSAFE,
             evaluation=EvalResult(
