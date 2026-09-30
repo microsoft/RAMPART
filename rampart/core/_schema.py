@@ -32,14 +32,14 @@ def trace_schema(
     Returns:
         CoreSchema: A configured copy of the generated dataclass schema.
     """
-    return _trace_schema(schema=handler(source), handler=handler, references=set())
+    return _trace_schema(schema=handler(source), handler=handler, definitions={})
 
 
 def _trace_schema(
     *,
     schema: core_schema.CoreSchema,
     handler: GetCoreSchemaHandler,
-    references: set[str],
+    definitions: dict[str, core_schema.CoreSchema],
 ) -> core_schema.CoreSchema:
     """Copy generated schema nodes while applying shared trace rules.
 
@@ -47,45 +47,49 @@ def _trace_schema(
         CoreSchema: The adapter-local schema, preserving definition references.
     """
     if schema["type"] == "definition-ref":
+        # Reuse the configured copy, not the original definition that Pydantic
+        # would otherwise resolve at repeated occurrences of a dataclass.
         reference = schema["schema_ref"]
-        if reference in references:
-            return schema
-        references.add(reference)
-        return _trace_schema(
-            schema=handler.resolve_ref_schema(schema),
-            handler=handler,
-            references=references,
-        )
+        if reference not in definitions:
+            definitions[reference] = schema
+            definitions[reference] = _trace_schema(
+                schema=handler.resolve_ref_schema(schema),
+                handler=handler,
+                definitions=definitions,
+            )
+        return definitions[reference]
 
     schema = schema.copy()
     if schema["type"] == "dataclass":
-        return _trace_dataclass(schema=schema, handler=handler, references=references)
+        return _trace_dataclass(schema=schema, handler=handler, definitions=definitions)
     if schema["type"] == "default" or schema["type"] == "nullable":
         schema["schema"] = _trace_schema(
-            schema=schema["schema"], handler=handler, references=references
+            schema=schema["schema"], handler=handler, definitions=definitions
         )
     elif schema["type"] == "dataclass-args":
         schema["fields"] = [
             {
                 **field,
                 "schema": _trace_schema(
-                    schema=field["schema"], handler=handler, references=references
+                    schema=field["schema"], handler=handler, definitions=definitions
                 ),
             }
             for field in schema["fields"]
         ]
     elif schema["type"] == "list":
         schema["items_schema"] = _trace_schema(
-            schema=schema["items_schema"], handler=handler, references=references
+            schema=schema["items_schema"], handler=handler, definitions=definitions
         )
     elif schema["type"] == "union":
         schema["choices"] = [
             (
-                _trace_schema(schema=choice[0], handler=handler, references=references),
+                _trace_schema(
+                    schema=choice[0], handler=handler, definitions=definitions
+                ),
                 choice[1],
             )
             if isinstance(choice, tuple)
-            else _trace_schema(schema=choice, handler=handler, references=references)
+            else _trace_schema(schema=choice, handler=handler, definitions=definitions)
             for choice in schema["choices"]
         ]
     elif schema["type"] == "dict":
@@ -127,7 +131,7 @@ def _trace_dataclass(
     *,
     schema: core_schema.DataclassSchema,
     handler: GetCoreSchemaHandler,
-    references: set[str],
+    definitions: dict[str, core_schema.CoreSchema],
 ) -> core_schema.CoreSchema:
     """Configure a copied dataclass schema without changing its class.
 
@@ -135,7 +139,7 @@ def _trace_dataclass(
         CoreSchema: A revalidating schema with trace-only invariant checks.
     """
     schema["schema"] = _trace_schema(
-        schema=schema["schema"], handler=handler, references=references
+        schema=schema["schema"], handler=handler, definitions=definitions
     )
     schema["config"] = {
         **schema.get("config", {}),
@@ -161,7 +165,7 @@ def _population_fields(schema: core_schema.CoreSchema) -> core_schema.CoreSchema
     """Constrain population fields in the adapter and its generated JSON Schema.
 
     Returns:
-        CoreSchema: The copied dataclass arguments with numeric bounds.
+        CoreSchema: The copied dataclass arguments with bounded field schemas.
 
     Raises:
         TypeError: If the generated population schema has an unexpected shape.
@@ -189,7 +193,7 @@ def _population_field_schema(
     """Add bounds without changing the live population dataclass annotations.
 
     Returns:
-        CoreSchema: A constrained numeric schema, or the unchanged field schema.
+        CoreSchema: A bounded field schema, or the unchanged field schema.
 
     Raises:
         TypeError: If a constrained population field has an unexpected schema.
@@ -198,7 +202,13 @@ def _population_field_schema(
         return {**schema, "ge": 0 if name == "index" else 1}
     if schema["type"] == "float" and name == "threshold":
         return {**schema, "ge": 0.0, "le": 1.0}
-    if name in {"index", "size", "threshold"}:
+    if (
+        name == "id"
+        and schema["type"] == "function-after"
+        and schema["schema"]["type"] == "str"
+    ):
+        return {**schema, "schema": {**schema["schema"], "min_length": 1}}
+    if name in {"id", "index", "size", "threshold"}:
         msg = f"Unexpected schema for PopulationRef.{name}: {schema['type']}"
         raise TypeError(msg)
     return schema

@@ -12,7 +12,11 @@ from rampart.core.types import (
     SideEffect,
     Turn,
 )
-from rampart.evaluators import ResponseContains, SideEffectOccurred
+from rampart.evaluators import (
+    ResponseContains,
+    ResponseScope,
+    SideEffectOccurred,
+)
 
 
 def _ctx_with_side_effects(
@@ -130,7 +134,7 @@ class TestSideEffectOccurredComposedWhenUnobserved:
     async def test_and_is_settled_by_the_observable_operand_async(self) -> None:
         ctx = _ctx_with_side_effects(observability=ObservabilityLevel.TOOL_ONLY)
         unobserved = SideEffectOccurred("http_request")
-        text = ResponseContains("id_rsa")
+        text = ResponseContains("id_rsa", scope=ResponseScope.ANY_TURN)
 
         forward = await (unobserved & text).evaluate_async(context=ctx)
         flipped = await (text & unobserved).evaluate_async(context=ctx)
@@ -141,7 +145,7 @@ class TestSideEffectOccurredComposedWhenUnobserved:
     async def test_or_stays_undetermined_when_one_side_unobserved_async(self) -> None:
         ctx = _ctx_with_side_effects(observability=ObservabilityLevel.TOOL_ONLY)
         unobserved = SideEffectOccurred("http_request")
-        text = ResponseContains("id_rsa")
+        text = ResponseContains("id_rsa", scope=ResponseScope.ANY_TURN)
 
         forward = await (unobserved | text).evaluate_async(context=ctx)
         flipped = await (text | unobserved).evaluate_async(context=ctx)

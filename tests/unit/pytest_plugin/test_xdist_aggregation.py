@@ -595,6 +595,100 @@ class TestXdistTrialAggregation:
         assert report["passed"] == 3
         assert report["failed"] == 1
 
+    def test_execute_trials_terminal_provenance_crosses_worker_boundary(
+        self,
+        configured_pytester: Pytester,
+    ) -> None:
+        """Worker-produced trial results retain provenance in controller JSON."""
+        configured_pytester.makepyfile(
+            test_terminal_population="""
+            import pytest
+
+            from rampart.core import BaseExecution, execute_trials_async
+            from rampart.core.result import Result, SafetyStatus
+            from rampart.core.types import (
+                EvalOutcome,
+                EvalResult,
+                EvaluationPurpose,
+                ObservabilityLevel,
+                Request,
+                Response,
+                TraceEndReason,
+                Turn,
+            )
+
+            class Adapter:
+                manifest = None
+                observability_profile = ObservabilityLevel.RESPONSE_ONLY
+
+            class Execution(BaseExecution):
+                @property
+                def strategy_name(self):
+                    return "terminal-population"
+
+                async def _execute_async(self, *, adapter):
+                    del adapter
+                    online = EvalResult(
+                        outcome=EvalOutcome.NOT_DETECTED,
+                        rationale="continue",
+                    )
+                    terminal = EvalResult(
+                        outcome=EvalOutcome.NOT_DETECTED,
+                        evidence=["terminal evidence"],
+                        rationale="complete",
+                    )
+                    return Result(
+                        status=SafetyStatus.SAFE,
+                        summary="safe terminal trace",
+                        observability_level=ObservabilityLevel.RESPONSE_ONLY,
+                        final_trace_evaluation=terminal,
+                        trace_end_reason=TraceEndReason.DRIVER_EXHAUSTED,
+                        turns=[Turn(
+                            request=Request(prompt="p"),
+                            response=Response(text="r"),
+                            eval_result=online,
+                            eval_purpose=EvaluationPurpose.STOP_CHECK,
+                        )],
+                    )
+
+            @pytest.mark.harm("test")
+            async def test_terminal_population_async():
+                population = await execute_trials_async(
+                    execution_factory=Execution,
+                    adapter=Adapter(),
+                    n=2,
+                    threshold=0.5,
+                )
+                assert population.safe
+            """,
+        )
+
+        result = configured_pytester.runpytest(
+            "-p",
+            "no:cacheprovider",
+            "-n",
+            "1",
+        )
+
+        result.assert_outcomes(passed=1)
+        reports = _load_reports(configured_pytester)
+        assert len(reports) == 1
+        streamed = _report_results(reports[0])
+        assert len(streamed) == 2
+        populations = [item["population"] for item in streamed]
+        assert len({item["id"] for item in populations}) == 1
+        assert [item["index"] for item in populations] == [0, 1]
+        assert all(item["size"] == 2 for item in populations)
+        assert all(item["threshold"] == pytest.approx(0.5) for item in populations)
+        assert all(
+            item["final_trace_evaluation"]["evidence"] == ["terminal evidence"]
+            for item in streamed
+        )
+        assert all(item["trace_end_reason"] == "driver_exhausted" for item in streamed)
+        assert all(
+            item["turns"][0]["eval_purpose"] == "stop_check" for item in streamed
+        )
+
 
 class TestXdistMetadata:
     def test_report_includes_xdist_metadata(

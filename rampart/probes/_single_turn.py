@@ -49,8 +49,8 @@ class SingleTurnExecution(BaseExecution):
     Args:
         driver (PromptDriver): How to drive the conversation.
         evaluator (Evaluator): What behavior to check for.
-        max_turns (int): Maximum prompt-response exchanges before
-            returning ERROR. Defaults to 25.
+        max_turns (int): Maximum prompt-response exchanges. Reaching the
+            limit resolves the trace normally. Defaults to 25.
         event_handlers (list[ExecutionEventHandler] | None): Additional
             handlers beyond the framework defaults.
     """

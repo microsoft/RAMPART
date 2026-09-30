@@ -30,6 +30,7 @@ from rampart.core.serialization import (
 from rampart.core.types import (
     EvalOutcome,
     EvalResult,
+    EvaluationPurpose,
     ObservabilityLevel,
     Payload,
     PayloadFormat,
@@ -37,13 +38,14 @@ from rampart.core.types import (
     Response,
     SideEffect,
     ToolCall,
+    TraceEndReason,
     Turn,
 )
 
 if TYPE_CHECKING:
     from datetime import datetime
 
-    from hypothesis.strategies import SearchStrategy
+    from hypothesis.strategies import DrawFn, SearchStrategy
 
 
 def _json_maps() -> SearchStrategy[dict[str, Any]]:
@@ -112,8 +114,8 @@ def _responses() -> SearchStrategy[Response]:
     )
 
 
-def _turns() -> SearchStrategy[Turn]:
-    evaluations = st.builds(
+def _evaluations() -> SearchStrategy[EvalResult]:
+    return st.builds(
         EvalResult,
         outcome=st.sampled_from(EvalOutcome),
         confidence=st.floats(min_value=0, max_value=1),
@@ -121,14 +123,23 @@ def _turns() -> SearchStrategy[Turn]:
         rationale=st.text(max_size=50),
         undetermined_operands=st.lists(st.text(max_size=30), max_size=3),
     )
-    return st.builds(
-        Turn,
-        request=_requests(),
-        response=_responses(),
-        eval_result=st.none() | evaluations,
-        turn_number=st.integers(min_value=0, max_value=100),
-        timestamp=_timestamps(),
-        driver_reasoning=st.text(max_size=50),
+
+
+@st.composite
+def _turns(draw: DrawFn) -> Turn:
+    evaluation = draw(st.none() | _evaluations())
+    purpose = st.none() | st.sampled_from(EvaluationPurpose)
+    return draw(
+        st.builds(
+            Turn,
+            request=_requests(),
+            response=_responses(),
+            eval_result=st.just(evaluation),
+            eval_purpose=st.none() if evaluation is None else purpose,
+            turn_number=st.integers(min_value=0, max_value=100),
+            timestamp=_timestamps(),
+            driver_reasoning=st.text(max_size=50),
+        )
     )
 
 
@@ -140,7 +151,7 @@ def _results() -> SearchStrategy[Result]:
     )
     populations = st.builds(
         PopulationRef,
-        id=st.text(max_size=30),
+        id=st.text(min_size=1, max_size=30),
         index=st.integers(min_value=0, max_value=9),
         size=st.just(10),
         threshold=st.floats(min_value=0, max_value=1),
@@ -150,7 +161,9 @@ def _results() -> SearchStrategy[Result]:
         status=st.sampled_from(SafetyStatus),
         summary=st.text(max_size=100),
         observability_level=st.sampled_from(ObservabilityLevel),
+        final_trace_evaluation=st.none() | _evaluations(),
         turns=st.lists(_turns(), max_size=3),
+        trace_end_reason=st.none() | st.sampled_from(TraceEndReason),
         duration_seconds=st.floats(min_value=0, allow_infinity=False),
         harm_category=st.none() | st.text(max_size=30) | st.sampled_from(HarmCategory),
         strategy=st.text(max_size=30),
@@ -161,6 +174,49 @@ def _results() -> SearchStrategy[Result]:
 
 
 class TestGeneratedRoundTrips:
+    @given(
+        terminal=_evaluations(),
+        online=_evaluations(),
+        reason=st.sampled_from(TraceEndReason),
+        purpose=st.none() | st.sampled_from(EvaluationPurpose),
+    )
+    def test_both_evaluation_placements_and_provenance_round_trip(
+        self,
+        *,
+        terminal: EvalResult,
+        online: EvalResult,
+        reason: TraceEndReason,
+        purpose: EvaluationPurpose | None,
+    ) -> None:
+        record = ResultRecord(
+            result=Result(
+                status=SafetyStatus.SAFE,
+                summary="recorded trace",
+                observability_level=ObservabilityLevel.RESPONSE_ONLY,
+                final_trace_evaluation=terminal,
+                trace_end_reason=reason,
+                turns=[
+                    Turn(
+                        request=Request(prompt="request"),
+                        response=Response(text="response"),
+                        eval_result=online,
+                        eval_purpose=purpose,
+                    )
+                ],
+            )
+        )
+
+        encoded = serialize_record(record=record)
+        restored = deserialize_record(data=encoded)
+
+        assert restored == record
+        assert restored.result.final_trace_evaluation == terminal
+        assert restored.result.turns[0].eval_result == online
+        assert restored.result.trace_end_reason is reason
+        assert restored.result.turns[0].eval_purpose is purpose
+        assert serialize_record(record=restored) == encoded
+        Draft202012Validator(ResultRecord.json_schema()).validate(json.loads(encoded))
+
     @given(
         result=_results(),
         nodeid=st.none() | st.text(max_size=40),

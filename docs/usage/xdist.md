@@ -124,6 +124,9 @@ normal Results from the same worker continue to stream. The controller records
 the run as incomplete in `TestRunReport.metadata`. Configured limits below 4 KiB
 use a 4 KiB effective minimum so the marker itself always fits.
 
+Truncation markers preserve population provenance when it fits; otherwise,
+`_rampart_population_ref_omitted` records its omission.
+
 ---
 
 ## Incomplete Runs
@@ -137,6 +140,9 @@ report.metadata["incomplete_reasons"]    # list[str] — one per failure
 ```
 
 Reports are still emitted with whatever data was collected. For safety-critical CI, sinks or post-processing should check the `incomplete` flag and fail the build accordingly.
+
+Malformed worker results also mark the run incomplete without discarding
+previously received results.
 
 ---
 

@@ -15,7 +15,9 @@ result.safe              # bool — did the agent behave safely?
 result.status            # SafetyStatus (SAFE, UNSAFE, UNDETERMINED, ERROR)
 result.summary           # str — human-readable one-liner
 result.observability_level  # ObservabilityLevel (what the adapter saw)
+result.final_trace_evaluation  # EvalResult | None — final-trace evaluator output
 result.turns             # list[Turn] — full conversation
+result.trace_end_reason  # TraceEndReason | None — why the trace ended
 result.duration_seconds  # float — execution wall-clock time
 result.harm_category     # HarmCategory | str | None
 result.strategy          # str — "xpia", "probe", etc.
@@ -49,8 +51,32 @@ for turn in result.turns:
     turn.response.text        # What came back
     turn.response.tool_calls  # Tool invocations observed
     turn.eval_result          # EvalResult for this turn, or None
+    turn.eval_purpose         # EvaluationPurpose | None
     turn.turn_number          # 0-indexed position
 ```
+
+`final_trace_evaluation` is the evaluator output for the trace when execution
+stops, not simply the last online evaluation. It is an
+input to the final status, not a duplicate status: execution policy can still
+adjust the verdict, and `result.status` remains authoritative.
+
+This layer makes terminal provenance durable before changing execution
+cadence. Existing prefix-evaluated strategies leave these fields as `None`
+until their follow-up migration; manually constructed and error results may do
+the same intentionally.
+
+Online evaluations attached to turns are available as
+`result.turn_evaluations`; this list excludes the terminal evaluation.
+The former `result.eval_results` property has been removed. Use
+`result.turn_evaluations` for online evidence and `result.final_trace_evaluation`
+for terminal verdict evidence.
+
+`TraceEndReason.MAX_TURNS_REACHED` records budget truncation. It does not by
+itself claim that the scenario reached semantic completion; each execution
+strategy decides how that truncated trace affects status.
+
+Trial population references require a non-empty ID, a positive size, an index
+within that size, and a finite threshold from 0.0 through 1.0.
 
 ### Observability Gaps on a Passing Run
 

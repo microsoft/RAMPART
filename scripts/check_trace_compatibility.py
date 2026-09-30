@@ -37,6 +37,7 @@ class CompatibilityDeclaration(BaseModel):
         "rampart/core/types.py",
         "rampart/core/serialization.py",
         "rampart/core/_schema.py",
+        "rampart/core/_population.py",
     )
 
     model_config = ConfigDict(extra="forbid", strict=True, frozen=True)
@@ -131,7 +132,6 @@ def _base_files(*, root: Path, base_ref: str) -> dict[str, str]:
 
 def _validate_decision(
     *,
-    root: Path,
     current: CompatibilityDeclaration,
     previous: CompatibilityDeclaration | None,
 ) -> None:
@@ -173,16 +173,8 @@ def _validate_decision(
             "and an adjacent major version bump."
         )
         raise ValueError(msg)
-    if not current.migration_note:
-        msg = "A new major requires a migration_note pointing to a repository document."
-        raise ValueError(msg)
-    note = (root / current.migration_note).resolve()
-    if (
-        not note.is_relative_to(root.resolve())
-        or not note.is_file()
-        or not note.read_text(encoding="utf-8").strip()
-    ):
-        msg = "migration_note must reference a nonempty document inside the repository."
+    if current.migration_note is None or not current.migration_note.strip():
+        msg = "A new major requires a migration_note with nonempty inline instructions."
         raise ValueError(msg)
 
 
@@ -235,7 +227,7 @@ def check_compatibility(*, root: Path, base_ref: str | None = None) -> None:
         if any(path.endswith(".schema.json") for path in base):
             msg = "The base has a trace schema but no compatibility declaration."
             raise ValueError(msg)
-        _validate_decision(root=root, current=current, previous=None)
+        _validate_decision(current=current, previous=None)
         return
     previous = CompatibilityDeclaration.model_validate_json(declaration)
     if previous.contract_sha256 != _fingerprint(base):
@@ -243,7 +235,7 @@ def check_compatibility(*, root: Path, base_ref: str | None = None) -> None:
         raise ValueError(msg)
     if current == previous and files == base:
         return
-    _validate_decision(root=root, current=current, previous=previous)
+    _validate_decision(current=current, previous=previous)
     editable_schema = (
         f"schemas/trace.{current.version.rsplit('.', 1)[-1]}.schema.json"
         if current.version == previous.version
