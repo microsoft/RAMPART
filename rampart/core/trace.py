@@ -1,7 +1,7 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT license.
 
-"""Shared linear trace execution and terminal evaluation helpers."""
+"""Shared linear trace execution and final-trace evaluation helpers."""
 
 from __future__ import annotations
 
@@ -84,19 +84,19 @@ def _evaluation_context(
     )
 
 
-def _matches_terminal_context(*, context: EvalContext, run: TraceRun) -> bool:
+def _matches_final_trace_context(*, context: EvalContext, run: TraceRun) -> bool:
     """Check that the raw trace and adapter context are unchanged.
 
     Returns:
-        bool: Whether this context can supply the terminal judgment.
+        bool: Whether this context can supply the final-trace judgment.
     """
     return (
         context.observability_level is run.observability_level
         and context.manifest is run.manifest
         and len(context.turns) == len(run.raw_turns)
         and all(
-            evaluated is terminal
-            for evaluated, terminal in zip(context.turns, run.raw_turns, strict=True)
+            evaluated is final
+            for evaluated, final in zip(context.turns, run.raw_turns, strict=True)
         )
     )
 
@@ -185,12 +185,12 @@ async def run_trace_async(
     return run
 
 
-async def evaluate_terminal_async(
+async def evaluate_final_trace_async(
     *,
     evaluator: Evaluator,
     run: TraceRun,
 ) -> EvalResult | None:
-    """Evaluate the terminal raw trace, reusing an identical online judgment.
+    """Evaluate the final raw trace, reusing an identical online judgment.
 
     Args:
         evaluator: Evaluator responsible for the final verdict.
@@ -211,7 +211,7 @@ async def evaluate_terminal_async(
     if (
         record is not None
         and record.evaluator is evaluator
-        and _matches_terminal_context(context=record.context, run=run)
+        and _matches_final_trace_context(context=record.context, run=run)
     ):
         return replace(
             record.result,

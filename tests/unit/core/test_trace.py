@@ -13,7 +13,7 @@ import pytest
 from rampart.core.evaluator import Evaluator
 from rampart.core.manifest import AppManifest
 from rampart.core.prompt_driver import PromptDecision
-from rampart.core.trace import evaluate_terminal_async, run_trace_async
+from rampart.core.trace import evaluate_final_trace_async, run_trace_async
 from rampart.core.types import (
     EvalOutcome,
     EvalResult,
@@ -166,7 +166,7 @@ class TestRunTraceAsync:
             )
 
 
-class TestEvaluateTerminalAsync:
+class TestEvaluateFinalTraceAsync:
     async def test_changed_observability_requires_new_judgment_async(self) -> None:
         evaluator = ToolCalled("send_email")
         run = await run_trace_async(
@@ -181,7 +181,7 @@ class TestEvaluateTerminalAsync:
             observability_level=ObservabilityLevel.RESPONSE_ONLY,
         )
 
-        result = await evaluate_terminal_async(evaluator=evaluator, run=updated_run)
+        result = await evaluate_final_trace_async(evaluator=evaluator, run=updated_run)
 
         assert run.latest_online_evaluation is not None
         assert run.latest_online_evaluation.result.outcome is EvalOutcome.NOT_DETECTED
@@ -203,7 +203,7 @@ class TestEvaluateTerminalAsync:
             manifest=AppManifest(name="agent"),
         )
 
-        result = await evaluate_terminal_async(
+        result = await evaluate_final_trace_async(
             evaluator=evaluator,
             run=replace(run, manifest=manifest),
         )
@@ -245,7 +245,7 @@ class TestEvaluateTerminalAsync:
             stop_when=evaluator,
         )
 
-        result = await evaluate_terminal_async(evaluator=evaluator, run=run)
+        result = await evaluate_final_trace_async(evaluator=evaluator, run=run)
 
         assert result is not None
         assert result.outcome is EvalOutcome.DETECTED
@@ -265,7 +265,7 @@ class TestEvaluateTerminalAsync:
             observability_level=ObservabilityLevel.TOOL_AND_SIDE_EFFECTS,
         )
 
-        result = await evaluate_terminal_async(evaluator=evaluator, run=run)
+        result = await evaluate_final_trace_async(evaluator=evaluator, run=run)
 
         assert result is None
         assert run.trace_end_reason is TraceEndReason.DRIVER_EXHAUSTED
@@ -294,14 +294,14 @@ class TestEvaluateTerminalAsync:
         online_result = run.latest_online_evaluation
         assert online_result is not None
 
-        result = await evaluate_terminal_async(evaluator=evaluator, run=run)
+        result = await evaluate_final_trace_async(evaluator=evaluator, run=run)
 
         assert result == online_result.result
         assert result is not online_result.result
         assert result.evidence is not online_result.result.evidence
         assert evaluator.evaluate_async.await_count == 1
 
-    async def test_non_firing_stop_reuses_terminal_prefix_without_extra_call_async(
+    async def test_non_firing_stop_reuses_final_prefix_without_extra_call_async(
         self,
     ) -> None:
         evaluator = _evaluator(
@@ -317,12 +317,12 @@ class TestEvaluateTerminalAsync:
             stop_when=evaluator,
         )
 
-        result = await evaluate_terminal_async(evaluator=evaluator, run=run)
+        result = await evaluate_final_trace_async(evaluator=evaluator, run=run)
 
         assert result is not None and result.outcome is EvalOutcome.NOT_DETECTED
         assert evaluator.evaluate_async.await_count == 3
 
-    async def test_distinct_evaluator_runs_once_on_terminal_trace_async(self) -> None:
+    async def test_distinct_evaluator_runs_once_on_final_trace_async(self) -> None:
         stop = _evaluator(EvalOutcome.NOT_DETECTED)
         verdict = _evaluator(EvalOutcome.DETECTED)
         manifest = AppManifest(name="agent")
@@ -335,7 +335,7 @@ class TestEvaluateTerminalAsync:
             manifest=manifest,
         )
 
-        result = await evaluate_terminal_async(
+        result = await evaluate_final_trace_async(
             evaluator=verdict,
             run=run,
         )
@@ -364,7 +364,7 @@ class TestEvaluateTerminalAsync:
             ),
         )
 
-        result = await evaluate_terminal_async(evaluator=evaluator, run=run)
+        result = await evaluate_final_trace_async(evaluator=evaluator, run=run)
 
         assert result is not None and result.outcome is EvalOutcome.DETECTED
         assert evaluator.evaluate_async.await_count == 2

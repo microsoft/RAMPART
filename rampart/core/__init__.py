@@ -39,7 +39,7 @@ from rampart.core.result import (
 from rampart.core.trace import (
     EvaluationRecord,
     TraceRun,
-    evaluate_terminal_async,
+    evaluate_final_trace_async,
     run_trace_async,
 )
 from rampart.core.types import (
@@ -101,7 +101,7 @@ __all__ = [
     "TraceEndReason",
     "TraceRun",
     "Turn",
-    "evaluate_terminal_async",
+    "evaluate_final_trace_async",
     "evaluate_turn_async",
     "execute_trials_async",
     "resolve_as_attack",
