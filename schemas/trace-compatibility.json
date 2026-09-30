@@ -1,8 +1,8 @@
 {
   "version": "rampart.trace.v2",
-  "contract_sha256": "ad6e853e46dbdf05dda4460ea476e218f9ed8273a565a396bc484eae1c608d66",
+  "contract_sha256": "f3cc87fce1006b240a376b167ad1d874b6219c9aaea23a30063a0b4c232edb1a",
   "previous_contract_sha256": "828c2783d81d06185caeeef1a7ff83e025d9470d3c9dc894a6a555e555c47ed9",
   "decision": "compatible",
-  "rationale": "Removes the list-based resolve_as_probe helper. Result fields, canonical serialization, and published schemas are unchanged, so existing v2 records remain valid.",
+  "rationale": "Removes the list-based resolve_as_probe helper and updates Result documentation. Result fields, canonical serialization, and published schemas are unchanged, so existing v2 records remain valid.",
   "migration_note": null
 }

@@ -6,7 +6,7 @@
 Sends prompts via a PromptDriver, evaluates the completed trace once, and
 resolves using probe semantics (DETECTED → SAFE, NOT_DETECTED → UNSAFE).
 No injection phase — just session creation, prompt driving, optional online
-stopping, terminal evaluation, and cleanup. Inherits BaseExecution lifecycle.
+stopping, final-trace evaluation, and cleanup. Inherits BaseExecution lifecycle.
 """
 
 from __future__ import annotations
@@ -131,7 +131,7 @@ def _build_summary(
 
     Args:
         status (SafetyStatus): The resolved safety status.
-        evaluation (EvalResult | None): The terminal evaluator output.
+        evaluation (EvalResult | None): The final-trace evaluator output.
         trace_end_reason (TraceEndReason): Why the trace ended.
 
     Returns:

@@ -351,7 +351,7 @@ class TestPopulationRef:
 
 
 class TestResultTurnEvaluationsProperty:
-    """Turn evaluations remain separate from the terminal evaluation."""
+    """Turn evaluations remain separate from the final-trace evaluation."""
 
     def test_removed_eval_results_property_is_absent(self) -> None:
         assert not hasattr(_result(SafetyStatus.SAFE), "eval_results")

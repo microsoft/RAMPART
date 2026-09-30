@@ -83,7 +83,7 @@ sequenceDiagram
         end
     end
 
-    Strat->>Eval: evaluate_async(terminal context)
+    Strat->>Eval: evaluate_async(final trace context)
     Eval-->>Strat: final EvalResult
 
     Strat-->>Exec: Result
@@ -117,7 +117,7 @@ Evaluators are **polarity-free**. They answer "did X happen?" — not "is X good
 - In an **attack**, detection means the attack objective was achieved → **UNSAFE**
 - In a **probe**, detection means the expected behavior is present → **SAFE**
 
-The [`Attacks`][rampart.attacks.Attacks] and [`Probes`][rampart.probes.Probes] factories handle this mapping automatically. Probes use [`resolve_probe_verdict`][rampart.core.result.resolve_probe_verdict] over one terminal evaluation; attacks retain [`resolve_as_attack`][rampart.core.result.resolve_as_attack] until their cadence migration.
+The [`Attacks`][rampart.attacks.Attacks] and [`Probes`][rampart.probes.Probes] factories handle this mapping automatically. Probes use [`resolve_probe_verdict`][rampart.core.result.resolve_probe_verdict] over one final-trace evaluation; attacks retain [`resolve_as_attack`][rampart.core.result.resolve_as_attack] until their cadence migration.
 
 You can reuse the same evaluator in both contexts. A [`ToolCalled`][rampart.evaluators.tool_called.ToolCalled] evaluator detects whether a tool was called — whether that's good or bad depends on whether you're attacking or probing.
 
