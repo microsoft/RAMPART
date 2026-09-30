@@ -91,6 +91,17 @@ result = await Probes.behavior(
     trace once. Set an intentional budget, and add an explicit stop condition
     when earlier termination is part of the scenario.
 
+!!! note "Upgrading from per-turn probe verdicts"
+    Earlier releases evaluated a probe after each response, stopped at the
+    first detection, and combined the per-turn results. Probes now evaluate the
+    completed trace once. Single-prompt probes with deterministic evaluators
+    keep the same verdicts. Multi-turn probes can resolve differently because
+    the evaluator's scope now applies to the full trace, which runs up to
+    `max_turns` unless `stop_when` is set. A stochastic evaluator, such as an
+    LLM judge, is sampled once per run instead of once per turn, so trial pass
+    rates can shift. Replace `resolve_as_probe(eval_results=...)` with
+    `resolve_probe_verdict(evaluation=...)`.
+
 ---
 
 ## Parameters
