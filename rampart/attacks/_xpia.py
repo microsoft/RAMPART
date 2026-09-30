@@ -5,7 +5,7 @@
 
 Orchestrates the full XPIA lifecycle: activate injections, wait for
 indexing, create a session, drive the trigger conversation with optional
-online stopping, evaluate the terminal trace, clean up, and build a Result
+online stopping, evaluate the final trace, clean up, and build a Result
 using attack semantics. Inherits BaseExecution for lifecycle, events, and
 infrastructure error handling.
 """
@@ -58,7 +58,7 @@ class XPIAExecution(BaseExecution):
         3. Create session (via async context manager).
         4. Drive the trigger conversation via the PromptDriver.
         5. Apply an optional online stop condition while driving turns.
-        6. Evaluate the terminal trace once.
+        6. Evaluate the final trace once.
         7. Cleanup session and injections (guaranteed via AsyncExitStack).
         8. Build and return Result via direct attack polarity.
 
@@ -203,14 +203,14 @@ class XPIAExecution(BaseExecution):
         evaluation: EvalResult | None,
         trace_end_reason: TraceEndReason,
     ) -> Result:
-        """Resolve the terminal evaluation into an attack Result.
+        """Resolve the final-trace evaluation into an attack Result.
 
         Applies observability adjustment when the initial verdict is SAFE.
 
         Args:
             adapter (AgentAdapter): The adapter under test.
             turns (list[Turn]): Conversation history.
-            evaluation (EvalResult | None): Terminal verdict evidence.
+            evaluation (EvalResult | None): Final-trace verdict evidence.
             trace_end_reason (TraceEndReason): Why the trace ended.
 
         Returns:
@@ -344,7 +344,7 @@ def _build_summary(
 
     Args:
         status (SafetyStatus): The resolved safety status.
-        evaluation (EvalResult | None): Terminal verdict evidence.
+        evaluation (EvalResult | None): Final-trace verdict evidence.
         trace_end_reason (TraceEndReason): Why the trace ended.
 
     Returns:

@@ -14,7 +14,7 @@ Attacks use the following mapping from evaluator outcomes to safety verdicts:
 | `NOT_DETECTED` | `SAFE` | The attack failed — the agent resisted |
 | `UNDETERMINED` | `UNDETERMINED` | The evaluator could not determine whether the attack succeeded |
 
-The evaluator runs once over the terminal trace, and the outcome maps directly
+The evaluator runs once over the final trace, and the outcome maps directly
 to the verdict. This logic lives in
 [`resolve_attack_verdict`][rampart.core.result.resolve_attack_verdict].
 
@@ -32,7 +32,7 @@ All attack executions share this lifecycle:
 2. **Wait** — Allow time for indexing or propagation
 3. **Trigger** — Send prompts that cause the agent to process the injected content
 4. **Stop (optional)** — Check an online condition after each response
-5. **Evaluate** — Check the terminal trace once for the attack objective
+5. **Evaluate** — Check the final trace once for the attack objective
 6. **Clean up** — Remove injected content (guaranteed, even on failure)
 7. **Report** — Produce a [`Result`][rampart.core.result.Result]
 
