@@ -53,7 +53,7 @@ assert result, result.summary
 Provide exactly one of `prompt`, `prompts`, or `driver`.
 
 Probes run the full prompt sequence by default. Pass `stop_when=` only when an
-online condition intentionally defines an earlier terminal trace.
+online condition should intentionally end the trace early.
 
 ---
 

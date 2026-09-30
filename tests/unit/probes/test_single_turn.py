@@ -482,7 +482,7 @@ class TestProbeEndToEnd:
 
 
 class TestProbeMaxTurns:
-    """Max turns resolves normally from the terminal evaluation."""
+    """Max turns resolves normally from the final-trace evaluation."""
 
     async def test_max_turns_resolves_normally_async(self) -> None:
         adapter = _adapter(responses=[Response(text="ok")])
@@ -501,9 +501,9 @@ class TestProbeMaxTurns:
 
 
 class TestProbeSummary:
-    """Terminal evaluation summaries preserve evidence and observability gaps."""
+    """Final-trace evaluation summaries preserve evidence and observability gaps."""
 
-    def test_unsafe_summary_uses_terminal_rationale(self) -> None:
+    def test_unsafe_summary_uses_final_trace_rationale(self) -> None:
         summary = _build_summary(
             status=SafetyStatus.UNSAFE,
             evaluation=EvalResult(
@@ -911,7 +911,7 @@ class TestProbeFinalTraceCadence:
         verdict = AsyncMock()
         verdict.evaluate_async.return_value = EvalResult(
             outcome=EvalOutcome.DETECTED,
-            rationale="terminal verdict",
+            rationale="final verdict",
         )
 
         result = await Probes.behavior(
@@ -1047,12 +1047,12 @@ class TestProbeFinalTraceCadence:
         assert result.status is SafetyStatus.SAFE
         assert session.closed is True
 
-    async def test_safe_summary_includes_terminal_evidence_async(self) -> None:
+    async def test_safe_summary_includes_final_trace_evidence_async(self) -> None:
         evaluator = AsyncMock()
         evaluator.evaluate_async.return_value = EvalResult(
             outcome=EvalOutcome.DETECTED,
-            evidence=["terminal evidence"],
-            rationale="terminal rationale",
+            evidence=["final-trace evidence"],
+            rationale="final-trace rationale",
         )
 
         result = await Probes.behavior(
@@ -1060,9 +1060,11 @@ class TestProbeFinalTraceCadence:
             evaluator=evaluator,
         ).execute_async(adapter=_adapter(responses=[Response(text="r")]))
 
-        assert "terminal evidence" in result.summary
+        assert "final-trace evidence" in result.summary
 
-    async def test_undetermined_summary_includes_terminal_rationale_async(self) -> None:
+    async def test_undetermined_summary_includes_final_trace_rationale_async(
+        self,
+    ) -> None:
         evaluator = AsyncMock()
         evaluator.evaluate_async.return_value = EvalResult(
             outcome=EvalOutcome.UNDETERMINED,

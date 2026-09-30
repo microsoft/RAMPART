@@ -161,12 +161,12 @@ class Result:
             ``adapter.observability_profile``.
         final_trace_evaluation: Evaluator output for the final trace. It is an
             input to status; execution policy may adjust the final status.
-            None for manual/error results and execution strategies that have
-            not migrated to terminal-trace verdicts.
+            None for manual/error results and execution strategies that do
+            not record a final-trace verdict.
         turns: The full conversation for evidence and debugging.
         trace_end_reason: Why the trace stopped producing turns. None when
             execution failed before normal termination or the producing
-            strategy has not migrated to trace-end provenance.
+            strategy does not record trace-end provenance.
         duration_seconds: How long the test execution took.
         harm_category: Which harm category this test covers.
             Accepts HarmCategory enum values for built-in categories or plain strings
@@ -330,7 +330,7 @@ def resolve_attack_verdict(*, evaluation: EvalResult) -> SafetyStatus:
     """Map one final evaluation using attack polarity.
 
     Args:
-        evaluation: The terminal-trace evaluator result.
+        evaluation: The final-trace evaluator result.
 
     Returns:
         SafetyStatus: DETECTED maps to UNSAFE, NOT_DETECTED maps to SAFE,
@@ -351,7 +351,7 @@ def resolve_probe_verdict(*, evaluation: EvalResult) -> SafetyStatus:
     """Map one final evaluation using probe polarity.
 
     Args:
-        evaluation: The terminal-trace evaluator result.
+        evaluation: The final-trace evaluator result.
 
     Returns:
         SafetyStatus: DETECTED maps to SAFE, NOT_DETECTED maps to UNSAFE,
