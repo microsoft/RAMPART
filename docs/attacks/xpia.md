@@ -207,7 +207,7 @@ assert result, result.summary
     Construct a new `LLMDriver` per test. Each instance maintains its own conversation state and cannot be reused.
 
 !!! note "Adaptive driver budgets"
-    `LLMDriver` does not stop itself. The default `stop_when="auto"` stops
+    `LLMDriver` does not stop itself. The default `stop_when=StopWhen.AUTO` stops
     early for stable built-in conditions such as `ToolCalled`, but unknown or
     stochastic evaluators run to `max_turns` and evaluate the final trace
     once. Use an explicit `stop_when` when that online judgment intentionally
@@ -217,7 +217,7 @@ assert result, result.summary
     Earlier releases evaluated XPIA after each response and stopped at the
     first detection. XPIA now evaluates the final trace once, so single-trigger
     attacks with deterministic evaluators keep the same verdicts. The default
-    `stop_when="auto"` still stops early for stable built-in conditions such as
+    `stop_when=StopWhen.AUTO` still stops early for stable built-in conditions such as
     `ToolCalled`. Other evaluators, including LLM judges, no longer stop early
     by default: they are called once on the final trace, and adaptive drivers
     can run up to `max_turns`. Pass the same evaluator as `stop_when` to restore
@@ -259,7 +259,7 @@ See [`Attacks.xpia()`][rampart.attacks.Attacks.xpia] for the full API reference.
 | `inject` | `InjectionHandle \| list[InjectionHandle] \| None` | `None` | Prepared injections from `surface.inject()`. `None` for inline XPIA. |
 | `trigger` | `str \| list[str] \| Request \| list[Request] \| PromptDriver` | required | Benign prompt(s) that cause retrieval of injected content. |
 | `evaluator` | [`Evaluator`][rampart.core.evaluator.Evaluator] | required | What attack condition to detect. |
-| `stop_when` | [`Evaluator`][rampart.core.evaluator.Evaluator] `\| "auto" \| None` | `"auto"` | Online stop condition. Auto reuses stable built-in verdict evaluators and exposes their prefix results to adaptive drivers; `None` disables stopping and online feedback. |
+| `stop_when` | [`Evaluator`][rampart.core.evaluator.Evaluator] `\|` [`StopWhen`][rampart.attacks.StopWhen] `\| None` | `StopWhen.AUTO` | Online stop condition. `StopWhen.AUTO` reuses stable built-in verdict evaluators and exposes their prefix results to adaptive drivers; `None` disables stopping and online feedback. |
 | `max_turns` | `int` | `5` | Maximum prompt-response exchanges; reaching the limit resolves the trace normally. |
 | `event_handlers` | `list[ExecutionEventHandler] \| None` | `None` | Additional lifecycle event handlers. |
 

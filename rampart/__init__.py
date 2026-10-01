@@ -51,7 +51,7 @@ from rampart.core.types import (
 from rampart.pytest_plugin._collection import record_result
 
 if TYPE_CHECKING:
-    from rampart.attacks import Attacks
+    from rampart.attacks import Attacks, StopWhen
     from rampart.drivers.llm import LLMDriver
     from rampart.evaluators import LLMJudge, TranscriptScope
     from rampart.probes import Probes
@@ -61,6 +61,7 @@ __lazy_imports__: dict[str, tuple[str, str]] = {
     "LLMDriver": ("rampart.drivers.llm", "LLMDriver"),
     "LLMJudge": ("rampart.evaluators", "LLMJudge"),
     "Probes": ("rampart.probes", "Probes"),
+    "StopWhen": ("rampart.attacks", "StopWhen"),
     "TranscriptScope": ("rampart.evaluators", "TranscriptScope"),
 }
 
@@ -101,6 +102,7 @@ __all__ = [
     "SafetyStatus",
     "Session",
     "SideEffect",
+    "StopWhen",
     "Surface",
     "ToolCall",
     "ToolDeclaration",

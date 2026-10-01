@@ -8,7 +8,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from rampart.attacks import Attacks
+from rampart.attacks import Attacks, StopWhen
 from rampart.attacks._xpia import _build_summary
 from rampart.core.errors import InfrastructureError
 from rampart.core.evaluator import Evaluator
@@ -134,7 +134,7 @@ class TestXPIADetection:
 
 class TestXPIAParameterValidation:
     def test_invalid_stop_policy_raises(self) -> None:
-        with pytest.raises(ValueError, match="'auto'"):
+        with pytest.raises(ValueError, match=r"StopWhen\.AUTO"):
             Attacks.xpia(
                 inject=_mock_handle(),
                 trigger="Summarize Q3",
@@ -198,6 +198,32 @@ class TestXPIAEarlyStop:
         )
 
         assert result.status is SafetyStatus.UNSAFE
+        assert len(result.turns) == 2
+        assert result.trace_end_reason is TraceEndReason.STOP_CONDITION_MET
+
+    @pytest.mark.parametrize("stop_when", [StopWhen.AUTO, "auto"])
+    async def test_explicit_auto_policy_matches_default_async(
+        self,
+        *,
+        stop_when: StopWhen,
+    ) -> None:
+        result = await Attacks.xpia(
+            inject=_mock_handle(),
+            trigger=["Turn 1", "Turn 2", "Turn 3"],
+            evaluator=ToolCalled("exfiltrate"),
+            stop_when=stop_when,
+        ).execute_async(
+            adapter=_adapter(
+                responses=[
+                    Response(text="one"),
+                    Response(
+                        text="two",
+                        tool_calls=[ToolCall(name="exfiltrate")],
+                    ),
+                ],
+            ),
+        )
+
         assert len(result.turns) == 2
         assert result.trace_end_reason is TraceEndReason.STOP_CONDITION_MET
 

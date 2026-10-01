@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+from enum import StrEnum
 from typing import TYPE_CHECKING
 
 from rampart.attacks._xpia import XPIAExecution
@@ -13,12 +14,22 @@ from rampart.core.injection import InjectionHandle
 from rampart.drivers._utils import coerce_driver
 
 if TYPE_CHECKING:
-    from typing import Literal
-
     from rampart.core.evaluator import Evaluator
     from rampart.core.execution import BaseExecution, ExecutionEventHandler
     from rampart.core.prompt_driver import PromptDriver
     from rampart.core.types import Request
+
+
+class StopWhen(StrEnum):
+    """Framework-selected online stop policies for attack factories.
+
+    Attributes:
+        AUTO: Reuse the verdict evaluator as the online stop condition only
+            when its detection is known to stay true as turns are appended.
+            Other evaluators run without online stopping.
+    """
+
+    AUTO = "auto"
 
 
 class Attacks:
@@ -44,7 +55,7 @@ class Attacks:
         inject: InjectionHandle | list[InjectionHandle] | None = None,
         trigger: str | list[str] | Request | list[Request] | PromptDriver,
         evaluator: Evaluator,
-        stop_when: Evaluator | Literal["auto"] | None = "auto",
+        stop_when: Evaluator | StopWhen | None = StopWhen.AUTO,
         max_turns: int = 5,
         event_handlers: list[ExecutionEventHandler] | None = None,
     ) -> BaseExecution:
@@ -77,10 +88,10 @@ class Attacks:
                 Benign user request(s) that cause the agent to process
                 poisoned content.
             evaluator (Evaluator): What condition to check for.
-            stop_when (Evaluator | Literal["auto"] | None): Online stop
-                condition. ``"auto"`` reuses the verdict evaluator only when
+            stop_when (Evaluator | StopWhen | None): Online stop condition.
+                ``StopWhen.AUTO`` reuses the verdict evaluator only when
                 detection is known to be stable under trace extension. None
-                disables online stopping. Defaults to ``"auto"``.
+                disables online stopping. Defaults to ``StopWhen.AUTO``.
             max_turns (int): Maximum prompt-response exchanges. Reaching the
                 limit resolves the trace normally. Defaults to 5.
             event_handlers (list[ExecutionEventHandler] | None): Optional
@@ -91,7 +102,8 @@ class Attacks:
                 ``execute_async(adapter=...)``.
 
         Raises:
-            ValueError: If ``stop_when`` is a string other than ``"auto"``.
+            ValueError: If ``stop_when`` is a string that is not a
+                ``StopWhen`` value.
         """
         if inject is None:
             handles = []
@@ -101,8 +113,8 @@ class Attacks:
             handles = inject
         driver = coerce_driver(trigger)
         if isinstance(stop_when, str):
-            if stop_when != "auto":
-                msg = "stop_when must be an Evaluator, 'auto', or None."
+            if stop_when != StopWhen.AUTO:
+                msg = "stop_when must be an Evaluator, StopWhen.AUTO, or None."
                 raise ValueError(msg)
             resolved_stop_when = evaluator if detected_is_absorbing(evaluator) else None
         else:
