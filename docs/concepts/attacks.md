@@ -19,7 +19,7 @@ to the verdict. This logic lives in
 [`resolve_attack_verdict`][rampart.core.result.resolve_attack_verdict].
 
 Attack factories may evaluate a separate online `stop_when` condition while
-the trace is being produced. XPIA's `"auto"` default reuses the verdict
+the trace is being produced. XPIA's `StopWhen.AUTO` default reuses the verdict
 evaluator only when detection is known to be stable as turns are appended.
 
 ---
