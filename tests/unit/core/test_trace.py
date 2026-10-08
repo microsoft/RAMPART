@@ -61,7 +61,7 @@ class TestRunTraceAsync:
         assert run.trace_end_reason is TraceEndReason.DRIVER_EXHAUSTED
         assert [turn.response.text for turn in run.turns] == ["r1", "r2"]
         assert run.turns == run.raw_turns
-        assert run.latest_online_evaluation is None
+        assert run.latest_stop_check is None
 
     async def test_turn_budget_is_a_normal_termination_async(self) -> None:
         run = await run_trace_async(
@@ -183,8 +183,8 @@ class TestEvaluateFinalTraceAsync:
 
         result = await evaluate_final_trace_async(evaluator=evaluator, run=updated_run)
 
-        assert run.latest_online_evaluation is not None
-        assert run.latest_online_evaluation.result.outcome is EvalOutcome.NOT_DETECTED
+        assert run.latest_stop_check is not None
+        assert run.latest_stop_check.result.outcome is EvalOutcome.NOT_DETECTED
         assert result is not None
         assert result.outcome is EvalOutcome.UNDETERMINED
 
@@ -278,7 +278,7 @@ class TestEvaluateFinalTraceAsync:
             (EvalOutcome.NOT_DETECTED,),
         ],
     )
-    async def test_reuses_identical_latest_online_evaluation_async(
+    async def test_reuses_identical_latest_stop_check_async(
         self,
         outcomes: tuple[EvalOutcome, ...],
     ) -> None:
@@ -291,14 +291,14 @@ class TestEvaluateFinalTraceAsync:
             stop_when=evaluator,
             manifest=AppManifest(name="agent"),
         )
-        online_result = run.latest_online_evaluation
-        assert online_result is not None
+        stop_check = run.latest_stop_check
+        assert stop_check is not None
 
         result = await evaluate_final_trace_async(evaluator=evaluator, run=run)
 
-        assert result == online_result.result
-        assert result is not online_result.result
-        assert result.evidence is not online_result.result.evidence
+        assert result == stop_check.result
+        assert result is not stop_check.result
+        assert result.evidence is not stop_check.result.evidence
         assert evaluator.evaluate_async.await_count == 1
 
     async def test_non_firing_stop_reuses_final_prefix_without_extra_call_async(

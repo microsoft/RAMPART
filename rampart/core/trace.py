@@ -27,7 +27,7 @@ if TYPE_CHECKING:
 
 @dataclass(frozen=True, kw_only=True, eq=False)
 class EvaluationRecord:
-    """One online evaluation and the exact context it judged.
+    """One stop-condition check and the exact context it judged.
 
     Args:
         evaluator: Evaluator object that produced the result. Identity is the
@@ -43,7 +43,7 @@ class EvaluationRecord:
 
 @dataclass(kw_only=True)
 class TraceRun:
-    """A completed linear trace and its latest online evaluation.
+    """A completed linear trace and its latest stop-condition check.
 
     ``turns`` is the driver/report view and may carry online evidence.
     ``raw_turns`` is the evaluator view and never carries framework-produced
@@ -55,7 +55,8 @@ class TraceRun:
         manifest: Agent capabilities used to create evaluator contexts.
         turns: Annotated history passed to prompt drivers and results.
         raw_turns: Annotation-free history passed to evaluators.
-        latest_online_evaluation: Most recent stop-condition evaluation.
+        latest_stop_check: Most recent ``stop_when`` evaluation, or None when
+            no stop condition was configured.
     """
 
     trace_end_reason: TraceEndReason
@@ -63,7 +64,7 @@ class TraceRun:
     manifest: AppManifest | None = None
     turns: list[Turn] = field(default_factory=list[Turn])
     raw_turns: list[Turn] = field(default_factory=list[Turn])
-    latest_online_evaluation: EvaluationRecord | None = None
+    latest_stop_check: EvaluationRecord | None = None
 
 
 def _evaluation_context(
@@ -166,7 +167,7 @@ async def run_trace_async(
             manifest=manifest,
         )
         evaluation = await stop_when.evaluate_async(context=context)
-        run.latest_online_evaluation = EvaluationRecord(
+        run.latest_stop_check = EvaluationRecord(
             evaluator=stop_when,
             context=context,
             result=evaluation,
@@ -190,10 +191,10 @@ async def evaluate_final_trace_async(
     evaluator: Evaluator,
     run: TraceRun,
 ) -> EvalResult | None:
-    """Evaluate the final raw trace, reusing an identical online judgment.
+    """Evaluate the final raw trace, reusing an identical stop-condition check.
 
     Args:
-        evaluator: Evaluator responsible for the final verdict.
+        evaluator: Evaluator applied to the final trace.
         run: Completed trace from :func:`run_trace_async`.
 
     Returns:
@@ -207,7 +208,7 @@ async def evaluate_final_trace_async(
     if not run.raw_turns:
         return None
 
-    record = run.latest_online_evaluation
+    record = run.latest_stop_check
     if (
         record is not None
         and record.evaluator is evaluator
