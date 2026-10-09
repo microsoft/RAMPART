@@ -32,7 +32,6 @@ from rampart.core.result import (
     Result,
     SafetyStatus,
     resolve_as_attack,
-    resolve_as_probe,
     resolve_attack_verdict,
     resolve_probe_verdict,
 )
@@ -105,7 +104,6 @@ __all__ = [
     "evaluate_turn_async",
     "execute_trials_async",
     "resolve_as_attack",
-    "resolve_as_probe",
     "resolve_attack_verdict",
     "resolve_probe_verdict",
     "run_trace_async",
