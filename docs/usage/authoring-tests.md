@@ -167,6 +167,9 @@ example `Pattern found on turn(s): 0, 2`. `CURRENT_TURN` uses the same format
 with only the latest turn number. A failed `ALL_TURNS` match identifies the
 missing turns with `Pattern missing on turn(s): ...`.
 
+    Attacks and probes evaluate their verdict once over the completed trace
+    unless an explicit stop condition ends the scenario earlier.
+
 #### How Each Evaluator Sees the Transcript
 
 Built-in evaluators reach their temporal behavior in two ways. Quantifying

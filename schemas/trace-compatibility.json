@@ -1,8 +1,8 @@
 {
   "version": "rampart.trace.v2",
-  "contract_sha256": "828c2783d81d06185caeeef1a7ff83e025d9470d3c9dc894a6a555e555c47ed9",
-  "previous_contract_sha256": "da1a36daa27b5fc2cdaf4305ba3aa743f52789643de94ed97916ebbaa5fc2b47",
-  "decision": "new-major",
-  "rationale": "V2 requires nonempty PopulationRef.id values, rejecting records accepted by v1 and therefore requiring a major version bump. The optional final_trace_evaluation, trace_end_reason, and Turn.eval_purpose fields define absence as not recorded; those additions alone are compatible. Repeated EvalResult definitions now consistently receive canonical validation policies. The published v1 schema is preserved unchanged.",
-  "migration_note": "This reader accepts only v2; no v1 decoder, upcaster, or migration utility is provided. Convert v1 records explicitly into separate v2 records and validate them with deserialize_record(); do not merely relabel their version. Empty population IDs require legitimate producer provenance or regeneration, not invented identifiers. Leave unrecorded final_trace_evaluation, trace_end_reason, and eval_purpose fields absent or null rather than inferring them from online evaluations. Preserve the original records."
+  "contract_sha256": "395e16a3990852c7f2f85cca296e711dfb146f311a2c307f0ed7e368a0d15d80",
+  "previous_contract_sha256": "828c2783d81d06185caeeef1a7ff83e025d9470d3c9dc894a6a555e555c47ed9",
+  "decision": "compatible",
+  "rationale": "Removes the list-based resolve_as_probe and resolve_as_attack helpers and updates Result documentation. Result fields, canonical serialization, and published schemas are unchanged, so existing v2 records remain valid.",
+  "migration_note": null
 }

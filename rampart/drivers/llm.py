@@ -8,9 +8,9 @@ each turn. The driver maintains two related conversations:
 
   - The **driver-side conversation** with the driving LLM, stored in
     PyRIT's CentralMemory keyed by self._conversation_id. Each turn
-    consists of a framework-built user message (containing the latest
-    agent response and evaluator feedback) and the LLM's next-prompt
-    reply.
+    consists of a framework-built user message containing the latest agent
+    response and any available online evaluator feedback, followed by the
+    LLM's next-prompt reply.
 
   - The **agent-side conversation** with the agent under test,
     represented by the ``history: list[Turn]`` passed into
@@ -73,10 +73,9 @@ class LLMDriver:
         represented by ``history: list[Turn]`` passed into
         ``next_prompt_async``.
 
-    Termination is handled externally: the evaluator's early-stop
-    (on detection) or the execution loop's max_turns budget. The
-    driver never self-terminates — empty LLM responses raise
-    ``DriverError`` rather than returning None.
+    Termination is handled externally by an explicit online stop condition or
+    the execution loop's max-turn budget. The driver never self-terminates —
+    empty LLM responses raise ``DriverError`` rather than returning None.
 
     One driver instance = one driver-side conversation. Construct a
     new driver per test. Use ``from_target`` for custom targets.
