@@ -23,6 +23,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          fetch-depth: 0
           persist-credentials: false
 
       - name: Set up Python
@@ -31,7 +32,7 @@ jobs:
           python-version: "3.12"
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
         with:
           enable-cache: true
 
@@ -49,6 +50,14 @@ jobs:
 
       - name: ty
         run: uv run ty check
+
+      - name: Trace schema drift
+        run: uv run python scripts/generate_trace_schema.py --check
+
+      - name: Trace compatibility decision
+        env:
+          TRACE_SCHEMA_BASE: ${{ github.event.pull_request.base.sha }}
+        run: uv run python scripts/check_trace_compatibility.py --base-ref "$TRACE_SCHEMA_BASE"
 
   test:
     name: Test (Python ${{ matrix.python-version }})
@@ -73,7 +82,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
         with:
           enable-cache: true
           cache-suffix: py${{ matrix.python-version }}

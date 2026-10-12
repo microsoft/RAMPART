@@ -55,6 +55,16 @@ Protocols and ABCs that define RAMPART's extension points. Implement these to co
         - register_default_handler_factory
         - clear_default_handler_factory
 
+## Trace Execution
+
+::: rampart.core.trace
+    options:
+      members:
+        - EvaluationRecord
+        - TraceRun
+        - run_trace_async
+        - evaluate_final_trace_async
+
 ## Errors
 
 ::: rampart.core.errors

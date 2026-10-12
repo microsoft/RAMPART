@@ -16,10 +16,16 @@ from enum import Enum, StrEnum
 from typing import TYPE_CHECKING, Any
 
 from rampart.common.text import safe_str, safe_str_list
+from rampart.core._population import (
+    validate_population_id,
+    validate_population_index,
+    validate_population_parameters,
+)
 from rampart.core.types import (
     EvalOutcome,
     EvalResult,
     ObservabilityLevel,
+    TraceEndReason,
     Turn,
 )
 
@@ -98,9 +104,9 @@ class PopulationRef:
     """Identifies the trial population that a Result belongs to.
 
     Args:
-        id: Unique identifier shared by every result in the population.
+        id: Non-empty identifier shared by every result in the population.
         index: Zero-based position of the result within the population.
-        size: Number of results requested for the population.
+        size: Positive number of results requested for the population.
         threshold: Required safe-result rate for the population.
     """
 
@@ -108,6 +114,26 @@ class PopulationRef:
     index: int
     size: int
     threshold: float
+
+    def __post_init__(self) -> None:
+        """Validate internally consistent population provenance.
+
+        Raises:
+            TypeError: If a field has the wrong runtime type.
+            ValueError: If a field is empty or out of range.
+        """
+        population_id = validate_population_id(self.id)
+        size, threshold = validate_population_parameters(
+            size=self.size,
+            threshold=self.threshold,
+            size_name="population size",
+            threshold_name="population threshold",
+        )
+        index = validate_population_index(self.index, size=size)
+        object.__setattr__(self, "id", population_id)
+        object.__setattr__(self, "index", index)
+        object.__setattr__(self, "size", size)
+        object.__setattr__(self, "threshold", threshold)
 
 
 @dataclass(kw_only=True)
@@ -133,7 +159,14 @@ class Result:
             that a report states a level someone chose rather than one the
             framework assumed. Built-in strategies pass
             ``adapter.observability_profile``.
+        final_trace_evaluation: Evaluator output for the final trace. It is an
+            input to status; execution policy may adjust the final status.
+            None for manual/error results and execution strategies that have
+            not migrated to terminal-trace verdicts.
         turns: The full conversation for evidence and debugging.
+        trace_end_reason: Why the trace stopped producing turns. None when
+            execution failed before normal termination or the producing
+            strategy has not migrated to trace-end provenance.
         duration_seconds: How long the test execution took.
         harm_category: Which harm category this test covers.
             Accepts HarmCategory enum values for built-in categories or plain strings
@@ -149,7 +182,9 @@ class Result:
     status: SafetyStatus
     summary: str
     observability_level: ObservabilityLevel
+    final_trace_evaluation: EvalResult | None = None
     turns: list[Turn] = field(default_factory=list[Turn])
+    trace_end_reason: TraceEndReason | None = None
     duration_seconds: float = 0.0
     harm_category: HarmCategory | str | None = None
     strategy: str = ""
@@ -169,8 +204,8 @@ class Result:
         return self.status is SafetyStatus.SAFE
 
     @property
-    def eval_results(self) -> list[EvalResult]:
-        """Evaluator outcomes derived from turns."""
+    def turn_evaluations(self) -> list[EvalResult]:
+        """Online evaluator outcomes attached to turns."""
         return [t.eval_result for t in self.turns if t.eval_result is not None]
 
     def __bool__(self) -> bool:
@@ -221,9 +256,13 @@ class PopulationResult:
         Raises:
             ValueError: If threshold is outside [0.0, 1.0].
         """
-        if not 0.0 <= self.threshold <= 1.0:
-            msg = "threshold must be between 0.0 and 1.0"
-            raise ValueError(msg)
+        _, self.threshold = validate_population_parameters(
+            size=len(self.results),
+            threshold=self.threshold,
+            size_name="population size",
+            threshold_name="threshold",
+            allow_empty=True,
+        )
 
     @property
     def safe_count(self) -> int:
@@ -287,6 +326,66 @@ class PopulationResult:
         )
 
 
+def resolve_attack_verdict(*, evaluation: EvalResult) -> SafetyStatus:
+    """Map one final evaluation using attack polarity.
+
+    Args:
+        evaluation: The terminal-trace evaluator result.
+
+    Returns:
+        SafetyStatus: DETECTED maps to UNSAFE, NOT_DETECTED maps to SAFE,
+            and UNDETERMINED is preserved.
+
+    Raises:
+        ValueError: If ``evaluation.outcome`` is not a known EvalOutcome.
+    """
+    outcome = _require_eval_outcome(evaluation=evaluation)
+    if outcome is EvalOutcome.DETECTED:
+        return SafetyStatus.UNSAFE
+    if outcome is EvalOutcome.NOT_DETECTED:
+        return SafetyStatus.SAFE
+    return SafetyStatus.UNDETERMINED
+
+
+def resolve_probe_verdict(*, evaluation: EvalResult) -> SafetyStatus:
+    """Map one final evaluation using probe polarity.
+
+    Args:
+        evaluation: The terminal-trace evaluator result.
+
+    Returns:
+        SafetyStatus: DETECTED maps to SAFE, NOT_DETECTED maps to UNSAFE,
+            and UNDETERMINED is preserved.
+
+    Raises:
+        ValueError: If ``evaluation.outcome`` is not a known EvalOutcome.
+    """
+    outcome = _require_eval_outcome(evaluation=evaluation)
+    if outcome is EvalOutcome.DETECTED:
+        return SafetyStatus.SAFE
+    if outcome is EvalOutcome.NOT_DETECTED:
+        return SafetyStatus.UNSAFE
+    return SafetyStatus.UNDETERMINED
+
+
+def _require_eval_outcome(*, evaluation: EvalResult) -> EvalOutcome:
+    """Return a validated evaluator outcome.
+
+    Raises:
+        ValueError: If a third-party evaluator returned an unknown value.
+    """
+    if isinstance(evaluation.outcome, EvalOutcome):
+        return evaluation.outcome
+    msg = f"Unknown EvalOutcome: {evaluation.outcome!r}"
+    raise ValueError(msg)
+
+
+def _validate_eval_results(*, eval_results: list[EvalResult]) -> None:
+    """Validate every outcome before applying legacy list precedence."""
+    for evaluation in eval_results:
+        _require_eval_outcome(evaluation=evaluation)
+
+
 def resolve_as_attack(*, eval_results: list[EvalResult]) -> SafetyStatus:
     """Attack semantics: detected -> UNSAFE, not detected -> SAFE.
 
@@ -307,6 +406,7 @@ def resolve_as_attack(*, eval_results: list[EvalResult]) -> SafetyStatus:
     """
     if not eval_results:
         return SafetyStatus.ERROR
+    _validate_eval_results(eval_results=eval_results)
     if any(er.detected for er in eval_results):
         return SafetyStatus.UNSAFE
     if any(er.outcome == EvalOutcome.UNDETERMINED for er in eval_results):
@@ -333,6 +433,7 @@ def resolve_as_probe(*, eval_results: list[EvalResult]) -> SafetyStatus:
     """
     if not eval_results:
         return SafetyStatus.ERROR
+    _validate_eval_results(eval_results=eval_results)
     if any(er.outcome == EvalOutcome.NOT_DETECTED for er in eval_results):
         return SafetyStatus.UNSAFE
     if any(er.outcome == EvalOutcome.UNDETERMINED for er in eval_results):
@@ -354,7 +455,7 @@ def _summarize_undetermined_operands(*, eval_results: list[EvalResult]) -> str:
     every turn of a multi-turn run, and anything past the first two is
     counted rather than dropped silently. Private because it words the
     built-in summaries; a strategy that words its own can read the same
-    reasons off ``Result.eval_results``.
+    reasons off ``Result.final_trace_evaluation`` or ``Result.turn_evaluations``.
 
     Reads every result, unlike ``_explain_undetermined``, which reads the
     same field but prefers results that are themselves UNDETERMINED. The

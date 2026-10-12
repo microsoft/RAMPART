@@ -12,6 +12,7 @@ from rampart.core.types import (
     EvalContext,
     EvalOutcome,
     EvalResult,
+    EvaluationPurpose,
     ObservabilityLevel,
     Payload,
     PayloadFormat,
@@ -19,6 +20,7 @@ from rampart.core.types import (
     Response,
     SideEffect,
     ToolCall,
+    TraceEndReason,
     Turn,
 )
 
@@ -112,6 +114,7 @@ class TestTurn:
         assert t.timestamp is None
         assert t.driver_reasoning == ""
         assert t.eval_result is None
+        assert t.eval_purpose is None
 
     def test_eval_result_round_trips(self):
         er = EvalResult(outcome=EvalOutcome.DETECTED, rationale="found it")
@@ -122,6 +125,24 @@ class TestTurn:
         )
         assert t.eval_result is er
         assert t.eval_result is not None and t.eval_result.detected is True
+
+    def test_eval_purpose_round_trips(self):
+        evaluation = EvalResult(outcome=EvalOutcome.DETECTED)
+        t = Turn(
+            request=Request(prompt="p"),
+            response=Response(text="r"),
+            eval_result=evaluation,
+            eval_purpose=EvaluationPurpose.STOP_CHECK,
+        )
+        assert t.eval_purpose is EvaluationPurpose.STOP_CHECK
+
+    def test_eval_purpose_requires_eval_result(self) -> None:
+        with pytest.raises(ValueError, match="eval_purpose requires eval_result"):
+            Turn(
+                request=Request(prompt="p"),
+                response=Response(text="r"),
+                eval_purpose=EvaluationPurpose.STOP_CHECK,
+            )
 
     def test_frozen_prevents_mutation(self):
         t = Turn(request=Request(prompt="p"), response=Response(text="r"))
@@ -148,6 +169,42 @@ class TestEvalResult:
         assert er.evidence == []
         assert er.rationale == ""
         assert er.undetermined_operands == []
+
+
+class TestExecutionMetadataEnums:
+    def test_evaluation_purpose_value(self) -> None:
+        assert EvaluationPurpose.STOP_CHECK.value == "stop_check"
+        assert not isinstance(EvaluationPurpose.STOP_CHECK, str)
+
+    def test_trace_end_reason_values(self) -> None:
+        assert TraceEndReason.DRIVER_EXHAUSTED.value == "driver_exhausted"
+        assert TraceEndReason.MAX_TURNS_REACHED.value == "max_turns_reached"
+        assert TraceEndReason.STOP_CONDITION_MET.value == "stop_condition_met"
+        assert not isinstance(TraceEndReason.STOP_CONDITION_MET, str)
+
+    def test_purpose_and_reason_do_not_compare_equal(self) -> None:
+        assert EvaluationPurpose.STOP_CHECK != TraceEndReason.STOP_CONDITION_MET
+
+
+def test_new_contract_is_available_from_core_package() -> None:
+    """Execution vocabulary is available from the narrower core API."""
+    from rampart.core import (
+        EvaluationPurpose as CoreEvaluationPurpose,
+    )
+    from rampart.core import (
+        TraceEndReason as CoreTraceEndReason,
+    )
+    from rampart.core import (
+        resolve_attack_verdict as core_attack_resolver,
+    )
+    from rampart.core import (
+        resolve_probe_verdict as core_probe_resolver,
+    )
+
+    assert CoreEvaluationPurpose is EvaluationPurpose
+    assert CoreTraceEndReason is TraceEndReason
+    assert core_attack_resolver is not None
+    assert core_probe_resolver is not None
 
 
 class TestEvalContext:

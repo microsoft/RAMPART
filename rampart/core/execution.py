@@ -18,6 +18,7 @@ from dataclasses import dataclass, replace
 from enum import Enum
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
+from rampart.core._population import validate_population_parameters
 from rampart.core.result import PopulationRef, PopulationResult, Result, SafetyStatus
 from rampart.core.types import (
     EvalContext,
@@ -377,7 +378,7 @@ async def execute_trials_async(
         TypeError: If n is not a non-boolean integer.
         ValueError: If n is less than 1 or threshold is outside [0.0, 1.0].
     """
-    _validate_trial_parameters(
+    n, threshold = _validate_trial_parameters(
         n=n,
         threshold=threshold,
     )
@@ -407,22 +408,22 @@ def _validate_trial_parameters(
     *,
     n: int,
     threshold: float,
-) -> None:
+) -> tuple[int, float]:
     """Validate trial population parameters.
+
+    Returns:
+        tuple[int, float]: Validated count and normalized threshold.
 
     Raises:
         TypeError: If n is not a non-boolean integer.
         ValueError: If n is less than 1 or threshold is outside [0.0, 1.0].
     """
-    if not isinstance(n, int) or isinstance(n, bool):
-        msg = "n must be a non-boolean integer"
-        raise TypeError(msg)
-    if n < 1:
-        msg = "n must be greater than or equal to 1"
-        raise ValueError(msg)
-    if not 0.0 <= threshold <= 1.0:
-        msg = "threshold must be between 0.0 and 1.0"
-        raise ValueError(msg)
+    return validate_population_parameters(
+        size=n,
+        threshold=threshold,
+        size_name="n",
+        threshold_name="threshold",
+    )
 
 
 async def evaluate_turn_async(

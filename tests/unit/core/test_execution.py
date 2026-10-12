@@ -4,6 +4,7 @@
 import asyncio
 import types
 from typing import Self
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -359,6 +360,23 @@ class TestExecuteTrials:
 
         assert handler.events == []
 
+    @pytest.mark.parametrize("threshold", [True, float("nan"), float("inf")])
+    async def test_rejects_malformed_threshold_before_factory_async(
+        self,
+        threshold: object,
+    ) -> None:
+        factory = MagicMock(return_value=_SuccessExecution())
+
+        with pytest.raises((TypeError, ValueError)):
+            await execute_trials_async(
+                execution_factory=factory,
+                adapter=_StubAdapter(),
+                n=1,
+                threshold=threshold,  # ty: ignore[invalid-argument-type]
+            )
+
+        factory.assert_not_called()
+
 
 class TestPopulationPublicExports:
     def test_execute_trials_exported_from_rampart(self) -> None:
@@ -607,6 +625,7 @@ class TestEvaluateTurnAsync:
 
         assert turn.eval_result is not None
         assert turn.eval_result.outcome is EvalOutcome.DETECTED
+        assert turn.eval_purpose is None
         assert turn.request.prompt == "hello"
         assert turn.response.text == "world"
         assert turn.turn_number == 0

@@ -26,6 +26,7 @@ from rampart.core.types import (
 from rampart.drivers.static import StaticDriver
 from rampart.evaluators import (
     ResponseContains,
+    ResponseScope,
     SideEffectOccurred,
     ToolCalled,
 )
@@ -624,7 +625,8 @@ class TestProbeSafeSummary:
 
         result = await Probes.behavior(
             prompt="test",
-            evaluator=ToolCalled("audit_log") | ResponseContains("logged"),
+            evaluator=ToolCalled("audit_log")
+            | ResponseContains("logged", scope=ResponseScope.ALL_TURNS),
         ).execute_async(adapter=adapter)
 
         assert result.status is SafetyStatus.SAFE

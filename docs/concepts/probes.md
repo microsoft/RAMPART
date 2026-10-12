@@ -38,11 +38,11 @@ All probes are created through the [`Probes`][rampart.probes.Probes] class:
 
 ```python
 from rampart import Probes
-from rampart.evaluators import ResponseContains
+from rampart.evaluators import ResponseContains, ResponseScope
 
 execution = Probes.behavior(
     prompt="What is 2 + 2?",
-    evaluator=ResponseContains("4"),
+    evaluator=ResponseContains("4", scope=ResponseScope.ALL_TURNS),
 )
 
 result = await execution.execute_async(adapter=my_adapter)
@@ -60,5 +60,3 @@ Provide exactly one of `prompt`, `prompts`, or `driver`.
 | [Behavioral](../probes/behavioral.md) | `Probes.behavior(...)` | Verify the agent produces expected responses or behaviors |
 
 More probe types will be added. Each new probe is a new factory method on `Probes`.
-
-

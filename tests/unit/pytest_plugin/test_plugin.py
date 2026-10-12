@@ -21,7 +21,11 @@ from rampart.pytest_plugin._collection import (
     deactivate_collector,
 )
 from rampart.pytest_plugin._session import RampartSession
-from rampart.pytest_plugin._xdist import REPORT_RESULTS_ATTR, serialize_report_data
+from rampart.pytest_plugin._xdist import (
+    REPORT_RESULTS_ATTR,
+    SCHEMA_VERSION,
+    serialize_report_data,
+)
 from rampart.pytest_plugin.plugin import (
     _call_results_key,
     _emit_sinks,
@@ -863,3 +867,95 @@ class TestPytestRuntestLogreport:
         )
         pytest_runtest_logreport(cast("pytest.TestReport", report))
         assert rampart_session.is_incomplete is True
+
+    @pytest.mark.parametrize("exponent", [400, 10_000])
+    @pytest.mark.parametrize("field", ["final_trace_evaluation", "turns", "population"])
+    def test_overflowing_evaluation_or_population_marks_run_incomplete(
+        self,
+        *,
+        exponent: int,
+        field: str,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        nodeid = "test_plugin.py::test_stream"
+        evaluation = {"outcome": "detected", "confidence": 10**exponent}
+        malformed_fields = {
+            "final_trace_evaluation": evaluation,
+            "turns": [
+                {
+                    "request": {"prompt": "p"},
+                    "response": {"text": "r"},
+                    "eval_result": evaluation,
+                    "eval_purpose": "stop_check",
+                },
+            ],
+            "population": {
+                "id": "population-1",
+                "index": 0,
+                "size": 1,
+                "threshold": 10**exponent,
+            },
+        }
+        report, rampart_session = _make_controller_report(
+            payload={
+                "schema": SCHEMA_VERSION,
+                "nodeid": nodeid,
+                "results": [
+                    {
+                        "status": "unsafe",
+                        "summary": "unsafe terminal trace",
+                        "observability_level": "response_only",
+                        field: malformed_fields[field],
+                    },
+                ],
+            },
+        )
+
+        pytest_runtest_logreport(cast("pytest.TestReport", report))
+
+        assert rampart_session.is_incomplete is True
+        assert rampart_session._results == []
+        assert "Failed to merge streamed Result report from worker gw0" in caplog.text
+
+    @pytest.mark.parametrize("location", ["final_trace_evaluation", "turns"])
+    @pytest.mark.parametrize(
+        "field", ["rationale", "evidence", "undetermined_operands"]
+    )
+    def test_unprintable_evaluation_text_preserves_earlier_results(
+        self,
+        *,
+        location: str,
+        field: str,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        payload = serialize_report_data(
+            config=_make_reporting_item().config,
+            nodeid="test_plugin.py::test_stream",
+            results=[_make_result(summary="earlier result")],
+        )
+        report, rampart_session = _make_controller_report(payload=payload)
+        pytest_runtest_logreport(cast("pytest.TestReport", report))
+        earlier_results = list(rampart_session._results)
+        evaluation = {
+            "outcome": "detected",
+            field: 10**10_000 if field == "rationale" else [10**10_000],
+        }
+        payload["results"][0][location] = (
+            evaluation
+            if location == "final_trace_evaluation"
+            else [
+                {
+                    "request": {"prompt": "p"},
+                    "response": {"text": "r"},
+                    "eval_result": evaluation,
+                    "eval_purpose": "stop_check",
+                },
+            ]
+        )
+
+        pytest_runtest_logreport(cast("pytest.TestReport", report))
+
+        assert rampart_session.is_incomplete is True
+        assert rampart_session._results == earlier_results
+        assert report.node.config.stash[_received_result_counts_key] == {"gw0": 1}
+        assert "Failed to merge streamed Result report from worker gw0" in caplog.text
