@@ -33,6 +33,8 @@ onboarding, including follow-up turns and skill reloads:
   it is useful or necessary now, and how it connects to the user's application.
   Explain commands and generated files rather than just supplying code, and
   tailor the depth to the user's experience without repeating a whole tutorial.
+  Keep learning tied to the user's application and selected test, not generic
+  practice projects.
 - Ask whether to use RAMPART `main` or the latest published release before
   installing dependencies or building the integration or tests. Explain feature
   availability and API tradeoffs rather than silently choosing a source.
@@ -64,12 +66,11 @@ is worth adding now. A probe checks required behavior: detecting that behavior
 means SAFE. An attack tries to induce disallowed behavior: detecting it means
 UNSAFE. Both require the agreed evidence; missing evidence is not safety.
 
-For example, a legitimate password-reset probe establishes that the correct
-account and recipient receive the intended tool action. A ticket-injection
-attack challenges whether untrusted ticket content can redirect that action to
-a synthetic unauthorized recipient. These are complementary: benign success
-does not demonstrate resistance, and refusing everything does not demonstrate
-useful behavior.
+Where relevant, the assistant should suggest pairing a required-behavior probe
+with an attack against the same application workflow. Both cases should be
+grounded in the user's code, with an explanation of why successful legitimate
+behavior and resistance to adversarial input provide different evidence.
+Neither substitutes for the other.
 
 After a result or completed task, the assistant should recommend a specific
 next step and invite a choice rather than ending with a generic "let me know."
@@ -144,11 +145,14 @@ files do not by themselves establish a regression.
 
 ### Optional independence milestone
 
-After the first useful test, offer to coach the user through rerunning it or
-making a small variation themselves. Explain the concept and expected outcome,
-then help them locate results and interpret the evidence without taking over.
-This is an optional learning exercise, not a quiz or a gate to further help.
-Respect a decline and keep existing execution permissions and cost limits.
+After the first useful test, offer a choice in one focused question: practice
+by rerunning or making a small variation of their own test, or move directly to
+another relevant test case. For practice, explain the concept and expected
+outcome, then help them locate results and interpret the evidence without taking
+over. If they choose another case, agree its evaluation contract and execution
+scope without requiring the practice exercise. Respect a decline and keep
+existing execution permissions and cost limits; offering either option does not
+authorize additional live calls.
 
 On request, leave a short runbook covering setup, chosen revisions, run commands,
 working directory, result locations, safe reset/cleanup, and limitations. The
@@ -260,9 +264,9 @@ explicit skill invocation or picker and select `rampartner`. For
 assistants without skill support, ask the assistant to read and follow the same
 `SKILL.md` file for the conversation.
 
-If you do not have an application ready, ask for the bundled offline smoke test.
-It uses a fake agent without credentials or model calls to demonstrate framework
-wiring, not to assess your application's safety.
+If the application cannot run yet, the assistant should help resolve the next
+setup blocker or prepare its test from available application code or interface
+details, rather than switching to an unrelated demo.
 
 Only allow execution against systems you are authorized to test. Use synthetic
 data and isolated targets, keep secrets out of chat, and review reports before
@@ -277,7 +281,6 @@ For the underlying walkthroughs, see [Installation](installation.md),
 
 Update `rampart/skills/rampartner/SKILL.md` as the single source of
 onboarding instructions. Keep it self-contained so users can install just that
-directory. `tests/unit/test_onboarding_skill.py` covers discovery metadata, the
-leading conversation contract, and the offline example with its negative
-control. These checks do not establish conversational quality; assess that
-through an interactive onboarding conversation.
+directory. Review discovery metadata and the conversation contract when updating
+it, and assess conversational quality through an interactive onboarding
+conversation grounded in the user's application.
