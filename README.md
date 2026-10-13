@@ -21,6 +21,16 @@
 
 RAMPART provides a structured, developer-friendly way to write and run safety and security tests for AI agents -- covering **adversarial attacks**, **benign failures**, and a broad range of **harm categories**, all with evaluation-driven assertions and seamless integration with [pytest](https://docs.pytest.org/).
 
+## Guided Onboarding
+
+Bring your use case to the
+[RAMPARTner](https://microsoft.github.io/RAMPART/getting-started/onboarding-skill/), the RAMPART onboarding skill,
+in your coding assistant. It helps you agree on what a first test should prove,
+build the integration, run the test, and choose code-grounded follow-up tests and
+payloads. It also explains when to extend your project or request a framework
+feature. The self-contained skill ships at
+`rampart/skills/rampartner/SKILL.md` in the repository and Python package.
+
 ## Trademarks
 
 This project may contain trademarks or logos for projects, products, or services. Authorized use of Microsoft

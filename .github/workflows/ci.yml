@@ -56,7 +56,8 @@ jobs:
 
       - name: Trace compatibility decision
         env:
-          TRACE_SCHEMA_BASE: ${{ github.event.pull_request.base.sha }}
+          # Use the tested merge's base; the event's base SHA can be stale.
+          TRACE_SCHEMA_BASE: ${{ github.event_name == 'pull_request' && 'HEAD^1' || '' }}
         run: uv run python scripts/check_trace_compatibility.py --base-ref "$TRACE_SCHEMA_BASE"
 
   test:

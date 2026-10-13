@@ -2,6 +2,9 @@
 
 This guide walks you through writing your first RAMPART safety test — from adapter to a passing test run.
 
+!!! tip "Prefer guidance tailored to your application?"
+    Install [RAMPARTner](onboarding-skill.md), the onboarding skill, in your coding assistant to choose a first test, agree on its evidence requirements, and plan follow-up coverage for your use case.
+
 !!! tip "Prefer to read working code?"
     [`microsoft/rampart-examples`](https://github.com/microsoft/rampart-examples) hosts self-contained demos with a complete adapter, manifest, surface, and red → fix → green test walkthrough you can clone and run.
 
