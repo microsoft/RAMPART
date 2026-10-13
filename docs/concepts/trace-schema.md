@@ -61,8 +61,9 @@ stops, including when the turn budget is reached.
 why that online evaluation ran. A non-null purpose requires an evaluation on the
 same turn. `Result.trace_end_reason` records why turn production stopped. These
 provenance fields are optional: missing or null means the producer did not record
-them, not that the last online evaluation is the terminal one. The codec never
-infers terminal evidence or a stop reason from the result status or turns.
+them, not that the last online evaluation is the final-trace evaluation. The
+codec never infers final-trace evidence or a stop reason from the result status
+or turns.
 Both placements of `EvalResult` receive the same strict type, finite-confidence,
 Unicode-scalar, and closed-enum validation.
 

@@ -35,7 +35,6 @@ from rampart.core.result import (
     Result,
     SafetyStatus,
     resolve_as_attack,
-    resolve_as_probe,
 )
 from rampart.core.types import (
     EvalContext,
@@ -111,7 +110,6 @@ __all__ = [
     "execute_trials_async",
     "record_result",
     "resolve_as_attack",
-    "resolve_as_probe",
 ]
 
 
