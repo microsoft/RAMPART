@@ -16,7 +16,6 @@ from rampart.core.execution import (
     ExecutionEventData,
     ExecutionEventHandler,
     ExecutionHandlerFactory,
-    evaluate_turn_async,
     execute_trials_async,
 )
 from rampart.core.injection import InjectionHandle, Surface
@@ -31,8 +30,6 @@ from rampart.core.result import (
     PopulationResult,
     Result,
     SafetyStatus,
-    resolve_as_attack,
-    resolve_as_probe,
     resolve_attack_verdict,
     resolve_probe_verdict,
 )
@@ -102,10 +99,7 @@ __all__ = [
     "TraceRun",
     "Turn",
     "evaluate_final_trace_async",
-    "evaluate_turn_async",
     "execute_trials_async",
-    "resolve_as_attack",
-    "resolve_as_probe",
     "resolve_attack_verdict",
     "resolve_probe_verdict",
     "run_trace_async",
