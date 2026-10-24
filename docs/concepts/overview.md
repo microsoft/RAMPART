@@ -91,7 +91,7 @@ sequenceDiagram
     Exec-->>Test: Result
 ```
 
-Attack strategies add an injection phase before the conversation loop and, until their cadence migration, evaluate inside the loop instead of after it. Probe strategies skip injection entirely.
+Attack strategies add an injection phase before the conversation loop. Probe strategies skip injection entirely.
 
 If an [`InfrastructureError`][rampart.core.errors.InfrastructureError] is raised during execution, `BaseExecution` catches it and produces a [`Result`][rampart.core.result.Result] with [`SafetyStatus.ERROR`][rampart.core.result.SafetyStatus].
 

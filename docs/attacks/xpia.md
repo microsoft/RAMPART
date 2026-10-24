@@ -211,22 +211,9 @@ assert result, result.summary
     early for stable built-in conditions such as `ToolCalled`, but unknown or
     stochastic evaluators run to `max_turns` and evaluate the final trace
     once. Use an explicit `stop_when` when that online judgment intentionally
-    defines the end of the attack scenario.
-
-!!! note "Upgrading from per-turn attack verdicts"
-    Earlier releases evaluated XPIA after each response and stopped at the
-    first detection. XPIA now evaluates the final trace once, so single-trigger
-    attacks with deterministic evaluators keep the same verdicts. The default
-    `stop_when=StopWhen.AUTO` still stops early for stable built-in conditions such as
-    `ToolCalled`. Other evaluators, including LLM judges, no longer stop early
-    by default: they are called once on the final trace, and adaptive drivers
-    can run up to `max_turns`. Pass the same evaluator as `stop_when` to restore
-    per-turn early stopping without a duplicate final call. With the default,
-    a stochastic evaluator is sampled once per run instead of once per turn, so
-    trial pass rates can shift. Replace `resolve_as_attack(eval_results=...)`
-    with `resolve_attack_verdict(evaluation=...)`, and replace
-    `evaluate_turn_async` with `run_trace_async` and
-    `evaluate_final_trace_async`.
+    defines the end of the attack scenario. Passing the verdict evaluator
+    itself as `stop_when` stops at its first detection and reuses that check
+    as the verdict, so the final evaluation makes no extra call.
 
 ---
 
