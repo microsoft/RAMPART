@@ -17,8 +17,6 @@ from rampart.core.result import (
     SafetyStatus,
     _explain_undetermined,
     _summarize_undetermined_operands,
-    resolve_as_attack,
-    resolve_as_probe,
     resolve_attack_verdict,
     resolve_probe_verdict,
 )
@@ -352,7 +350,7 @@ class TestPopulationRef:
 
 
 class TestResultTurnEvaluationsProperty:
-    """Turn evaluations remain separate from the terminal evaluation."""
+    """Turn evaluations remain separate from the final-trace evaluation."""
 
     def test_removed_eval_results_property_is_absent(self) -> None:
         assert not hasattr(_result(SafetyStatus.SAFE), "eval_results")
@@ -427,122 +425,6 @@ class TestResultTurnEvaluationsProperty:
         )
         assert r.turn_evaluations == [turn_evaluation]
         assert r.final_trace_evaluation is final
-
-
-class TestResolveAsAttack:
-    def test_empty_returns_error(self) -> None:
-        status = resolve_as_attack(eval_results=[])
-        assert status is SafetyStatus.ERROR
-
-    def test_detected_returns_unsafe(self) -> None:
-        status = resolve_as_attack(
-            eval_results=[_er(EvalOutcome.DETECTED)],
-        )
-        assert status is SafetyStatus.UNSAFE
-
-    def test_not_detected_returns_safe(self) -> None:
-        status = resolve_as_attack(
-            eval_results=[_er(EvalOutcome.NOT_DETECTED)],
-        )
-        assert status is SafetyStatus.SAFE
-
-    def test_undetermined_only_returns_undetermined(self) -> None:
-        status = resolve_as_attack(
-            eval_results=[_er(EvalOutcome.UNDETERMINED)],
-        )
-        assert status is SafetyStatus.UNDETERMINED
-
-    def test_mixed_detected_and_undetermined_returns_unsafe(self) -> None:
-        status = resolve_as_attack(
-            eval_results=[
-                _er(EvalOutcome.UNDETERMINED),
-                _er(EvalOutcome.DETECTED),
-            ],
-        )
-        assert status is SafetyStatus.UNSAFE
-
-    def test_mixed_not_detected_and_undetermined_returns_undetermined(self) -> None:
-        status = resolve_as_attack(
-            eval_results=[
-                _er(EvalOutcome.NOT_DETECTED),
-                _er(EvalOutcome.UNDETERMINED),
-            ],
-        )
-        assert status is SafetyStatus.UNDETERMINED
-
-    def test_all_not_detected_returns_safe(self) -> None:
-        status = resolve_as_attack(
-            eval_results=[
-                _er(EvalOutcome.NOT_DETECTED),
-                _er(EvalOutcome.NOT_DETECTED),
-            ],
-        )
-        assert status is SafetyStatus.SAFE
-
-    def test_rejects_malformed_runtime_outcome(self) -> None:
-        malformed = EvalResult(
-            outcome="detected",  # ty: ignore[invalid-argument-type]
-        )
-        with pytest.raises(ValueError, match="Unknown EvalOutcome"):
-            resolve_as_attack(eval_results=[malformed])
-
-
-class TestResolveAsProbe:
-    def test_empty_returns_error(self) -> None:
-        status = resolve_as_probe(eval_results=[])
-        assert status is SafetyStatus.ERROR
-
-    def test_detected_returns_safe(self) -> None:
-        status = resolve_as_probe(
-            eval_results=[_er(EvalOutcome.DETECTED)],
-        )
-        assert status is SafetyStatus.SAFE
-
-    def test_not_detected_returns_unsafe(self) -> None:
-        status = resolve_as_probe(
-            eval_results=[_er(EvalOutcome.NOT_DETECTED)],
-        )
-        assert status is SafetyStatus.UNSAFE
-
-    def test_undetermined_only_returns_undetermined(self) -> None:
-        status = resolve_as_probe(
-            eval_results=[_er(EvalOutcome.UNDETERMINED)],
-        )
-        assert status is SafetyStatus.UNDETERMINED
-
-    def test_mixed_not_detected_and_undetermined_returns_unsafe(self) -> None:
-        status = resolve_as_probe(
-            eval_results=[
-                _er(EvalOutcome.UNDETERMINED),
-                _er(EvalOutcome.NOT_DETECTED),
-            ],
-        )
-        assert status is SafetyStatus.UNSAFE
-
-    def test_mixed_detected_and_undetermined_returns_undetermined(self) -> None:
-        status = resolve_as_probe(
-            eval_results=[
-                _er(EvalOutcome.DETECTED),
-                _er(EvalOutcome.UNDETERMINED),
-            ],
-        )
-        assert status is SafetyStatus.UNDETERMINED
-
-    def test_all_detected_returns_safe(self) -> None:
-        status = resolve_as_probe(
-            eval_results=[
-                _er(EvalOutcome.DETECTED),
-                _er(EvalOutcome.DETECTED),
-            ],
-        )
-        assert status is SafetyStatus.SAFE
-
-    def test_rejects_malformed_runtime_outcome(self) -> None:
-        malformed = EvalResult(
-            outcome="detected",  # ty: ignore[invalid-argument-type]
-        )
-        with pytest.raises(ValueError, match="Unknown EvalOutcome"):
-            resolve_as_probe(eval_results=[malformed])
 
 
 class TestSummarizeUndeterminedOperands:
@@ -818,6 +700,14 @@ class TestExplainUndetermined:
 
 
 class TestResolveAttackVerdict:
+    def test_aggregate_resolver_is_not_exported(self) -> None:
+        import rampart
+        from rampart import core
+        from rampart.core import result
+
+        for module in (rampart, core, result):
+            assert not hasattr(module, "resolve_as_attack")
+
     @pytest.mark.parametrize(
         ("evaluation", "expected"),
         [
@@ -842,6 +732,14 @@ class TestResolveAttackVerdict:
 
 
 class TestResolveProbeVerdict:
+    def test_aggregate_resolver_is_not_exported(self) -> None:
+        import rampart
+        from rampart import core
+        from rampart.core import result
+
+        for module in (rampart, core, result):
+            assert not hasattr(module, "resolve_as_probe")
+
     @pytest.mark.parametrize(
         ("evaluation", "expected"),
         [

@@ -4,4 +4,5 @@
     options:
       members:
         - Attacks
+        - StopWhen
         - XPIAExecution

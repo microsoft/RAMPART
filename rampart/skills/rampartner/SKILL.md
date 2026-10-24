@@ -271,7 +271,7 @@ Recheck it when making a recommendation.
 | Check desired behavior | `Probes.behavior` with a prompt, prompt sequence, or driver | An evaluator detects the desired condition; detection means SAFE. |
 | Test indirect prompt injection | `Attacks.xpia` with injected surfaces or `Request` attachments | Keep the user trigger benign; the test content enters through the lower-trust surface. The adapter must actually deliver attachments or retrieve the injected content. |
 | Inspect observable behavior | `ResponseContains`, `ToolCalled`, `SideEffectOccurred`, `LLMJudge` | Choose evidence before the evaluator. An LLM judge adds configuration, cost, and uncertainty; it does not create missing telemetry. |
-| Drive conversations | `StaticDriver`, `LLMDriver`, or a custom `PromptDriver` | Built-in executions support multiple turns but may stop early on detection. A turn limit is not a promise to execute every planned turn. |
+| Drive conversations | `StaticDriver`, `LLMDriver`, or a custom `PromptDriver` | Built-in executions support multiple turns and evaluate the verdict once over the completed trace. Probes run the whole sequence unless `stop_when` is set; XPIA stops early only for stable built-in evaluators or an explicit `stop_when`. A turn limit is not a promise to execute every planned turn. |
 | Deliver payloads | `OneDriveSurface`, `DocxConverter`, or custom protocols | OneDrive requires its optional extra and authorized credentials. Do not describe Slack, SharePoint, or other mentioned services as built-in integrations without verifying an implementation. |
 | Integrate with pytest | Automatic result collection, harm markers, execution-level trials, report sinks | A harm category is a label, not a test suite or attack implementation. JSON output requires a registered sink. |
 
@@ -403,8 +403,10 @@ Agree on behavior, evidence, lifecycle, stopping/budget limits, and scope first.
 Inspect version-matched `BaseExecution`, public exports, and extension docs.
 Where supported, implement `strategy_name` and `_execute_async`, call
 `super().__init__`, and retain inherited `execute_async` so timing, error handling,
-and result collection remain wired. Reuse `evaluate_turn_async` and the appropriate
-`resolve_as_attack` or `resolve_as_probe`; teach their opposite detection meanings.
+and result collection remain wired. Reuse `run_trace_async` with an optional
+`stop_when`, evaluate once with `evaluate_final_trace_async`, and map the result
+with `resolve_attack_verdict` or `resolve_probe_verdict`; teach their opposite
+detection meanings.
 Preserve real observability, required delivery checks, cleanup, and fresh state.
 Do not assume a verdict resolver supplies missing exposure checks automatically.
 
