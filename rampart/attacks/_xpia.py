@@ -132,7 +132,7 @@ class XPIAExecution(BaseExecution):
         *,
         adapter: AgentAdapter,
     ) -> tuple[TraceRun, EvalResult | None]:
-        """Run XPIA phases 1-5 inside a cleanup-guaranteed context.
+        """Run XPIA phases 1-6 inside a cleanup-guaranteed context.
 
         Args:
             adapter (AgentAdapter): The agent adapter.

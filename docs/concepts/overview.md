@@ -76,7 +76,7 @@ sequenceDiagram
         Strat->>Strat: driver.next_prompt_async(history)
         Strat->>Adapter: session.send_async(request)
         Adapter-->>Strat: Response
-        opt Explicit online stop condition
+        opt Online stop condition
             Strat->>Eval: evaluate_async(prefix context)
             Eval-->>Strat: stop EvalResult
             Note over Strat: Stop if detected

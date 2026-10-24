@@ -263,3 +263,5 @@ This only fires when all three conditions hold:
 3. Zero tool calls were observed
 
 It is a backstop for evaluators that cannot say up front what evidence they need, such as `LLMJudge`, where the answer depends on the objective. `ToolCalled` and `SideEffectOccurred` return `UNDETERMINED` themselves, so on their own they do not reach this check as `SAFE`. A composition still can, so the backstop stays.
+
+When the adjustment fires, `result.metadata["observability_adjusted"]` is `True`, so reports can distinguish a downgraded verdict from one the evaluator produced directly.

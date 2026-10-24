@@ -26,7 +26,8 @@ class StopWhen(StrEnum):
     Attributes:
         AUTO: Reuse the verdict evaluator as the online stop condition only
             when its detection is known to stay true as turns are appended.
-            Other evaluators run without online stopping.
+            This applies to built-in evaluators; subclasses and custom
+            evaluators run without online stopping unless passed explicitly.
     """
 
     AUTO = "auto"
