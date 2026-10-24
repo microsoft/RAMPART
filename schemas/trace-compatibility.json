@@ -3,6 +3,6 @@
   "contract_sha256": "f3cc87fce1006b240a376b167ad1d874b6219c9aaea23a30063a0b4c232edb1a",
   "previous_contract_sha256": "828c2783d81d06185caeeef1a7ff83e025d9470d3c9dc894a6a555e555c47ed9",
   "decision": "compatible",
-  "rationale": "Removes the list-based resolve_as_probe helper and updates Result documentation. Result fields, canonical serialization, and published schemas are unchanged, so existing v2 records remain valid.",
+  "rationale": "Behavioral probes now compute verdicts from a final-trace evaluation rather than aggregating prefix evaluations. This changes execution policy, not the canonical record contract: status remains the producing strategy's safety verdict, and final_trace_evaluation, trace_end_reason, and online evaluation provenance retain their existing v2 meanings and absence semantics. Probes now populate those previously defined fields. Existing v2 records remain valid and must not be reinterpreted as final-trace-evaluated runs. Removing resolve_as_probe changes the Python API, not the serialized contract. The separate xdist envelope moves to v3 to reject workers using the previous probe semantics within the same distributed run.",
   "migration_note": null
 }

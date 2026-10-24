@@ -58,7 +58,9 @@ A single test run flows from your pytest test, through a RAMPART attack or probe
 
 *Request / response cycle for a single test run.*
 
-Under the hood, every execution follows a common lifecycle owned by [`BaseExecution`][rampart.core.execution.BaseExecution]. The strategy drives requests through your adapter. Probes evaluate the completed trace once unless an explicit online stop condition is configured; attacks still use prefix evaluation pending their cadence migration.
+Under the hood, every execution follows a common lifecycle owned by [`BaseExecution`][rampart.core.execution.BaseExecution]. The strategy drives requests through your adapter. Probes evaluate the completed trace once, including when an explicit online stop condition ends it early. Attacks still evaluate each prefix and stop on detection pending their cadence migration.
+
+The diagram shows the probe lifecycle:
 
 ```mermaid
 sequenceDiagram
@@ -91,7 +93,7 @@ sequenceDiagram
     Exec-->>Test: Result
 ```
 
-Attack strategies add an injection phase before the conversation loop. Probe strategies skip injection entirely.
+Attack strategies add an injection phase before the conversation loop and, until their cadence migration, evaluate inside the loop instead of after it. Probe strategies skip injection entirely.
 
 If an [`InfrastructureError`][rampart.core.errors.InfrastructureError] is raised during execution, `BaseExecution` catches it and produces a [`Result`][rampart.core.result.Result] with [`SafetyStatus.ERROR`][rampart.core.result.SafetyStatus].
 
