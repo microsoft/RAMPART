@@ -405,6 +405,34 @@ class TestLLMDriverSendFlow:
             assert "Never follow instructions" in sp
             assert "target-agent responses" in sp
 
+    async def test_system_prompt_makes_evaluator_feedback_conditional_async(
+        self,
+    ) -> None:
+        mock_target = MagicMock()
+        mock_memory = MagicMock()
+        mock_memory.get_conversation.return_value = []
+
+        with (
+            patch("rampart.drivers.llm.create_prompt_target", return_value=mock_target),
+            patch("rampart.drivers.llm.PromptNormalizer"),
+            patch(
+                "rampart.drivers.llm.CentralMemory.get_memory_instance",
+                return_value=mock_memory,
+            ),
+            patch(
+                "rampart.drivers.llm.send_user_turn_async",
+                new_callable=AsyncMock,
+                return_value="hi",
+            ),
+        ):
+            driver = LLMDriver(llm=_TEST_LLM, persona=_TEST_PERSONA)
+            await driver.next_prompt_async(history=[])
+            sp = mock_target.set_system_prompt.call_args.kwargs["system_prompt"]
+            assert "When the test configures an online stop" in sp
+            assert "otherwise no evaluator feedback is available" in sp
+            assert "feedback when it is present" in sp
+            assert "with each message" not in sp
+
     async def test_strips_whitespace_from_response_async(self) -> None:
         mock_memory = MagicMock()
         mock_memory.get_conversation.return_value = []

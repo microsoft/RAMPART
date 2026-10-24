@@ -55,8 +55,8 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-SCHEMA_VERSION: str = "rampart.xdist.v2"
-WORKEROUTPUT_KEY: str = "rampart_xdist_v2"
+SCHEMA_VERSION: str = "rampart.xdist.v3"
+WORKEROUTPUT_KEY: str = "rampart_xdist_v3"
 REPORT_RESULTS_ATTR: str = "_rampart_results"
 SIZE_LIMIT_OPTION: str = "rampart_xdist_max_bytes"
 DEFAULT_SIZE_LIMIT_BYTES: int = 16 * 1024 * 1024
@@ -494,7 +494,7 @@ def _serialize_population_ref(
 def _serialize_result(*, result: Result, nodeid: str) -> dict[str, Any]:
     """Serialize a Result to a JSON-safe dict for the xdist transport.
 
-    This full-fidelity transport projection round-trips terminal and online
+    This full-fidelity transport projection round-trips final-trace and online
     evaluation provenance together with trial-population attribution. It
     intentionally differs from the flatter public report shape produced by
     ``JsonFileReportSink._serialize_result``. The two projections are
