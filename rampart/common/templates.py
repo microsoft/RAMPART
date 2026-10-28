@@ -7,6 +7,8 @@
 compiles its Jinja source internally. ``PromptTemplate.from_yaml`` is the
 filesystem and YAML adapter used by RAMPART's built-in drivers and evaluators.
 Every render call must provide exactly the definition's declared parameters.
+Templates are compiled in a Jinja sandbox, so unsafe attribute access fails
+at render time instead of executing arbitrary Python.
 """
 
 from __future__ import annotations
@@ -16,7 +18,6 @@ from typing import TYPE_CHECKING, Annotated, TypeAlias, TypeVar, final
 
 import yaml
 from jinja2 import (
-    Environment,
     StrictUndefined,
     Template,
     TemplateError,
@@ -24,6 +25,7 @@ from jinja2 import (
     meta,
     select_autoescape,
 )
+from jinja2.sandbox import SandboxedEnvironment
 from pydantic import (
     AfterValidator,
     BaseModel,
@@ -46,7 +48,10 @@ if TYPE_CHECKING:
     from typing import Self
 
 
-_JINJA_ENVIRONMENT = Environment(
+# Sandboxed because PromptTemplate is public and may receive untrusted source;
+# a plain Environment lets literal-only payloads such as
+# ``{{ ''.__class__.__mro__ }}`` reach arbitrary Python.
+_JINJA_ENVIRONMENT = SandboxedEnvironment(
     autoescape=select_autoescape(default_for_string=False, default=False),
     undefined=StrictUndefined,
 )
@@ -210,6 +215,9 @@ class PromptTemplate:
         Raises:
             TemplateParameterError: If any declared key is missing or any
                 undeclared key is provided.
+            jinja2.exceptions.SecurityError: If the template attempts an
+                operation that the Jinja sandbox forbids, such as accessing
+                private or dunder attributes.
         """
         expected = frozenset(self.parameter_keys)
         provided = frozenset(kwargs)
