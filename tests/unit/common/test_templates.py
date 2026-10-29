@@ -7,6 +7,7 @@ from textwrap import dedent
 import pytest
 import yaml
 from jinja2 import TemplateSyntaxError
+from jinja2.exceptions import SecurityError
 from pydantic import ValidationError
 
 from rampart.common.templates import (
@@ -175,6 +176,62 @@ class TestPromptTemplateConstruction:
             "parameter_keys=('subject',))"
         )
         assert "Hidden prompt" not in repr(template)
+
+
+class TestPromptTemplateSandbox:
+    @pytest.mark.parametrize(
+        "value",
+        [
+            pytest.param("{{ ''.__class__.__mro__ }}", id="dunder-attribute"),
+            pytest.param(
+                "{{ ().__class__.__base__.__subclasses__() }}",
+                id="subclasses-call",
+            ),
+            pytest.param("{{ ''|attr('__class__') }}", id="attr-filter"),
+            pytest.param("{{ ''['__class__'] }}", id="subscript"),
+            pytest.param("{{ '{0.__class__}'.format('') }}", id="str-format"),
+        ],
+    )
+    def test_rejects_literal_only_attribute_traversal(self, value: str) -> None:
+        template = PromptTemplate(
+            definition=PromptTemplateDefinition(
+                name="Gadget",
+                parameters=(),
+                value=value,
+            ),
+        )
+
+        with pytest.raises(SecurityError, match="__class__"):
+            template.render()
+
+    def test_rejects_attribute_traversal_on_parameter(self) -> None:
+        template = PromptTemplate(
+            definition=PromptTemplateDefinition(
+                name="Gadget",
+                parameters=("subject",),
+                value="{{ subject.__class__.__mro__ }}",
+            ),
+        )
+
+        with pytest.raises(SecurityError, match="__class__"):
+            template.render(subject="Ada")
+
+    def test_allows_public_attribute_access_on_mapping_items(self) -> None:
+        template = PromptTemplate(
+            definition=PromptTemplateDefinition(
+                name="Injections",
+                parameters=("injections",),
+                value=(
+                    "{% for item in injections %}"
+                    "{{ item.format }}:{{ item.id }}"
+                    "{% endfor %}"
+                ),
+            ),
+        )
+
+        rendered = template.render(injections=[{"format": "docx", "id": "p1"}])
+
+        assert rendered == "docx:p1"
 
 
 class TestPromptTemplateDefinition:
