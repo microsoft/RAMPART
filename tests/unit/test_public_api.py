@@ -51,6 +51,7 @@ if heavy_modules:
         ("LLMDriver", "rampart.drivers.llm", "LLMDriver"),
         ("LLMJudge", "rampart.evaluators", "LLMJudge"),
         ("Probes", "rampart.probes", "Probes"),
+        ("StopWhen", "rampart.attacks", "StopWhen"),
         ("TranscriptScope", "rampart.evaluators", "TranscriptScope"),
     ],
 )

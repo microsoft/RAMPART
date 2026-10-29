@@ -11,7 +11,7 @@ API reference organized by RAMPART's package layout. Each page documents the pub
 |------|----------|
 | [Core Types](core-types.md) | `Payload`, `Request`, `Response`, `Turn`, `Result`, `SafetyStatus`, `HarmCategory`, and more |
 | [Core Protocols](core-protocols.md) | `Session`, `AgentAdapter`, `Evaluator`, `Surface`, `InjectionHandle`, and more |
-| [Attacks](attacks.md) | `Attacks.xpia()`, `XPIAExecution` |
+| [Attacks](attacks.md) | `Attacks.xpia()`, `StopWhen`, `XPIAExecution` |
 | [Probes](probes.md) | `Probes.behavior()`, `SingleTurnExecution` |
 | [Evaluators](evaluators.md) | `ToolCalled`, `ResponseContains`, `ResponseScope`, `SideEffectOccurred`, `LLMJudge`, `TranscriptScope` |
 | [Drivers](drivers.md) | `StaticDriver`, `LLMDriver` |
