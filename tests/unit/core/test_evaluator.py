@@ -149,6 +149,12 @@ class TestAbsorbingDetectionClassification:
 
         assert detected_is_absorbing(StructuralEvaluator()) is False
 
+    def test_subclass_of_builtin_is_not_absorbing(self) -> None:
+        class CustomToolCalled(ToolCalled):
+            pass
+
+        assert detected_is_absorbing(CustomToolCalled("send")) is False
+
 
 class TestOrComposition:
     async def test_left_detected_short_circuits_async(self) -> None:

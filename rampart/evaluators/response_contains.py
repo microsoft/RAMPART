@@ -20,8 +20,10 @@ class ResponseScope(Enum):
     """Which responses in the transcript the evaluator inspects.
 
     Scope applies only to turns already present in ``EvalContext``. It does
-    not control how many turns an execution produces or whether execution
-    stops early.
+    not change how many turns a probe produces. Under XPIA's default
+    ``StopWhen.AUTO``, only ``ANY_TURN`` detection is stable as the trace grows,
+    so only that scope is eligible for automatic early stopping; pass
+    ``stop_when=None`` when the whole planned sequence must run.
 
     Attributes:
         ANY_TURN: Detect when at least one response matches.

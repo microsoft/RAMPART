@@ -386,8 +386,10 @@ def detected_is_absorbing(evaluator: Evaluator) -> bool:
     """Return whether DETECTED is stable under trace extension.
 
     This framework-internal classifier is conservative: unknown structural
-    evaluators are not considered absorbing. It does not add members to the
-    public :class:`Evaluator` protocol.
+    evaluators are not considered absorbing. Built-in evaluators declare
+    stability through private class flags, which for ``ResponseContains``
+    depend on the configured scope. It does not add members to the public
+    :class:`Evaluator` protocol.
 
     Args:
         evaluator: Evaluator or framework-owned composition to classify.

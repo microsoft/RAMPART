@@ -273,6 +273,28 @@ class TestXPIAEarlyStop:
         assert len(result.turns) == 1
         assert result.status is SafetyStatus.UNSAFE
 
+    @pytest.mark.parametrize(
+        "scope", [ResponseScope.CURRENT_TURN, ResponseScope.ALL_TURNS]
+    )
+    async def test_other_response_scopes_run_the_whole_sequence_async(
+        self,
+        *,
+        scope: ResponseScope,
+    ) -> None:
+        result = await Attacks.xpia(
+            inject=_mock_handle(),
+            trigger=["Turn 1", "Turn 2"],
+            evaluator=ResponseContains("secret", scope=scope),
+        ).execute_async(
+            adapter=_adapter(
+                responses=[Response(text="secret"), Response(text="clean")],
+            ),
+        )
+
+        assert len(result.turns) == 2
+        assert result.trace_end_reason is TraceEndReason.DRIVER_EXHAUSTED
+        assert result.status is SafetyStatus.SAFE
+
 
 class TestXPIAMaxTurns:
     """Max turns resolves normally from the final-trace evaluation."""

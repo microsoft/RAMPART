@@ -165,10 +165,13 @@ The `&` above asks whether both happened, so one condition that definitively did
     [Temporal Scope table](../usage/authoring-tests.md#temporal-scope).
     Use `CURRENT_TURN` only when earlier responses should be ignored.
 
-    XPIA verdict evaluators receive the final trace. Automatic stopping is
-    enabled only when detection is known to remain true as the trace grows.
-    Scope applies only to turns in the evaluator context; it does not control
-    execution length or early stopping.
+    XPIA verdict evaluators receive the final trace. Scope defines which turns
+    in the evaluator context are matched, and under the default `StopWhen.AUTO`
+    it also decides eligibility for automatic stopping: only `ANY_TURN`
+    detection stays true as the trace grows, so only that scope stops early.
+    `CURRENT_TURN` and `ALL_TURNS` run to the end of the trigger sequence or
+    `max_turns`. Pass `stop_when=None` when the whole planned sequence must run
+    regardless of scope.
 
 ### LLMDriver for Adaptive Triggers
 
