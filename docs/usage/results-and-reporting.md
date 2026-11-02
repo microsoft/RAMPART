@@ -65,9 +65,13 @@ Behavioral probes evaluate the completed trace once by default. Their
 `Result.turn_evaluations` is normally empty. Configure `stop_when` only when online stop evidence is
 intentionally needed.
 
-Strategies that do not record a final-trace verdict leave
-`final_trace_evaluation` and `trace_end_reason` as `None`; manually constructed
-and error results may do the same intentionally.
+XPIA also derives its verdict from the final trace. Its automatic stopping
+policy collects online evidence only when detection is known to remain true as
+the trace grows; an explicit `stop_when` overrides that policy.
+
+Built-in probes and XPIA record final-trace evaluation and trace-end provenance
+for nonempty successful runs. Manually constructed, custom-strategy, and error
+results may intentionally leave those fields as `None`.
 
 Online evaluations attached to turns are available as
 `result.turn_evaluations`; this list excludes the final-trace evaluation.

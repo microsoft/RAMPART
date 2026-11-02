@@ -36,7 +36,6 @@ available from `rampart.core`; established result types remain importable from
         - InjectionRecord
         - resolve_attack_verdict
         - resolve_probe_verdict
-        - resolve_as_attack
 
 ## Configuration
 
