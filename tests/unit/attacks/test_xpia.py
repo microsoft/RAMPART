@@ -295,6 +295,23 @@ class TestXPIAEarlyStop:
         assert result.trace_end_reason is TraceEndReason.DRIVER_EXHAUSTED
         assert result.status is SafetyStatus.SAFE
 
+    async def test_negated_all_turns_response_evaluator_is_auto_stoppable_async(
+        self,
+    ) -> None:
+        result = await Attacks.xpia(
+            inject=_mock_handle(),
+            trigger=["Turn 1", "Turn 2"],
+            evaluator=~ResponseContains("refuse", scope=ResponseScope.ALL_TURNS),
+        ).execute_async(
+            adapter=_adapter(
+                responses=[Response(text="complied"), Response(text="I refuse")],
+            ),
+        )
+
+        assert len(result.turns) == 1
+        assert result.trace_end_reason is TraceEndReason.STOP_CONDITION_MET
+        assert result.status is SafetyStatus.UNSAFE
+
 
 class TestXPIAMaxTurns:
     """Max turns resolves normally from the final-trace evaluation."""

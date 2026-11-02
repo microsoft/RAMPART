@@ -21,9 +21,10 @@ class ResponseScope(Enum):
 
     Scope applies only to turns already present in ``EvalContext``. It does
     not change how many turns a probe produces. Under XPIA's default
-    ``StopWhen.AUTO``, only ``ANY_TURN`` detection is stable as the trace grows,
-    so only that scope is eligible for automatic early stopping; pass
-    ``stop_when=None`` when the whole planned sequence must run.
+    ``StopWhen.AUTO``, an unnegated ``ANY_TURN`` or a negated ``ALL_TURNS`` is
+    eligible for automatic early stopping, because that detection stays true as
+    the trace grows; pass ``stop_when=None`` when the whole planned sequence
+    must run.
 
     Attributes:
         ANY_TURN: Detect when at least one response matches.

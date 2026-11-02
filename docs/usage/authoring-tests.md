@@ -160,9 +160,10 @@ latest-response behavior is intentional.
 
 Scope quantifies only the turns present in the evaluator's `EvalContext`.
 It does not change how many turns a probe produces. For XPIA, the default
-`StopWhen.AUTO` uses scope to decide eligibility for automatic stopping: only
-`ANY_TURN` is eligible, so pass `stop_when=None` when the whole planned
-sequence must run. Every scope rejects an empty context.
+`StopWhen.AUTO` uses scope to decide eligibility for automatic stopping: an
+unnegated `ANY_TURN` or a negated `ALL_TURNS` is eligible, because their
+detection stays true as the trace grows; pass `stop_when=None` when the whole
+planned sequence must run. Every scope rejects an empty context.
 
 Matching evidence identifies the recorded, zero-indexed turn numbers, for
 example `Pattern found on turn(s): 0, 2`. `CURRENT_TURN` uses the same format
@@ -249,8 +250,9 @@ judge = LLMJudge(
 
 Use `TranscriptScope.FULL` when evidence from any earlier turn must affect the
 verdict. `CURRENT_TURN` intentionally gives the judge only the latest response.
-`TranscriptScope` never affects how many turns an execution produces: an LLM
-judge is not eligible for automatic stopping under any scope.
+`TranscriptScope` does not affect eligibility for automatic stopping: LLM judges
+are never selected by `StopWhen.AUTO`. If you explicitly pass a judge as
+`stop_when`, its scoped judgment determines whether the trace stops.
 
 **Custom persona.** The default judge identity is [`NEUTRAL_EVALUATOR`][rampart.evaluators.personas.NEUTRAL_EVALUATOR] — an impartial, literal evaluator. Override it when a different lens is useful:
 

@@ -167,11 +167,13 @@ The `&` above asks whether both happened, so one condition that definitively did
 
     XPIA verdict evaluators receive the final trace. Scope defines which turns
     in the evaluator context are matched, and under the default `StopWhen.AUTO`
-    it also decides eligibility for automatic stopping: only `ANY_TURN`
-    detection stays true as the trace grows, so only that scope stops early.
-    `CURRENT_TURN` and `ALL_TURNS` run to the end of the trigger sequence or
-    `max_turns`. Pass `stop_when=None` when the whole planned sequence must run
-    regardless of scope.
+    it also decides eligibility for automatic stopping. Detection must stay
+    true as the trace grows: for an unnegated `ResponseContains` only
+    `ANY_TURN` qualifies, and negation swaps this, so `~ResponseContains(...,
+    scope=ResponseScope.ALL_TURNS)` (the example above) also stops early. Other
+    combinations run to the end of the trigger sequence or `max_turns`. Pass
+    `stop_when=None` when the whole planned sequence must run regardless of
+    scope.
 
 ### LLMDriver for Adaptive Triggers
 
