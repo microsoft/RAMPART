@@ -28,7 +28,7 @@ import json
 import logging
 import shutil
 import tempfile
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 from typing import Any
 
 from rampart.core.types import Payload, PayloadFormat
@@ -232,6 +232,7 @@ class PayloadStore:
             not name
             or name in {".", ".."}
             or any(separator in name for separator in ("/", "\\"))
+            or bool(PureWindowsPath(name).drive)
         )
         is_windows_alias = (
             name.endswith((".", " ")) or basename in _WINDOWS_RESERVED_BASENAMES

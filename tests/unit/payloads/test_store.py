@@ -5,6 +5,7 @@
 
 import json
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
@@ -165,6 +166,20 @@ class TestPayloadStoreCollectionManagement:
 
         with pytest.raises(ValueError, match="Invalid collection name"):
             store.manifest("..")
+
+    @pytest.mark.parametrize("name", ["C:", "C:outside"])
+    def test_rejects_windows_drive_relative_names(
+        self,
+        store: PayloadStore,
+        name: str,
+    ) -> None:
+        with patch("rampart.payloads._store.shutil.rmtree") as remove:
+            with pytest.raises(ValueError, match="Invalid collection name"):
+                store.delete(name)
+            remove.assert_not_called()
+
+        with pytest.raises(ValueError, match="Invalid collection name"):
+            store.manifest(name)
 
     @pytest.mark.parametrize("alias", ["victim.", "victim...", "victim "])
     def test_delete_rejects_windows_trailing_alias(
