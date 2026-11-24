@@ -1479,7 +1479,7 @@ def finalize_worker(
         return
     workeroutput = cast(
         "dict[str, Any]",
-        config.workeroutput,  # ty: ignore[unresolved-attribute]
+        config.workeroutput,  # ty: ignore[missing-attribute]
     )
     workeroutput[WORKEROUTPUT_KEY] = serialize_worker_data(
         streamed_result_count=streamed_result_count,
