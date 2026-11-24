@@ -158,7 +158,7 @@ external = ["RMP001", "RMP002"]
   "magic-value-comparison",                            # magic values in assertions are fine
   "manual-list-comprehension",
   "missing-return-type-private-function",
-  "missing-return-type-undocumented-public-function",
+  "missing-return-type-public-function",
   "missing-type-function-argument",
   "no-self-use",                                       # allow pytest fixtures in tests
   "private-member-access",                             # testing private members is valid
